@@ -1,0 +1,11 @@
+This is the dvbs2rx-write-a-block package meant as a guide to building
+out-of-tree packages. To use the dvbs2rx blocks, the Python namespaces
+is in 'dvbs2rx', which is imported as:
+
+    import dvbs2rx
+
+See the Doxygen documentation for details about the blocks available
+in this package. A quick listing of the details can be found in Python
+after importing by using:
+
+    help(dvbs2rx)
