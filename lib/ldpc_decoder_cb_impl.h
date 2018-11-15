@@ -40,6 +40,7 @@ namespace gr {
       unsigned int signal_constellation;
       unsigned int code_rate;
       unsigned int nbch;
+      unsigned int q_val;
       unsigned int dvb_standard;
       unsigned int output_mode;
       unsigned int frame;
@@ -53,6 +54,31 @@ namespace gr {
       unsigned int rowaddr7;
       LDPCInterface<int8_t> *ldpc;
       Modulation<gr_complex, int8_t> *mod;
+
+      const static int twist16n[8];
+      const static int twist64n[12];
+      const static int twist256n[16];
+
+      const static int twist16s[8];
+      const static int twist64s[12];
+      const static int twist256s[8];
+
+      const static int mux16[8];
+      const static int mux64[12];
+      const static int mux256[16];
+
+      const static int mux16_35[8];
+      const static int mux16_13[8];
+      const static int mux16_25[8];
+      const static int mux64_35[12];
+      const static int mux64_13[12];
+      const static int mux64_25[12];
+      const static int mux256_35[16];
+      const static int mux256_23[16];
+
+      const static int mux256s[8];
+      const static int mux256s_13[8];
+      const static int mux256s_25[8];
 
      public:
       ldpc_decoder_cb_impl(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_constellation_t constellation, dvb_outputmode_t outputmode);
