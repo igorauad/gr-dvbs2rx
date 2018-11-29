@@ -43,7 +43,7 @@ add_library(gnuradio-dvbs2rx SHARED ${dvbs2rx_sources})
 target_link_libraries(gnuradio-dvbs2rx ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES})
 set_target_properties(gnuradio-dvbs2rx PROPERTIES DEFINE_SYMBOL "gnuradio_dvbs2rx_EXPORTS")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11")
 
 if(APPLE)
     set_target_properties(gnuradio-dvbs2rx PROPERTIES

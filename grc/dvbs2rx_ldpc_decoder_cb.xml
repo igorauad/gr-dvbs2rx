@@ -30,7 +30,7 @@ $constellation1.val, #slurp
 #else
 $constellation2.val, #slurp
 #end if
-$outputmode.val)</make>
+$outputmode.val, $infomode.val)</make>
   <param>
     <name>Standard</name>
     <key>standard</key>
@@ -555,6 +555,21 @@ $outputmode.val)</make>
       <name>Message</name>
       <key>OM_MESSAGE</key>
       <opt>val:dvbs2rx.OM_MESSAGE</opt>
+    </option>
+  </param>
+  <param>
+    <name>Show Corrected SNR</name>
+    <key>infomode</key>
+    <type>enum</type>
+    <option>
+      <name>Off</name>
+      <key>INFO_OFF</key>
+      <opt>val:dvbs2rx.INFO_OFF</opt>
+    </option>
+    <option>
+      <name>On</name>
+      <key>INFO_ON</key>
+      <opt>val:dvbs2rx.INFO_ON</opt>
     </option>
   </param>
   <sink>

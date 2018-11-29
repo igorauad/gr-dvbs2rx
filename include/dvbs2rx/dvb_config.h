@@ -126,6 +126,11 @@ namespace gr {
       OM_MESSAGE,
     };
 
+    enum dvb_infomode_t {
+      INFO_OFF = 0,
+      INFO_ON,
+    };
+
   } // namespace dvbs2rx
 } // namespace gr
 
@@ -134,6 +139,8 @@ typedef gr::dvbs2rx::dvb_code_rate_t dvb_code_rate_t;
 typedef gr::dvbs2rx::dvb_framesize_t dvb_framesize_t;
 typedef gr::dvbs2rx::dvb_constellation_t dvb_constellation_t;
 typedef gr::dvbs2rx::dvb_guardinterval_t dvb_guardinterval_t;
+typedef gr::dvbs2rx::dvb_outputmode_t dvb_outputmode_t;
+typedef gr::dvbs2rx::dvb_infomode_t dvb_infomode_t;
 
 #endif /* INCLUDED_DVBS2RX_DVB_CONFIG_H */
 

@@ -47,7 +47,7 @@ namespace gr {
        * class. dvbs2rx::ldpc_decoder_cb::make is the public interface for
        * creating new instances.
        */
-      static sptr make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_constellation_t constellation, dvb_outputmode_t outputmode);
+      static sptr make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_constellation_t constellation, dvb_outputmode_t outputmode, dvb_infomode_t infomode);
     };
 
   } // namespace dvbs2rx

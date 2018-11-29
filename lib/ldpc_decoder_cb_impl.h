@@ -29,6 +29,21 @@
 #include "dvb_s2_tables.hh"
 #include "dvb_s2x_tables.hh"
 #include "dvb_t2_tables.hh"
+#include "simd.hh"
+#include "algorithms.hh"
+
+#ifdef __AVX2__
+const int SIZEOF_SIMD = 32;
+#else
+const int SIZEOF_SIMD = 16;
+#endif
+
+typedef int8_t code_type;
+const int SIMD_WIDTH = SIZEOF_SIMD / sizeof(code_type);
+typedef SIMD<code_type, SIMD_WIDTH> simd_type;
+
+typedef SelfCorrectedUpdate<simd_type> update_type;
+typedef MinSumAlgorithm<simd_type, update_type> algorithm_type;
 
 namespace gr {
   namespace dvbs2rx {
@@ -43,7 +58,11 @@ namespace gr {
       unsigned int q_val;
       unsigned int dvb_standard;
       unsigned int output_mode;
+      unsigned int info_mode;
       unsigned int frame;
+      unsigned int chunk;
+      unsigned int total_trials;
+      float total_snr;
       unsigned int rowaddr0;
       unsigned int rowaddr1;
       unsigned int rowaddr2;
@@ -52,7 +71,7 @@ namespace gr {
       unsigned int rowaddr5;
       unsigned int rowaddr6;
       unsigned int rowaddr7;
-      LDPCInterface<int8_t> *ldpc;
+      LDPCInterface *ldpc;
       Modulation<gr_complex, int8_t> *mod;
 
       const static int twist16n[8];
@@ -81,7 +100,7 @@ namespace gr {
       const static int mux256s_25[8];
 
      public:
-      ldpc_decoder_cb_impl(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_constellation_t constellation, dvb_outputmode_t outputmode);
+      ldpc_decoder_cb_impl(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_constellation_t constellation, dvb_outputmode_t outputmode, dvb_infomode_t infomode);
       ~ldpc_decoder_cb_impl();
 
       void forecast (int noutput_items, gr_vector_int &ninput_items_required);

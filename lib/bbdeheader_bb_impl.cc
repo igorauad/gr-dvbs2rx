@@ -358,7 +358,7 @@ namespace gr {
         }
         if (check != TRUE) {
           synched = FALSE;
-          printf("bad header!!!!!\n");
+          printf("Baseband header crc failed.\n");
           i += (kbch / 8);
         }
         else {
@@ -397,7 +397,7 @@ namespace gr {
           }
           in += 8;
           if (synched == FALSE) {
-            printf("resync!!!!!!\n");
+            printf("Baseband header resynchronizing.\n");
             if (mode == INPUTMODE_NORMAL) {
               in += h->syncd + 8;
               h->dfl -= h->syncd + 8;
@@ -458,6 +458,9 @@ namespace gr {
                 }
                 count = 0;
                 h->dfl -= 8;
+                if (h->dfl == 0) {
+                  distance = (TRANSPORT_PACKET_LENGTH - 1) * 8;
+                }
               }
               if (h->dfl >= 8 && count > 0) {
                 tmp = 0;
@@ -475,6 +478,9 @@ namespace gr {
                 }
                 count++;
                 h->dfl -= 8;
+                if (h->dfl == 0) {
+                  distance = 0;
+                }
               }
             }
           }
@@ -508,6 +514,9 @@ namespace gr {
               }
               else if (count == TRANSPORT_PACKET_LENGTH) {
                 count = 0;
+                if (h->dfl == 0) {
+                  distance = 0;
+                }
               }
               if (h->dfl >= 8 && count > 0) {
                 tmp = 0;
@@ -524,15 +533,17 @@ namespace gr {
                 }
                 count++;
                 h->dfl -= 8;
+                if (h->dfl == 0) {
+                  distance = 0;
+                }
               }
             }
           }
         }
-        distance = 0;
       }
 
       if (errors != 0) {
-        printf("crc errors = %d\n", errors);
+        printf("TS packet crc errors = %d\n", errors);
       }
 
       // Tell runtime system how many input items we consumed on
