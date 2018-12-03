@@ -24,7 +24,7 @@ Author: Ron Economos
 Email: <w6rz@comcast.net>
 
 The goal of this project is to build GNU Radio blocks that implement
-the BICM (Bit-Interleaved Codec Modulation) portion of the DVB-S2 and
+the BICM (Bit-Interleaved Coded Modulation) portion of the DVB-S2 and
 DVB-T2 standards. The LDPC block is a port of the code in:
 
 https://github.com/xdsopl/LDPC
