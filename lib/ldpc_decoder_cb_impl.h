@@ -73,6 +73,11 @@ namespace gr {
       unsigned int rowaddr7;
       LDPCInterface *ldpc;
       Modulation<gr_complex, int8_t> *mod;
+      int8_t *soft;
+      int8_t *dint;
+      int8_t *tempu;
+      int8_t *tempv;
+      void *aligned_buffer;
 
       const static int twist16n[8];
       const static int twist64n[12];
