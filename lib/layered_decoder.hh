@@ -32,6 +32,7 @@ class LDPCDecoder
   uint8_t *cnc;
   ALG alg;
   int N, K, R, CNL, LT;
+  bool initialized;
 
   void reset()
   {
@@ -93,8 +94,17 @@ class LDPCDecoder
     }
   }
 public:
-  LDPCDecoder(LDPCInterface *it)
+  LDPCDecoder() : initialized(false)
   {
+  }
+  void init(LDPCInterface *it)
+  {
+    if (initialized) {
+      free(bnl);
+      delete[] cnc;
+      delete[] pos;
+    }
+    initialized = true;
     LDPCInterface *ldpc = it->clone();
     N = ldpc->code_len();
     K = ldpc->data_len();
@@ -127,9 +137,11 @@ public:
   }
   ~LDPCDecoder()
   {
-    free(bnl);
-    delete[] cnc;
-    delete[] pos;
+    if (initialized) {
+      free(bnl);
+      delete[] cnc;
+      delete[] pos;
+    }
   }
 };
 

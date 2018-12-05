@@ -615,6 +615,7 @@ namespace gr {
       tempu = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
       tempv = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
       aligned_buffer = aligned_alloc(sizeof(simd_type), sizeof(simd_type) * ldpc->code_len());
+      decode.init(ldpc);
       if (outputmode == OM_MESSAGE) {
         set_output_multiple(nbch * SIZEOF_SIMD);
       }
@@ -661,7 +662,6 @@ namespace gr {
       const int DATA_LEN = ldpc->data_len();
       const int MOD_BITS = mod->bits();
       simd_type *simd = reinterpret_cast<simd_type *>(aligned_buffer);
-      LDPCDecoder<simd_type, algorithm_type> decode(ldpc);
       int8_t tmp[MOD_BITS];
       int8_t *code;
       float sp, np, sigma, precision, snr;

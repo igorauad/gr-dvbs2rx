@@ -84,6 +84,7 @@ namespace gr {
       unsigned int rowaddr7;
       LDPCInterface *ldpc;
       Modulation<gr_complex, int8_t> *mod;
+      LDPCDecoder<simd_type, algorithm_type> decode;
       int8_t *soft;
       int8_t *dint;
       int8_t *tempu;
