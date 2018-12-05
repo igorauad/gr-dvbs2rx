@@ -278,6 +278,54 @@ inline SIMD<int64_t, 2> vdup<SIMD<int64_t, 2>>(int64_t a)
 }
 
 template <>
+inline SIMD<float, 4> vzero()
+{
+  SIMD<float, 4> tmp;
+  tmp.m = _mm_setzero_ps();
+  return tmp;
+}
+
+template <>
+inline SIMD<double, 2> vzero()
+{
+  SIMD<double, 2> tmp;
+  tmp.m = _mm_setzero_pd();
+  return tmp;
+}
+
+template <>
+inline SIMD<int8_t, 16> vzero()
+{
+  SIMD<int8_t, 16> tmp;
+  tmp.m = _mm_setzero_si128();
+  return tmp;
+}
+
+template <>
+inline SIMD<int16_t, 8> vzero()
+{
+  SIMD<int16_t, 8> tmp;
+  tmp.m = _mm_setzero_si128();
+  return tmp;
+}
+
+template <>
+inline SIMD<int32_t, 4> vzero()
+{
+  SIMD<int32_t, 4> tmp;
+  tmp.m = _mm_setzero_si128();
+  return tmp;
+}
+
+template <>
+inline SIMD<int64_t, 2> vzero()
+{
+  SIMD<int64_t, 2> tmp;
+  tmp.m = _mm_setzero_si128();
+  return tmp;
+}
+
+template <>
 inline SIMD<float, 4> vadd(SIMD<float, 4> a, SIMD<float, 4> b)
 {
   SIMD<float, 4> tmp;
@@ -402,6 +450,22 @@ inline SIMD<int16_t, 8> vqsub(SIMD<int16_t, 8> a, SIMD<int16_t, 8> b)
 {
   SIMD<int16_t, 8> tmp;
   tmp.m = _mm_subs_epi16(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<uint8_t, 16> vqsub(SIMD<uint8_t, 16> a, SIMD<uint8_t, 16> b)
+{
+  SIMD<uint8_t, 16> tmp;
+  tmp.m = _mm_subs_epu8(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<uint16_t, 8> vqsub(SIMD<uint16_t, 8> a, SIMD<uint16_t, 8> b)
+{
+  SIMD<uint16_t, 8> tmp;
+  tmp.m = _mm_subs_epu16(a.m, b.m);
   return tmp;
 }
 
@@ -618,6 +682,38 @@ inline SIMD<uint64_t, 2> vbic(SIMD<uint64_t, 2> a, SIMD<uint64_t, 2> b)
 }
 
 template <>
+inline SIMD<uint8_t, 16> vbsl(SIMD<uint8_t, 16> a, SIMD<uint8_t, 16> b, SIMD<uint8_t, 16> c)
+{
+  SIMD<uint8_t, 16> tmp;
+  tmp.m = _mm_or_si128(_mm_and_si128(a.m, b.m), _mm_andnot_si128(a.m, c.m));
+  return tmp;
+}
+
+template <>
+inline SIMD<uint16_t, 8> vbsl(SIMD<uint16_t, 8> a, SIMD<uint16_t, 8> b, SIMD<uint16_t, 8> c)
+{
+  SIMD<uint16_t, 8> tmp;
+  tmp.m = _mm_or_si128(_mm_and_si128(a.m, b.m), _mm_andnot_si128(a.m, c.m));
+  return tmp;
+}
+
+template <>
+inline SIMD<uint32_t, 4> vbsl(SIMD<uint32_t, 4> a, SIMD<uint32_t, 4> b, SIMD<uint32_t, 4> c)
+{
+  SIMD<uint32_t, 4> tmp;
+  tmp.m = _mm_or_si128(_mm_and_si128(a.m, b.m), _mm_andnot_si128(a.m, c.m));
+  return tmp;
+}
+
+template <>
+inline SIMD<uint64_t, 2> vbsl(SIMD<uint64_t, 2> a, SIMD<uint64_t, 2> b, SIMD<uint64_t, 2> c)
+{
+  SIMD<uint64_t, 2> tmp;
+  tmp.m = _mm_or_si128(_mm_and_si128(a.m, b.m), _mm_andnot_si128(a.m, c.m));
+  return tmp;
+}
+
+template <>
 inline SIMD<uint32_t, 4> vceqz(SIMD<float, 4> a)
 {
   SIMD<uint32_t, 4> tmp;
@@ -662,6 +758,55 @@ inline SIMD<uint64_t, 2> vceqz(SIMD<int64_t, 2> a)
 {
   SIMD<uint64_t, 2> tmp;
   tmp.m = _mm_cmpeq_epi64(a.m, _mm_setzero_si128());
+  return tmp;
+}
+
+
+template <>
+inline SIMD<uint32_t, 4> vceq(SIMD<float, 4> a, SIMD<float, 4> b)
+{
+  SIMD<uint32_t, 4> tmp;
+  tmp.m = (__m128i)_mm_cmpeq_ps(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<uint64_t, 2> vceq(SIMD<double, 2> a, SIMD<double, 2> b)
+{
+  SIMD<uint64_t, 2> tmp;
+  tmp.m = (__m128i)_mm_cmpeq_pd(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<uint8_t, 16> vceq(SIMD<int8_t, 16> a, SIMD<int8_t, 16> b)
+{
+  SIMD<uint8_t, 16> tmp;
+  tmp.m = _mm_cmpeq_epi8(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<uint16_t, 8> vceq(SIMD<int16_t, 8> a, SIMD<int16_t, 8> b)
+{
+  SIMD<uint16_t, 8> tmp;
+  tmp.m = _mm_cmpeq_epi16(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<uint32_t, 4> vceq(SIMD<int32_t, 4> a, SIMD<int32_t, 4> b)
+{
+  SIMD<uint32_t, 4> tmp;
+  tmp.m = _mm_cmpeq_epi32(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<uint64_t, 2> vceq(SIMD<int64_t, 2> a, SIMD<int64_t, 2> b)
+{
+  SIMD<uint64_t, 2> tmp;
+  tmp.m = _mm_cmpeq_epi64(a.m, b.m);
   return tmp;
 }
 
@@ -798,6 +943,46 @@ inline SIMD<int32_t, 4> vmin(SIMD<int32_t, 4> a, SIMD<int32_t, 4> b)
 {
   SIMD<int32_t, 4> tmp;
   tmp.m = _mm_min_epi32(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<float, 4> vmax(SIMD<float, 4> a, SIMD<float, 4> b)
+{
+  SIMD<float, 4> tmp;
+  tmp.m = _mm_max_ps(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<double, 2> vmax(SIMD<double, 2> a, SIMD<double, 2> b)
+{
+  SIMD<double, 2> tmp;
+  tmp.m = _mm_max_pd(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<int8_t, 16> vmax(SIMD<int8_t, 16> a, SIMD<int8_t, 16> b)
+{
+  SIMD<int8_t, 16> tmp;
+  tmp.m = _mm_max_epi8(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<int16_t, 8> vmax(SIMD<int16_t, 8> a, SIMD<int16_t, 8> b)
+{
+  SIMD<int16_t, 8> tmp;
+  tmp.m = _mm_max_epi16(a.m, b.m);
+  return tmp;
+}
+
+template <>
+inline SIMD<int32_t, 4> vmax(SIMD<int32_t, 4> a, SIMD<int32_t, 4> b)
+{
+  SIMD<int32_t, 4> tmp;
+  tmp.m = _mm_max_epi32(a.m, b.m);
   return tmp;
 }
 

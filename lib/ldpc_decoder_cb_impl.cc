@@ -29,8 +29,6 @@
 #include <iostream>
 #include <algorithm>
 
-#define FACTOR 2
-
 constexpr int DVB_S2_TABLE_B1::DEG[];
 constexpr int DVB_S2_TABLE_B1::LEN[];
 constexpr int DVB_S2_TABLE_B1::POS[];
@@ -669,7 +667,7 @@ namespace gr {
       float sp, np, sigma, precision, snr;
       gr_complex s, e;
       const int SYMBOLS = CODE_LEN / MOD_BITS;
-      int trials = 50;
+      int trials = TRIALS;
       int consumed = 0;
       int rows, offset, indexin, indexout;
       const int *twist;
@@ -1037,7 +1035,7 @@ namespace gr {
           }
         }
         if (count < 0) {
-          total_trials += 50;
+          total_trials += trials;
           printf("frame = %d, snr = %.2f, LDPC decoder failed at converging to a code word.\n", chunk * SIZEOF_SIMD, snr);
         }
         else {

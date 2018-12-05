@@ -18,117 +18,12 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef LDPC_HH
-#define LDPC_HH
+#ifndef FLOODING_DECODER_HH
+#define FLOODING_DECODER_HH
 
 #include <stdlib.h>
 #include "exclusive_reduce.hh"
-
-struct LDPCInterface
-{
-  virtual LDPCInterface *clone() = 0;
-  virtual int code_len() = 0;
-  virtual int data_len() = 0;
-  virtual int links_total() = 0;
-  virtual int links_max_cn() = 0;
-  virtual int bit_deg() = 0;
-  virtual int *acc_pos() = 0;
-  virtual void first_bit() = 0;
-  virtual void next_bit() = 0;
-  virtual ~LDPCInterface() = default;
-};
-
-template <typename TABLE>
-class LDPC : public LDPCInterface
-{
-  static const int M = TABLE::M;
-  static const int N = TABLE::N;
-  static const int K = TABLE::K;
-  static const int R = N-K;
-  static const int q = R/M;
-
-  int acc_pos_[TABLE::DEG_MAX];
-  const int *row_ptr;
-  int bit_deg_;
-  int grp_num;
-  int grp_len;
-  int grp_cnt;
-  int row_cnt;
-
-  void next_group()
-  {
-    if (grp_cnt >= grp_len) {
-      grp_len = TABLE::LEN[grp_num];
-      bit_deg_ = TABLE::DEG[grp_num];
-      grp_cnt = 0;
-      ++grp_num;
-    }
-    for (int i = 0; i < bit_deg_; ++i)
-      acc_pos_[i] = row_ptr[i];
-    row_ptr += bit_deg_;
-    ++grp_cnt;
-  }
-
-public:
-
-  LDPCInterface *clone()
-  {
-    return new LDPC<TABLE>();
-  }
-
-  int code_len()
-  {
-    return N;
-  }
-
-  int data_len()
-  {
-    return K;
-  }
-
-  int links_total()
-  {
-    return TABLE::LINKS_TOTAL;
-  }
-
-  int links_max_cn()
-  {
-    return TABLE::LINKS_MAX_CN;
-  }
-
-  int bit_deg()
-  {
-    return bit_deg_;
-  }
-
-  int *acc_pos()
-  {
-    return acc_pos_;
-  }
-
-  void next_bit()
-  {
-    if (++row_cnt < M) {
-      for (int i = 0; i < bit_deg_; ++i)
-        acc_pos_[i] += q;
-      for (int i = 0; i < bit_deg_; ++i)
-        acc_pos_[i] %= R;
-    } else {
-      next_group();
-      row_cnt = 0;
-    }
-  }
-
-  void first_bit()
-  {
-    grp_num = 0;
-    grp_len = 0;
-    grp_cnt = 0;
-    row_cnt = 0;
-    row_ptr = TABLE::POS;
-    next_group();
-  }
-};
+#include "ldpc.hh"
 
 template <typename TYPE, typename ALG>
 class LDPCDecoder
@@ -159,7 +54,6 @@ class LDPCDecoder
       ldpc->next_bit();
     }
   }
-
   void check_node_update()
   {
     TYPE *bl = bnl;
@@ -186,22 +80,21 @@ class LDPCDecoder
     for (int i = 0; i < R; ++i)
       alg.finalp(cnl+CNL*i, cnc[i]);
   }
-
   void bit_node_update(TYPE *data, TYPE *parity)
   {
     TYPE *bl = bnl;
     bnv[0] = alg.add(parity[0], alg.add(cnl[0], cnl[CNL]));
-    *bl = alg.update(*bl, alg.add(parity[0], cnl[CNL])); ++bl;
-    *bl = alg.update(*bl, alg.add(parity[0], cnl[0])); ++bl;
+    alg.update(bl++, alg.add(parity[0], cnl[CNL]));
+    alg.update(bl++, alg.add(parity[0], cnl[0]));
     cnc[0] = 1;
     for (int i = 1; i < R-1; ++i) {
       bnv[i] = alg.add(parity[i], alg.add(cnl[CNL*i+1], cnl[CNL*(i+1)]));
-      *bl = alg.update(*bl, alg.add(parity[i], cnl[CNL*(i+1)])); ++bl;
-      *bl = alg.update(*bl, alg.add(parity[i], cnl[CNL*i+1])); ++bl;
+      alg.update(bl++, alg.add(parity[i], cnl[CNL*(i+1)]));
+      alg.update(bl++, alg.add(parity[i], cnl[CNL*i+1]));
       cnc[i] = 2;
     }
     bnv[R-1] = alg.add(parity[R-1], cnl[CNL*(R-1)+1]);
-    *bl = alg.update(*bl, parity[R-1]); ++bl;
+    alg.update(bl++, parity[R-1]);
     cnc[R-1] = 2;
     ldpc->first_bit();
     for (int j = 0; j < K; ++j) {
@@ -215,12 +108,11 @@ class LDPCDecoder
       TYPE out[bit_deg];
       CODE::exclusive_reduce(inp, out, bit_deg, alg.add);
       bnv[j+R] = alg.add(data[j], alg.add(out[0], inp[0]));
-      for (int n = 0; n < bit_deg; ++n, ++bl)
-        *bl = alg.update(*bl, alg.add(data[j], out[n]));
+      for (int n = 0; n < bit_deg; ++n)
+        alg.update(bl++, alg.add(data[j], out[n]));
       ldpc->next_bit();
     }
   }
-
   bool hard_decision(int blocks)
   {
     for (int i = 0; i < R; ++i)
@@ -228,7 +120,6 @@ class LDPCDecoder
         return true;
     return false;
   }
-
   void update_user(TYPE *data, TYPE *parity)
   {
     for (int i = 0; i < R; ++i)
@@ -236,9 +127,7 @@ class LDPCDecoder
     for (int i = 0; i < K; ++i)
       data[i] = bnv[i+R];
   }
-
 public:
-
   LDPCDecoder(LDPCInterface *it)
   {
     ldpc = it->clone();
@@ -256,7 +145,6 @@ public:
     cnv = ptr; ptr += R;
     cnc = new uint8_t[R];
   }
-
   int operator()(TYPE *data, TYPE *parity, int trials = 50, int blocks = 1)
   {
     bit_node_init(data, parity);
@@ -273,7 +161,6 @@ public:
     update_user(data, parity);
     return trials;
   }
-
   ~LDPCDecoder()
   {
     free(aligned_buffer);

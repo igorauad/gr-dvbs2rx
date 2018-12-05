@@ -137,6 +137,15 @@ static inline TYPE vdup(typename TYPE::value_type a)
   return tmp;
 }
 
+template <typename TYPE>
+static inline TYPE vzero()
+{
+  TYPE tmp;
+  for (int i = 0; i < TYPE::SIZE; ++i)
+    tmp.u[i] ^= tmp.u[i];
+  return tmp;
+}
+
 template <typename DST, typename SRC>
 static inline DST vreinterpret(SRC a)
 {
@@ -182,6 +191,54 @@ template <int WIDTH>
 static inline SIMD<uint64_t, WIDTH> vmask(SIMD<int64_t, WIDTH> a)
 {
   return vreinterpret<SIMD<uint64_t, WIDTH>>(a);
+}
+
+template <int WIDTH>
+static inline SIMD<uint8_t, WIDTH> vunsigned(SIMD<int8_t, WIDTH> a)
+{
+  return vreinterpret<SIMD<uint8_t, WIDTH>>(a);
+}
+
+template <int WIDTH>
+static inline SIMD<uint16_t, WIDTH> vunsigned(SIMD<int16_t, WIDTH> a)
+{
+  return vreinterpret<SIMD<uint16_t, WIDTH>>(a);
+}
+
+template <int WIDTH>
+static inline SIMD<uint32_t, WIDTH> vunsigned(SIMD<int32_t, WIDTH> a)
+{
+  return vreinterpret<SIMD<uint32_t, WIDTH>>(a);
+}
+
+template <int WIDTH>
+static inline SIMD<uint64_t, WIDTH> vunsigned(SIMD<int64_t, WIDTH> a)
+{
+  return vreinterpret<SIMD<uint64_t, WIDTH>>(a);
+}
+
+template <int WIDTH>
+static inline SIMD<int8_t, WIDTH> vsigned(SIMD<uint8_t, WIDTH> a)
+{
+  return vreinterpret<SIMD<int8_t, WIDTH>>(a);
+}
+
+template <int WIDTH>
+static inline SIMD<int16_t, WIDTH> vsigned(SIMD<uint16_t, WIDTH> a)
+{
+  return vreinterpret<SIMD<int16_t, WIDTH>>(a);
+}
+
+template <int WIDTH>
+static inline SIMD<int32_t, WIDTH> vsigned(SIMD<uint32_t, WIDTH> a)
+{
+  return vreinterpret<SIMD<int32_t, WIDTH>>(a);
+}
+
+template <int WIDTH>
+static inline SIMD<int64_t, WIDTH> vsigned(SIMD<uint64_t, WIDTH> a)
+{
+  return vreinterpret<SIMD<int64_t, WIDTH>>(a);
 }
 
 template <int WIDTH>
@@ -464,6 +521,42 @@ static inline SIMD<uint64_t, WIDTH> vbic(SIMD<uint64_t, WIDTH> a, SIMD<uint64_t,
 }
 
 template <int WIDTH>
+static inline SIMD<uint8_t, WIDTH> vbsl(SIMD<uint8_t, WIDTH> a, SIMD<uint8_t, WIDTH> b, SIMD<uint8_t, WIDTH> c)
+{
+  SIMD<uint8_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = (a.v[i] & b.v[i]) | (~a.v[i] & c.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint16_t, WIDTH> vbsl(SIMD<uint16_t, WIDTH> a, SIMD<uint16_t, WIDTH> b, SIMD<uint16_t, WIDTH> c)
+{
+  SIMD<uint16_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = (a.v[i] & b.v[i]) | (~a.v[i] & c.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint32_t, WIDTH> vbsl(SIMD<uint32_t, WIDTH> a, SIMD<uint32_t, WIDTH> b, SIMD<uint32_t, WIDTH> c)
+{
+  SIMD<uint32_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = (a.v[i] & b.v[i]) | (~a.v[i] & c.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint64_t, WIDTH> vbsl(SIMD<uint64_t, WIDTH> a, SIMD<uint64_t, WIDTH> b, SIMD<uint64_t, WIDTH> c)
+{
+  SIMD<uint64_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = (a.v[i] & b.v[i]) | (~a.v[i] & c.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
 static inline SIMD<uint32_t, WIDTH> vcgtz(SIMD<float, WIDTH> a)
 {
   SIMD<uint32_t, WIDTH> tmp;
@@ -716,6 +809,60 @@ static inline SIMD<uint64_t, WIDTH> vcgt(SIMD<uint64_t, WIDTH> a, SIMD<uint64_t,
 }
 
 template <int WIDTH>
+static inline SIMD<uint32_t, WIDTH> vceq(SIMD<float, WIDTH> a, SIMD<float, WIDTH> b)
+{
+  SIMD<uint32_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = -(a.v[i] == b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint64_t, WIDTH> vceq(SIMD<double, WIDTH> a, SIMD<double, WIDTH> b)
+{
+  SIMD<uint64_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = -(a.v[i] == b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint8_t, WIDTH> vceq(SIMD<int8_t, WIDTH> a, SIMD<int8_t, WIDTH> b)
+{
+  SIMD<uint8_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = -(a.v[i] == b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint16_t, WIDTH> vceq(SIMD<int16_t, WIDTH> a, SIMD<int16_t, WIDTH> b)
+{
+  SIMD<uint16_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = -(a.v[i] == b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint32_t, WIDTH> vceq(SIMD<int32_t, WIDTH> a, SIMD<int32_t, WIDTH> b)
+{
+  SIMD<uint32_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = -(a.v[i] == b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint64_t, WIDTH> vceq(SIMD<int64_t, WIDTH> a, SIMD<int64_t, WIDTH> b)
+{
+  SIMD<uint64_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = -(a.v[i] == b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
 static inline SIMD<float, WIDTH> vmin(SIMD<float, WIDTH> a, SIMD<float, WIDTH> b)
 {
   SIMD<float, WIDTH> tmp;
@@ -766,6 +913,60 @@ static inline SIMD<int64_t, WIDTH> vmin(SIMD<int64_t, WIDTH> a, SIMD<int64_t, WI
   SIMD<int64_t, WIDTH> tmp;
   for (int i = 0; i < WIDTH; ++i)
     tmp.v[i] = std::min(a.v[i], b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<float, WIDTH> vmax(SIMD<float, WIDTH> a, SIMD<float, WIDTH> b)
+{
+  SIMD<float, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = std::max(a.v[i], b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<double, WIDTH> vmax(SIMD<double, WIDTH> a, SIMD<double, WIDTH> b)
+{
+  SIMD<double, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = std::max(a.v[i], b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<int8_t, WIDTH> vmax(SIMD<int8_t, WIDTH> a, SIMD<int8_t, WIDTH> b)
+{
+  SIMD<int8_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = std::max(a.v[i], b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<int16_t, WIDTH> vmax(SIMD<int16_t, WIDTH> a, SIMD<int16_t, WIDTH> b)
+{
+  SIMD<int16_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = std::max(a.v[i], b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<int32_t, WIDTH> vmax(SIMD<int32_t, WIDTH> a, SIMD<int32_t, WIDTH> b)
+{
+  SIMD<int32_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = std::max(a.v[i], b.v[i]);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<int64_t, WIDTH> vmax(SIMD<int64_t, WIDTH> a, SIMD<int64_t, WIDTH> b)
+{
+  SIMD<int64_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = std::max(a.v[i], b.v[i]);
   return tmp;
 }
 
@@ -910,6 +1111,24 @@ static inline SIMD<int16_t, WIDTH> vqsub(SIMD<int16_t, WIDTH> a, SIMD<int16_t, W
   SIMD<int16_t, WIDTH> tmp;
   for (int i = 0; i < WIDTH; ++i)
     tmp.v[i] = std::min<int32_t>(std::max<int32_t>(int32_t(a.v[i]) - int32_t(b.v[i]), INT16_MIN), INT16_MAX);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint8_t, WIDTH> vqsub(SIMD<uint8_t, WIDTH> a, SIMD<uint8_t, WIDTH> b)
+{
+  SIMD<uint8_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = std::max<int16_t>(int16_t(a.v[i]) - int16_t(b.v[i]), 0);
+  return tmp;
+}
+
+template <int WIDTH>
+static inline SIMD<uint16_t, WIDTH> vqsub(SIMD<uint16_t, WIDTH> a, SIMD<uint16_t, WIDTH> b)
+{
+  SIMD<uint16_t, WIDTH> tmp;
+  for (int i = 0; i < WIDTH; ++i)
+    tmp.v[i] = std::max<int32_t>(int32_t(a.v[i]) - int32_t(b.v[i]), 0);
   return tmp;
 }
 
