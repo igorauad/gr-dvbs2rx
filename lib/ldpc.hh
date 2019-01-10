@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Ahmet Inan, Ron Economos.
+ * Copyright 2018,2019 Ahmet Inan, Ron Economos.
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ struct LDPCInterface
   virtual LDPCInterface *clone() = 0;
   virtual int code_len() = 0;
   virtual int data_len() = 0;
+  virtual int group_len() = 0;
   virtual int links_total() = 0;
   virtual int links_max_cn() = 0;
   virtual int bit_deg() = 0;
@@ -77,6 +78,10 @@ public:
   int data_len()
   {
     return K;
+  }
+  int group_len()
+  {
+    return M;
   }
   int links_total()
   {
