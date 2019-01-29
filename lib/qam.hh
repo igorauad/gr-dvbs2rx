@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Ahmet Inan, Ron Economos.
+ * Copyright 2018,2019 Ahmet Inan, Ron Economos.
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -277,7 +277,7 @@ struct QuadratureAmplitudeModulation<1024, TYPE, CODE> : public Modulation<TYPE,
     b[9] = quantize(precision, std::abs(std::abs(std::abs(std::abs(c.imag())-amp(16))-amp(8))-amp(4))-amp(2));
   }
 
-  complex_type map(value_type *b)
+  complex_type map(code_type *b)
   {
     return AMP * complex_type(
       b[0]*(b[2]*(b[4]*(b[6]*(b[8]+value_type(2))+value_type(4))+value_type(8))+value_type(16)),

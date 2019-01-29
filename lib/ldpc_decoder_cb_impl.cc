@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Ahmet Inan, Ron Economos.
+ * Copyright 2018,2019 Ahmet Inan, Ron Economos.
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -612,8 +612,8 @@ namespace gr {
       info_mode = infomode;
       soft = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
       dint = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
-      tempu = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
-      tempv = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
+      tempu = new int8_t[ldpc->code_len()];
+      tempv = new int8_t[ldpc->code_len()];
       aligned_buffer = aligned_alloc(sizeof(simd_type), sizeof(simd_type) * ldpc->code_len());
       decode.init(ldpc);
       if (outputmode == OM_MESSAGE) {
@@ -675,7 +675,7 @@ namespace gr {
       int8_t *c1, *c2, *c3, *c4, *c5, *c6, *c7, *c8, *c9, *c10, *c11, *c12, *c13, *c14, *c15, *c16;
       int output_size = output_mode ? nbch : frame_size;
 
-      for (int i = 0; i < noutput_items; i += output_size  * SIZEOF_SIMD) {
+      for (int i = 0; i < noutput_items; i += output_size * SIZEOF_SIMD) {
         for (int blk = 0; blk < SIZEOF_SIMD; blk++) {
           sp = 0;
           np = 0;
@@ -751,13 +751,13 @@ namespace gr {
               }
               rows = frame_size / (MOD_BITS * 2);
               c1 = &tempv[0];
-              c2 = &tempv[rows + (blk * CODE_LEN)];
-              c3 = &tempv[rows * 2 + (blk * CODE_LEN)];
-              c4 = &tempv[rows * 3 + (blk * CODE_LEN)];
-              c5 = &tempv[rows * 4 + (blk * CODE_LEN)];
-              c6 = &tempv[rows * 5 + (blk * CODE_LEN)];
-              c7 = &tempv[rows * 6 + (blk * CODE_LEN)];
-              c8 = &tempv[rows * 7 + (blk * CODE_LEN)];
+              c2 = &tempv[rows];
+              c3 = &tempv[rows * 2];
+              c4 = &tempv[rows * 3];
+              c5 = &tempv[rows * 4];
+              c6 = &tempv[rows * 5];
+              c7 = &tempv[rows * 6];
+              c8 = &tempv[rows * 7];
               indexin = 0;
               indexout = 0;
               for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
@@ -769,20 +769,20 @@ namespace gr {
               }
               indexin = 0;
               for (int j = 0; j < rows; j++) {
-                c1[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c2[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c3[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c4[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c5[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c6[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c7[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c8[j] = tempu[indexin++ + (blk * CODE_LEN)];
+                c1[j] = tempu[indexin++];
+                c2[j] = tempu[indexin++];
+                c3[j] = tempu[indexin++];
+                c4[j] = tempu[indexin++];
+                c5[j] = tempu[indexin++];
+                c6[j] = tempu[indexin++];
+                c7[j] = tempu[indexin++];
+                c8[j] = tempu[indexin++];
               }
               indexout = 0;
               for (int col = 0; col < (MOD_BITS * 2); col++) {
                 offset = twist[col];
                 for (int row = 0; row < rows; row++) {
-                  tempu[indexout++ + (blk * CODE_LEN)] = tempv[(offset + (rows * col)) + (blk * CODE_LEN)];
+                  tempu[indexout++] = tempv[(offset + (rows * col))];
                   offset++;
                   if (offset == rows) {
                     offset = 0;
@@ -791,11 +791,11 @@ namespace gr {
               }
               for (unsigned int t = 0; t < q_val; t++) {
                 for (int s = 0; s < 360; s++) {
-                  dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempu[(nbch + (360 * t) + s) + (blk * CODE_LEN)];
+                  dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempu[(nbch + (360 * t) + s)];
                 }
               }
               for (unsigned int k = 0; k < nbch; k++) {
-                dint[k + (blk * CODE_LEN)] = tempu[k + (blk * CODE_LEN)];
+                dint[k + (blk * CODE_LEN)] = tempu[k];
               }
               code = dint;
               break;
@@ -820,46 +820,46 @@ namespace gr {
               }
               rows = frame_size / (MOD_BITS * 2);
               c1 = &tempv[0];
-              c2 = &tempv[rows + (blk * CODE_LEN)];
-              c3 = &tempv[rows * 2 + (blk * CODE_LEN)];
-              c4 = &tempv[rows * 3 + (blk * CODE_LEN)];
-              c5 = &tempv[rows * 4 + (blk * CODE_LEN)];
-              c6 = &tempv[rows * 5 + (blk * CODE_LEN)];
-              c7 = &tempv[rows * 6 + (blk * CODE_LEN)];
-              c8 = &tempv[rows * 7 + (blk * CODE_LEN)];
-              c9 = &tempv[rows * 8 + (blk * CODE_LEN)];
-              c10 = &tempv[rows * 9 + (blk * CODE_LEN)];
-              c11 = &tempv[rows * 10 + (blk * CODE_LEN)];
-              c12 = &tempv[rows * 11 + (blk * CODE_LEN)];
+              c2 = &tempv[rows];
+              c3 = &tempv[rows * 2];
+              c4 = &tempv[rows * 3];
+              c5 = &tempv[rows * 4];
+              c6 = &tempv[rows * 5];
+              c7 = &tempv[rows * 6];
+              c8 = &tempv[rows * 7];
+              c9 = &tempv[rows * 8];
+              c10 = &tempv[rows * 9];
+              c11 = &tempv[rows * 10];
+              c12 = &tempv[rows * 11];
               indexin = 0;
               indexout = 0;
               for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
                 for (int e = 0; e < (MOD_BITS * 2); e++) {
                   offset = mux[e];
-                  tempu[indexout++ + (blk * CODE_LEN)] = soft[(offset + indexin) + (blk * CODE_LEN)];
+                  tempu[indexout++] = soft[(offset + indexin) + (blk * CODE_LEN)];
                 }
                 indexin += MOD_BITS * 2;
               }
               indexin = 0;
               for (int j = 0; j < rows; j++) {
-                c1[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c2[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c3[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c4[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c5[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c6[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c7[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c8[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c9[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c10[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c11[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                c12[j] = tempu[indexin++ + (blk * CODE_LEN)];
+                c1[j] = tempu[indexin++];
+                c2[j] = tempu[indexin++];
+                c3[j] = tempu[indexin++];
+                c4[j] = tempu[indexin++];
+                c5[j] = tempu[indexin++];
+                c6[j] = tempu[indexin++];
+                c7[j] = tempu[indexin++];
+                c8[j] = tempu[indexin++];
+                c9[j] = tempu[indexin++];
+                c10[j] = tempu[indexin++];
+                c11[j] = tempu[indexin++];
+                c12[j] = tempu[indexin++];
               }
               indexout = 0;
               for (int col = 0; col < (MOD_BITS * 2); col++) {
                 offset = twist[col];
                 for (int row = 0; row < rows; row++) {
-                  tempu[indexout++ + (blk * CODE_LEN)] = tempv[(offset + (rows * col)) + (blk * CODE_LEN)];
+                  tempu[indexout++] = tempv[(offset + (rows * col))];
                   offset++;
                   if (offset == rows) {
                     offset = 0;
@@ -868,11 +868,11 @@ namespace gr {
               }
               for (unsigned int t = 0; t < q_val; t++) {
                 for (int s = 0; s < 360; s++) {
-                  dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempu[(nbch + (360 * t) + s) + (blk * CODE_LEN)];
+                  dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempu[(nbch + (360 * t) + s)];
                 }
               }
               for (unsigned int k = 0; k < nbch; k++) {
-                dint[k + (blk * CODE_LEN)] = tempu[k + (blk * CODE_LEN)];
+                dint[k + (blk * CODE_LEN)] = tempu[k];
               }
               code = dint;
               break;
@@ -890,54 +890,54 @@ namespace gr {
                 }
                 rows = frame_size / (MOD_BITS * 2);
                 c1 = &tempv[0];
-                c2 = &tempv[rows + (blk * CODE_LEN)];
-                c3 = &tempv[rows * 2 + (blk * CODE_LEN)];
-                c4 = &tempv[rows * 3 + (blk * CODE_LEN)];
-                c5 = &tempv[rows * 4 + (blk * CODE_LEN)];
-                c6 = &tempv[rows * 5 + (blk * CODE_LEN)];
-                c7 = &tempv[rows * 6 + (blk * CODE_LEN)];
-                c8 = &tempv[rows * 7 + (blk * CODE_LEN)];
-                c9 = &tempv[rows * 8 + (blk * CODE_LEN)];
-                c10 = &tempv[rows * 9 + (blk * CODE_LEN)];
-                c11 = &tempv[rows * 10 + (blk * CODE_LEN)];
-                c12 = &tempv[rows * 11 + (blk * CODE_LEN)];
-                c13 = &tempv[rows * 12 + (blk * CODE_LEN)];
-                c14 = &tempv[rows * 13 + (blk * CODE_LEN)];
-                c15 = &tempv[rows * 14 + (blk * CODE_LEN)];
-                c16 = &tempv[rows * 15 + (blk * CODE_LEN)];
+                c2 = &tempv[rows];
+                c3 = &tempv[rows * 2];
+                c4 = &tempv[rows * 3];
+                c5 = &tempv[rows * 4];
+                c6 = &tempv[rows * 5];
+                c7 = &tempv[rows * 6];
+                c8 = &tempv[rows * 7];
+                c9 = &tempv[rows * 8];
+                c10 = &tempv[rows * 9];
+                c11 = &tempv[rows * 10];
+                c12 = &tempv[rows * 11];
+                c13 = &tempv[rows * 12];
+                c14 = &tempv[rows * 13];
+                c15 = &tempv[rows * 14];
+                c16 = &tempv[rows * 15];
                 indexin = 0;
                 indexout = 0;
                 for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
                   for (int e = 0; e < (MOD_BITS * 2); e++) {
                     offset = mux[e];
-                    tempu[indexout++ + (blk * CODE_LEN)] = soft[(offset + indexin) + (blk * CODE_LEN)];
+                    tempu[indexout++] = soft[(offset + indexin)];
                   }
                   indexin += MOD_BITS * 2;
                 }
                 indexin = 0;
                 for (int j = 0; j < rows; j++) {
-                  c1[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c2[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c3[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c4[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c5[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c6[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c7[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c8[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c9[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c10[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c11[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c12[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c13[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c14[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c15[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c16[j] = tempu[indexin++ + (blk * CODE_LEN)];
+                  c1[j] = tempu[indexin++];
+                  c2[j] = tempu[indexin++];
+                  c3[j] = tempu[indexin++];
+                  c4[j] = tempu[indexin++];
+                  c5[j] = tempu[indexin++];
+                  c6[j] = tempu[indexin++];
+                  c7[j] = tempu[indexin++];
+                  c8[j] = tempu[indexin++];
+                  c9[j] = tempu[indexin++];
+                  c10[j] = tempu[indexin++];
+                  c11[j] = tempu[indexin++];
+                  c12[j] = tempu[indexin++];
+                  c13[j] = tempu[indexin++];
+                  c14[j] = tempu[indexin++];
+                  c15[j] = tempu[indexin++];
+                  c16[j] = tempu[indexin++];
                 }
                 indexout = 0;
                 for (int col = 0; col < (MOD_BITS * 2); col++) {
                   offset = twist[col];
                   for (int row = 0; row < rows; row++) {
-                    tempu[indexout++ + (blk * CODE_LEN)] = tempv[(offset + (rows * col)) + (blk * CODE_LEN)];
+                    tempu[indexout++] = tempv[(offset + (rows * col))];
                     offset++;
                     if (offset == rows) {
                       offset = 0;
@@ -946,11 +946,11 @@ namespace gr {
                 }
                 for (unsigned int t = 0; t < q_val; t++) {
                   for (int s = 0; s < 360; s++) {
-                    dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempu[(nbch + (360 * t) + s) + (blk * CODE_LEN)];
+                    dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempu[(nbch + (360 * t) + s)];
                   }
                 }
                 for (unsigned int k = 0; k < nbch; k++) {
-                  dint[k + (blk * CODE_LEN)] = tempu[k + (blk * CODE_LEN)];
+                  dint[k + (blk * CODE_LEN)] = tempu[k];
                 }
                 code = dint;
               }
@@ -967,38 +967,38 @@ namespace gr {
                 }
                 rows = frame_size / MOD_BITS;
                 c1 = &tempv[0];
-                c2 = &tempv[rows + (blk * CODE_LEN)];
-                c3 = &tempv[rows * 2 + (blk * CODE_LEN)];
-                c4 = &tempv[rows * 3 + (blk * CODE_LEN)];
-                c5 = &tempv[rows * 4 + (blk * CODE_LEN)];
-                c6 = &tempv[rows * 5 + (blk * CODE_LEN)];
-                c7 = &tempv[rows * 6 + (blk * CODE_LEN)];
-                c8 = &tempv[rows * 7 + (blk * CODE_LEN)];
+                c2 = &tempv[rows];
+                c3 = &tempv[rows * 2];
+                c4 = &tempv[rows * 3];
+                c5 = &tempv[rows * 4];
+                c6 = &tempv[rows * 5];
+                c7 = &tempv[rows * 6];
+                c8 = &tempv[rows * 7];
                 indexin = 0;
                 indexout = 0;
                 for (unsigned int d = 0; d < frame_size / MOD_BITS; d++) {
                   for (int e = 0; e < MOD_BITS; e++) {
                     offset = mux[e];
-                    tempu[indexout++ + (blk * CODE_LEN)] = soft[(offset + indexin) + (blk * CODE_LEN)];
+                    tempu[indexout++] = soft[(offset + indexin)];
                   }
                   indexin += MOD_BITS;
                 }
                 indexin = 0;
                 for (int j = 0; j < rows; j++) {
-                  c1[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c2[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c3[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c4[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c5[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c6[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c7[j] = tempu[indexin++ + (blk * CODE_LEN)];
-                  c8[j] = tempu[indexin++ + (blk * CODE_LEN)];
+                  c1[j] = tempu[indexin++];
+                  c2[j] = tempu[indexin++];
+                  c3[j] = tempu[indexin++];
+                  c4[j] = tempu[indexin++];
+                  c5[j] = tempu[indexin++];
+                  c6[j] = tempu[indexin++];
+                  c7[j] = tempu[indexin++];
+                  c8[j] = tempu[indexin++];
                 }
                 indexout = 0;
                 for (int col = 0; col < MOD_BITS; col++) {
                   offset = twist[col];
                   for (int row = 0; row < rows; row++) {
-                    tempu[indexout++ + (blk * CODE_LEN)] = tempv[(offset + (rows * col)) + (blk * CODE_LEN)];
+                    tempu[indexout++] = tempv[(offset + (rows * col))];
                     offset++;
                     if (offset == rows) {
                       offset = 0;
@@ -1007,11 +1007,11 @@ namespace gr {
                 }
                 for (unsigned int t = 0; t < q_val; t++) {
                   for (int s = 0; s < 360; s++) {
-                    dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempu[(nbch + (360 * t) + s) + (blk * CODE_LEN)];
+                    dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempu[(nbch + (360 * t) + s)];
                   }
                 }
                 for (unsigned int k = 0; k < nbch; k++) {
-                  dint[k + (blk * CODE_LEN)] = tempu[k + (blk * CODE_LEN)];
+                  dint[k + (blk * CODE_LEN)] = tempu[k];
                 }
                 code = dint;
               }
@@ -1048,22 +1048,22 @@ namespace gr {
             switch (signal_constellation) {
               case MOD_QPSK:
                 for (int j = 0; j < CODE_LEN; j++) {
-                  tempu[j + (blk * CODE_LEN)] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
+                  tempu[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
                 }
                 break;
               case MOD_8PSK:
                 for (int j = 0; j < CODE_LEN; j++) {
-                  tempv[j + (blk * CODE_LEN)] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
+                  tempv[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
                 }
                 rows = frame_size / MOD_BITS;
-                c1 = &tempv[rowaddr0 + (blk * CODE_LEN)];
-                c2 = &tempv[rowaddr1 + (blk * CODE_LEN)];
-                c3 = &tempv[rowaddr2 + (blk * CODE_LEN)];
+                c1 = &tempv[rowaddr0];
+                c2 = &tempv[rowaddr1];
+                c3 = &tempv[rowaddr2];
                 indexout = 0;
                 for (int j = 0; j < rows; j++) {
-                  tempu[indexout++ + (blk * CODE_LEN)] = c1[j];
-                  tempu[indexout++ + (blk * CODE_LEN)] = c2[j];
-                  tempu[indexout++ + (blk * CODE_LEN)] = c3[j];
+                  tempu[indexout++] = c1[j];
+                  tempu[indexout++] = c2[j];
+                  tempu[indexout++] = c3[j];
                 }
                 break;
               default:
@@ -1073,7 +1073,7 @@ namespace gr {
               sp = 0;
               np = 0;
               for (int j = 0; j < SYMBOLS; j++) {
-                s = mod->map(&tempu[(j * MOD_BITS) + (blk * CODE_LEN)]);
+                s = mod->map(&tempu[(j * MOD_BITS)]);
                 e = insnr[j] - s;
                 sp += std::norm(s);
                 np += std::norm(e);
