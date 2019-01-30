@@ -97,7 +97,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>0.28</value>
+      <value>0.35</value>
     </param>
     <param>
       <key>_enabled</key>
@@ -805,7 +805,7 @@
     </param>
     <param>
       <key>constellation</key>
-      <value>MOD_256QAM</value>
+      <value>MOD_64QAM</value>
     </param>
     <param>
       <key>affinity</key>
@@ -856,7 +856,7 @@
     </param>
     <param>
       <key>constellation</key>
-      <value>MOD_256QAM</value>
+      <value>MOD_64QAM</value>
     </param>
     <param>
       <key>affinity</key>
@@ -1140,7 +1140,7 @@
     </param>
     <param>
       <key>constellation1</key>
-      <value>MOD_256QAM</value>
+      <value>MOD_64QAM</value>
     </param>
     <param>
       <key>constellation2</key>
@@ -1164,7 +1164,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(1024, 272)</value>
+      <value>(1024, 264)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -1185,6 +1185,10 @@
     <param>
       <key>outputmode</key>
       <value>OM_MESSAGE</value>
+    </param>
+    <param>
+      <key>infomode</key>
+      <value>INFO_OFF</value>
     </param>
     <param>
       <key>standard</key>

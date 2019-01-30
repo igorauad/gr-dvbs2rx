@@ -664,7 +664,7 @@ namespace gr {
       simd_type *simd = reinterpret_cast<simd_type *>(aligned_buffer);
       int8_t tmp[MOD_BITS];
       int8_t *code;
-      float sp, np, sigma, precision, snr;
+      float sp, np, sigma, precision_sum;
       gr_complex s, e;
       const int SYMBOLS = CODE_LEN / MOD_BITS;
       int trials = TRIALS;
@@ -677,21 +677,23 @@ namespace gr {
 
       for (int i = 0; i < noutput_items; i += output_size * SIZEOF_SIMD) {
         for (int blk = 0; blk < SIZEOF_SIMD; blk++) {
-          sp = 0;
-          np = 0;
-          for (int j = 0; j < SYMBOLS; j++) {
-            mod->hard(tmp, in[j]);
-            s = mod->map(tmp);
-            e = in[j] - s;
-            sp += std::norm(s);
-            np += std::norm(e);
+          if (frame == 0) {
+            sp = 0;
+            np = 0;
+            for (int j = 0; j < SYMBOLS; j++) {
+              mod->hard(tmp, in[j]);
+              s = mod->map(tmp);
+              e = in[j] - s;
+              sp += std::norm(s);
+              np += std::norm(e);
+            }
+            if (!(np > 0)) {
+              np = 1e-12;
+            }
+            snr = 10 * std::log10(sp / np);
+            sigma = std::sqrt(np / (2 * sp));
+            precision = FACTOR / (sigma * sigma);
           }
-          if (!(np > 0)) {
-            np = 1e-12;
-          }
-          snr = 10 * std::log10(sp / np);
-          sigma = std::sqrt(np / (2 * sp));
-          precision = FACTOR / (sigma * sigma);
           for (int j = 0; j < SYMBOLS; j++) {
             mod->soft(soft + (j * MOD_BITS + (blk * CODE_LEN)), in[j], precision);
           }
@@ -910,7 +912,7 @@ namespace gr {
                 for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
                   for (int e = 0; e < (MOD_BITS * 2); e++) {
                     offset = mux[e];
-                    tempu[indexout++] = soft[(offset + indexin)];
+                    tempu[indexout++] = soft[(offset + indexin) + (blk * CODE_LEN)];
                   }
                   indexin += MOD_BITS * 2;
                 }
@@ -979,7 +981,7 @@ namespace gr {
                 for (unsigned int d = 0; d < frame_size / MOD_BITS; d++) {
                   for (int e = 0; e < MOD_BITS; e++) {
                     offset = mux[e];
-                    tempu[indexout++] = soft[(offset + indexin)];
+                    tempu[indexout++] = soft[(offset + indexin) + (blk * CODE_LEN)];
                   }
                   indexin += MOD_BITS;
                 }
@@ -1043,52 +1045,347 @@ namespace gr {
           printf("frame = %d, snr = %.2f, max trials = %d\n", chunk * SIZEOF_SIMD, snr, trials - count);
         }
         chunk++;
-        if (info_mode) {
-          for (int blk = 0; blk < SIZEOF_SIMD; blk++) {
-            switch (signal_constellation) {
-              case MOD_QPSK:
-                for (int j = 0; j < CODE_LEN; j++) {
-                  tempu[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
+        precision_sum = 0;
+        for (int blk = 0; blk < SIZEOF_SIMD; blk++) {
+          switch (signal_constellation) {
+            case MOD_QPSK:
+              for (int j = 0; j < CODE_LEN; j++) {
+                tempv[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
+              }
+              break;
+            case MOD_8PSK:
+              for (int j = 0; j < CODE_LEN; j++) {
+                tempu[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
+              }
+              rows = frame_size / MOD_BITS;
+              c1 = &tempu[rowaddr0];
+              c2 = &tempu[rowaddr1];
+              c3 = &tempu[rowaddr2];
+              indexout = 0;
+              for (int j = 0; j < rows; j++) {
+                tempv[indexout++] = c1[j];
+                tempv[indexout++] = c2[j];
+                tempv[indexout++] = c3[j];
+              }
+              break;
+            case MOD_16QAM:
+              if (frame_size == FRAME_SIZE_NORMAL) {
+                twist = &twist16n[0];
+              }
+              else {
+                twist = &twist16s[0];
+              }
+              if (code_rate == C3_5 && frame_size == FRAME_SIZE_NORMAL) {
+                mux = &mux16_35[0];
+              }
+              else if (code_rate == C1_3 && frame_size == FRAME_SIZE_SHORT) {
+                mux = &mux16_13[0];
+              }
+              else if (code_rate == C2_5 && frame_size == FRAME_SIZE_SHORT) {
+                mux = &mux16_25[0];
+              }
+              else {
+                mux = &mux16[0];
+              }
+              for (int j = 0; j < CODE_LEN; j++) {
+                tempv[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
+              }
+              rows = frame_size / (MOD_BITS * 2);
+              c1 = &tempv[0];
+              c2 = &tempv[rows];
+              c3 = &tempv[rows * 2];
+              c4 = &tempv[rows * 3];
+              c5 = &tempv[rows * 4];
+              c6 = &tempv[rows * 5];
+              c7 = &tempv[rows * 6];
+              c8 = &tempv[rows * 7];
+              for (unsigned int k = 0; k < nbch; k++) {
+                tempu[k] = tempv[k];
+              }
+              for (unsigned int t = 0; t < q_val; t++) {
+                for (int s = 0; s < 360; s++) {
+                  tempu[nbch + (360 * t) + s] = tempv[nbch + (q_val * s) + t];
                 }
-                break;
-              case MOD_8PSK:
+              }
+              indexin = 0;
+              for (int col = 0; col < (MOD_BITS * 2); col++) {
+                offset = twist[col];
+                for (int row = 0; row < rows; row++) {
+                  tempv[offset + (rows * col)] = tempu[indexin++];
+                  offset++;
+                  if (offset == rows) {
+                    offset = 0;
+                  }
+                }
+              }
+              indexout = 0;
+              for (int j = 0; j < rows; j++) {
+                tempu[indexout++] = c1[j];
+                tempu[indexout++] = c2[j];
+                tempu[indexout++] = c3[j];
+                tempu[indexout++] = c4[j];
+                tempu[indexout++] = c5[j];
+                tempu[indexout++] = c6[j];
+                tempu[indexout++] = c7[j];
+                tempu[indexout++] = c8[j];
+              }
+              indexin = 0;
+              indexout = 0;
+              for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                for (int e = 0; e < (MOD_BITS * 2); e++) {
+                  offset = mux[e];
+                  tempv[offset + indexout] = tempu[indexin++];
+                }
+                indexout += MOD_BITS * 2;
+              }
+              break;
+            case MOD_64QAM:
+              if (frame_size == FRAME_SIZE_NORMAL) {
+                twist = &twist64n[0];
+              }
+              else {
+                twist = &twist64s[0];
+              }
+              if (code_rate == C3_5 && frame_size == FRAME_SIZE_NORMAL) {
+                mux = &mux64_35[0];
+              }
+              else if (code_rate == C1_3 && frame_size == FRAME_SIZE_SHORT) {
+                mux = &mux64_13[0];
+              }
+              else if (code_rate == C2_5 && frame_size == FRAME_SIZE_SHORT) {
+                mux = &mux64_25[0];
+              }
+              else {
+                mux = &mux64[0];
+              }
+              for (int j = 0; j < CODE_LEN; j++) {
+                tempv[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
+              }
+              rows = frame_size / (MOD_BITS * 2);
+              c1 = &tempv[0];
+              c2 = &tempv[rows];
+              c3 = &tempv[rows * 2];
+              c4 = &tempv[rows * 3];
+              c5 = &tempv[rows * 4];
+              c6 = &tempv[rows * 5];
+              c7 = &tempv[rows * 6];
+              c8 = &tempv[rows * 7];
+              c9 = &tempv[rows * 8];
+              c10 = &tempv[rows * 9];
+              c11 = &tempv[rows * 10];
+              c12 = &tempv[rows * 11];
+              for (unsigned int k = 0; k < nbch; k++) {
+                tempu[k] = tempv[k];
+              }
+              for (unsigned int t = 0; t < q_val; t++) {
+                for (int s = 0; s < 360; s++) {
+                  tempu[nbch + (360 * t) + s] = tempv[nbch + (q_val * s) + t];
+                }
+              }
+              indexin = 0;
+              for (int col = 0; col < (MOD_BITS * 2); col++) {
+                offset = twist[col];
+                for (int row = 0; row < rows; row++) {
+                  tempv[offset + (rows * col)] = tempu[indexin++];
+                  offset++;
+                  if (offset == rows) {
+                    offset = 0;
+                  }
+                }
+              }
+              indexout = 0;
+              for (int j = 0; j < rows; j++) {
+                tempu[indexout++] = c1[j];
+                tempu[indexout++] = c2[j];
+                tempu[indexout++] = c3[j];
+                tempu[indexout++] = c4[j];
+                tempu[indexout++] = c5[j];
+                tempu[indexout++] = c6[j];
+                tempu[indexout++] = c7[j];
+                tempu[indexout++] = c8[j];
+                tempu[indexout++] = c9[j];
+                tempu[indexout++] = c10[j];
+                tempu[indexout++] = c11[j];
+                tempu[indexout++] = c12[j];
+              }
+              indexin = 0;
+              indexout = 0;
+              for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                for (int e = 0; e < (MOD_BITS * 2); e++) {
+                  offset = mux[e];
+                  tempv[offset + indexout] = tempu[indexin++];
+                }
+                indexout += MOD_BITS * 2;
+              }
+              break;
+            case MOD_256QAM:
+              if (frame_size == FRAME_SIZE_NORMAL) {
+                if (code_rate == C3_5) {
+                  mux = &mux256_35[0];
+                }
+                else if (code_rate == C2_3) {
+                  mux = &mux256_23[0];
+                }
+                else {
+                  mux = &mux256[0];
+                }
                 for (int j = 0; j < CODE_LEN; j++) {
                   tempv[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
                 }
-                rows = frame_size / MOD_BITS;
-                c1 = &tempv[rowaddr0];
-                c2 = &tempv[rowaddr1];
-                c3 = &tempv[rowaddr2];
+                rows = frame_size / (MOD_BITS * 2);
+                c1 = &tempv[0];
+                c2 = &tempv[rows];
+                c3 = &tempv[rows * 2];
+                c4 = &tempv[rows * 3];
+                c5 = &tempv[rows * 4];
+                c6 = &tempv[rows * 5];
+                c7 = &tempv[rows * 6];
+                c8 = &tempv[rows * 7];
+                c9 = &tempv[rows * 8];
+                c10 = &tempv[rows * 9];
+                c11 = &tempv[rows * 10];
+                c12 = &tempv[rows * 11];
+                c13 = &tempv[rows * 12];
+                c14 = &tempv[rows * 13];
+                c15 = &tempv[rows * 14];
+                c16 = &tempv[rows * 15];
+                for (unsigned int k = 0; k < nbch; k++) {
+                  tempu[k] = tempv[k];
+                }
+                for (unsigned int t = 0; t < q_val; t++) {
+                  for (int s = 0; s < 360; s++) {
+                    tempu[nbch + (360 * t) + s] = tempv[nbch + (q_val * s) + t];
+                  }
+                }
+                indexin = 0;
+                for (int col = 0; col < (MOD_BITS * 2); col++) {
+                  offset = twist256n[col];
+                  for (int row = 0; row < rows; row++) {
+                    tempv[offset + (rows * col)] = tempu[indexin++];
+                    offset++;
+                    if (offset == rows) {
+                      offset = 0;
+                    }
+                  }
+                }
                 indexout = 0;
                 for (int j = 0; j < rows; j++) {
                   tempu[indexout++] = c1[j];
                   tempu[indexout++] = c2[j];
                   tempu[indexout++] = c3[j];
+                  tempu[indexout++] = c4[j];
+                  tempu[indexout++] = c5[j];
+                  tempu[indexout++] = c6[j];
+                  tempu[indexout++] = c7[j];
+                  tempu[indexout++] = c8[j];
+                  tempu[indexout++] = c9[j];
+                  tempu[indexout++] = c10[j];
+                  tempu[indexout++] = c11[j];
+                  tempu[indexout++] = c12[j];
+                  tempu[indexout++] = c13[j];
+                  tempu[indexout++] = c14[j];
+                  tempu[indexout++] = c15[j];
+                  tempu[indexout++] = c16[j];
                 }
-                break;
-              default:
-                break;
-            }
-            if (signal_constellation == MOD_QPSK || signal_constellation == MOD_8PSK) {
-              sp = 0;
-              np = 0;
-              for (int j = 0; j < SYMBOLS; j++) {
-                s = mod->map(&tempu[(j * MOD_BITS)]);
-                e = insnr[j] - s;
-                sp += std::norm(s);
-                np += std::norm(e);
+                indexin = 0;
+                indexout = 0;
+                for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                  for (int e = 0; e < (MOD_BITS * 2); e++) {
+                    offset = mux[e];
+                    tempv[offset + indexout] = tempu[indexin++];
+                  }
+                  indexout += MOD_BITS * 2;
+                }
               }
-              if (!(np > 0)) {
-                np = 1e-12;
+              else {
+                if (code_rate == C1_3) {
+                  mux = &mux256s_13[0];
+                }
+                else if (code_rate == C2_5) {
+                  mux = &mux256s_25[0];
+                }
+                else {
+                  mux = &mux256s[0];
+                }
+                for (int j = 0; j < CODE_LEN; j++) {
+                  tempv[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
+                }
+                rows = frame_size / MOD_BITS;
+                c1 = &tempv[0];
+                c2 = &tempv[rows];
+                c3 = &tempv[rows * 2];
+                c4 = &tempv[rows * 3];
+                c5 = &tempv[rows * 4];
+                c6 = &tempv[rows * 5];
+                c7 = &tempv[rows * 6];
+                c8 = &tempv[rows * 7];
+                for (unsigned int k = 0; k < nbch; k++) {
+                  tempu[k] = tempv[k];
+                }
+                for (unsigned int t = 0; t < q_val; t++) {
+                  for (int s = 0; s < 360; s++) {
+                    tempu[nbch + (360 * t) + s] = tempv[nbch + (q_val * s) + t];
+                  }
+                }
+                in = in + (q_val * 360);
+                indexin = 0;
+                for (int col = 0; col < MOD_BITS; col++) {
+                  offset = twist256s[col];
+                  for (int row = 0; row < rows; row++) {
+                    tempv[offset + (rows * col)] = tempu[indexin++];
+                    offset++;
+                    if (offset == rows) {
+                      offset = 0;
+                    }
+                  }
+                }
+                indexout = 0;
+                for (int j = 0; j < rows; j++) {
+                  tempu[indexout++] = c1[j];
+                  tempu[indexout++] = c2[j];
+                  tempu[indexout++] = c3[j];
+                  tempu[indexout++] = c4[j];
+                  tempu[indexout++] = c5[j];
+                  tempu[indexout++] = c6[j];
+                  tempu[indexout++] = c7[j];
+                  tempu[indexout++] = c8[j];
+                }
+                indexin = 0;
+                indexout = 0;
+                for (unsigned int d = 0; d < frame_size / MOD_BITS; d++) {
+                  for (int e = 0; e < MOD_BITS; e++) {
+                    offset = mux[e];
+                    tempv[offset + indexout] = tempu[indexin++];
+                  }
+                  indexout += MOD_BITS;
+                }
               }
-              snr = 10 * std::log10(sp / np);
-              total_snr += snr;
-              printf("frame = %d, snr = %.2f, average max trials = %d, average snr = %.2f\n", frame, snr, total_trials / chunk, total_snr / (frame + 1));
-            }
-            insnr += frame_size / MOD_BITS;
-            frame++;
+              break;
+            default:
+              break;
           }
+          sp = 0;
+          np = 0;
+          for (int j = 0; j < SYMBOLS; j++) {
+            s = mod->map(&tempv[(j * MOD_BITS)]);
+            e = insnr[j] - s;
+            sp += std::norm(s);
+            np += std::norm(e);
+          }
+          if (!(np > 0)) {
+            np = 1e-12;
+          }
+          snr = 10 * std::log10(sp / np);
+          sigma = std::sqrt(np / (2 * sp));
+          precision_sum += FACTOR / (sigma * sigma);
+          total_snr += snr;
+          if (info_mode) {
+            printf("frame = %d, snr = %.2f, average max trials = %d, average snr = %.2f\n", frame, snr, total_trials / chunk, total_snr / (frame + 1));
+          }
+          insnr += frame_size / MOD_BITS;
+          frame++;
         }
+        precision = precision_sum / SIZEOF_SIMD;
         for (int blk = 0; blk < SIZEOF_SIMD; blk++) {
           for (int j = 0; j < output_size; j++) {
             if (code[j + (blk * CODE_LEN)] >= 0) {

@@ -73,6 +73,8 @@ namespace gr {
       unsigned int frame;
       unsigned int chunk;
       unsigned int total_trials;
+      float snr;
+      float precision;
       float total_snr;
       unsigned int rowaddr0;
       unsigned int rowaddr1;
