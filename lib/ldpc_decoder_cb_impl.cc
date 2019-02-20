@@ -647,7 +647,6 @@ namespace gr {
 
       for (int col = 0; col < mod; col++) {
         offset = twist[col];
-        printf("offset = %d\n", offset);
         for (int row = 0; row < rows; row++) {
           tempv[offset + (rows * col)] = tempu[index++];
           offset++;
@@ -656,7 +655,6 @@ namespace gr {
           }
         }
       }
-      printf("index = %d\n", index);
     }
 
     inline void
