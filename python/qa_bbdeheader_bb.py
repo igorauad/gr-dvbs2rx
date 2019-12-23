@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019-2021 Blockstream
+# Copyright (c) 2019-2021 Igor Freire
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #

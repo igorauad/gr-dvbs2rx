@@ -22,11 +22,12 @@ list(APPEND dvbs2rx_python_files
     bbdescrambler_bb_python.cc
     bch_decoder_bb_python.cc
     ldpc_decoder_cb_python.cc
+    plsync_cc_python.cc
     dvb_config_python.cc
     dvbs2_config_python.cc
     dvbt2_config_python.cc python_bindings.cc)
 
-GR_PYBIND_MAKE_OOT(dvbs2rx 
+GR_PYBIND_MAKE_OOT(dvbs2rx
    ../..
    gr::dvbs2rx
    "${dvbs2rx_python_files}")
