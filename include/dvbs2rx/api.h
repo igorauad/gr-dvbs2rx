@@ -26,9 +26,9 @@
 #include <gnuradio/attributes.h>
 
 #ifdef gnuradio_dvbs2rx_EXPORTS
-#  define DVBS2RX_API __GR_ATTR_EXPORT
+#define DVBS2RX_API __GR_ATTR_EXPORT
 #else
-#  define DVBS2RX_API __GR_ATTR_IMPORT
+#define DVBS2RX_API __GR_ATTR_IMPORT
 #endif
 
 #endif /* INCLUDED_DVBS2RX_API_H */

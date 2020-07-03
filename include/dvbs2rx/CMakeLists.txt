@@ -23,8 +23,8 @@
 ########################################################################
 install(FILES
     api.h
-    bbdescrambler_bb.h
     bbdeheader_bb.h
-    ldpc_decoder_cb.h
-    bch_decoder_bb.h DESTINATION include/dvbs2rx
+    bbdescrambler_bb.h
+    bch_decoder_bb.h
+    ldpc_decoder_cb.h DESTINATION include/dvbs2rx
 )
