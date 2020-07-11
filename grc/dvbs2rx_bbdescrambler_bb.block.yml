@@ -13,7 +13,7 @@ parameters:
     option_attributes:
         hide_dvbs2: [none, all]
         hide_dvbt2: [all, none]
-        val: [dtv.STANDARD_DVBS2, dtv.STANDARD_DVBT2]
+        val: [dvbs2rx.STANDARD_DVBS2, dvbs2rx.STANDARD_DVBT2]
 -   id: framesize1
     label: FECFRAME size
     dtype: enum
@@ -23,7 +23,7 @@ parameters:
         hide_medium: [all, all]
         hide_normal: [none, all]
         hide_short: [all, none]
-        val: [dtv.FECFRAME_NORMAL, dtv.FECFRAME_SHORT]
+        val: [dvbs2rx.FECFRAME_NORMAL, dvbs2rx.FECFRAME_SHORT]
     hide: ${ standard.hide_dvbt2 }
 -   id: framesize2
     label: FECFRAME size
@@ -34,7 +34,7 @@ parameters:
         hide_medium: [all, none, all]
         hide_normal: [none, all, all]
         hide_short: [all, all, none]
-        val: [dtv.FECFRAME_NORMAL, dtv.FECFRAME_MEDIUM, dtv.FECFRAME_SHORT]
+        val: [dvbs2rx.FECFRAME_NORMAL, dvbs2rx.FECFRAME_MEDIUM, dvbs2rx.FECFRAME_SHORT]
     hide: ${ standard.hide_dvbs2 }
 -   id: rate1
     label: Code rate
@@ -42,7 +42,7 @@ parameters:
     options: [C1_2, C3_5, C2_3, C3_4, C4_5, C5_6]
     option_labels: [1/2, 3/5, 2/3, 3/4, 4/5, 5/6]
     option_attributes:
-        val: [dtv.C1_2, dtv.C3_5, dtv.C2_3, dtv.C3_4, dtv.C4_5, dtv.C5_6]
+        val: [dvbs2rx.C1_2, dvbs2rx.C3_5, dvbs2rx.C2_3, dvbs2rx.C3_4, dvbs2rx.C4_5, dvbs2rx.C5_6]
     hide: ${ (framesize1.hide_normal if str(standard) == 'STANDARD_DVBT2' else 'all')
         }
 -   id: rate2
@@ -51,8 +51,8 @@ parameters:
     options: [C1_3, C2_5, C1_2, C3_5, C2_3, C3_4, C4_5, C5_6]
     option_labels: [1/3, 2/5, 1/2, 3/5, 2/3, 3/4, 4/5, 5/6]
     option_attributes:
-        val: [dtv.C1_3, dtv.C2_5, dtv.C1_2, dtv.C3_5, dtv.C2_3, dtv.C3_4, dtv.C4_5,
-            dtv.C5_6]
+        val: [dvbs2rx.C1_3, dvbs2rx.C2_5, dvbs2rx.C1_2, dvbs2rx.C3_5, dvbs2rx.C2_3, dvbs2rx.C3_4, dvbs2rx.C4_5,
+            dvbs2rx.C5_6]
     hide: ${ (framesize1.hide_short if str(standard) == 'STANDARD_DVBT2' else 'all')
         }
 -   id: rate3
@@ -67,12 +67,12 @@ parameters:
         23/36, 116/180, 20/30, 124/180, 25/36, 128/180, 13/18, 132/180, 22/30, 135/180,
         140/180, 7/9, 154/180]
     option_attributes:
-        val: [dtv.C1_4, dtv.C1_3, dtv.C2_5, dtv.C1_2, dtv.C3_5, dtv.C2_3, dtv.C3_4,
-            dtv.C4_5, dtv.C5_6, dtv.C8_9, dtv.C9_10, dtv.C2_9_VLSNR, dtv.C13_45, dtv.C9_20,
-            dtv.C90_180, dtv.C96_180, dtv.C11_20, dtv.C100_180, dtv.C104_180, dtv.C26_45,
-            dtv.C18_30, dtv.C28_45, dtv.C23_36, dtv.C116_180, dtv.C20_30, dtv.C124_180,
-            dtv.C25_36, dtv.C128_180, dtv.C13_18, dtv.C132_180, dtv.C22_30, dtv.C135_180,
-            dtv.C140_180, dtv.C7_9, dtv.C154_180]
+        val: [dvbs2rx.C1_4, dvbs2rx.C1_3, dvbs2rx.C2_5, dvbs2rx.C1_2, dvbs2rx.C3_5, dvbs2rx.C2_3, dvbs2rx.C3_4,
+            dvbs2rx.C4_5, dvbs2rx.C5_6, dvbs2rx.C8_9, dvbs2rx.C9_10, dvbs2rx.C2_9_VLSNR, dvbs2rx.C13_45, dvbs2rx.C9_20,
+            dvbs2rx.C90_180, dvbs2rx.C96_180, dvbs2rx.C11_20, dvbs2rx.C100_180, dvbs2rx.C104_180, dvbs2rx.C26_45,
+            dvbs2rx.C18_30, dvbs2rx.C28_45, dvbs2rx.C23_36, dvbs2rx.C116_180, dvbs2rx.C20_30, dvbs2rx.C124_180,
+            dvbs2rx.C25_36, dvbs2rx.C128_180, dvbs2rx.C13_18, dvbs2rx.C132_180, dvbs2rx.C22_30, dvbs2rx.C135_180,
+            dvbs2rx.C140_180, dvbs2rx.C7_9, dvbs2rx.C154_180]
     hide: ${ (framesize2.hide_normal if str(standard) == 'STANDARD_DVBS2' else 'all')
         }
 -   id: rate4
@@ -81,7 +81,7 @@ parameters:
     options: [C1_5_MEDIUM, C11_45_MEDIUM, C1_3_MEDIUM]
     option_labels: [1/5, 11/45, 1/3]
     option_attributes:
-        val: [dtv.C1_5_MEDIUM, dtv.C11_45_MEDIUM, dtv.C1_3_MEDIUM]
+        val: [dvbs2rx.C1_5_MEDIUM, dvbs2rx.C11_45_MEDIUM, dvbs2rx.C1_3_MEDIUM]
     hide: ${ (framesize2.hide_medium if str(standard) == 'STANDARD_DVBS2' else 'all')
         }
 -   id: rate5
@@ -94,10 +94,10 @@ parameters:
         14/45, 7/15, 8/15, 26/45, 32/45, 1/5 VL-SNR SF2, 11/45 VL-SNR SF2, 1/5 VL-SNR,
         4/15 VL-SNR, 1/3 VL-SNR]
     option_attributes:
-        val: [dtv.C1_4, dtv.C1_3, dtv.C2_5, dtv.C1_2, dtv.C3_5, dtv.C2_3, dtv.C3_4,
-            dtv.C4_5, dtv.C5_6, dtv.C8_9, dtv.C11_45, dtv.C4_15, dtv.C14_45, dtv.C7_15,
-            dtv.C8_15, dtv.C26_45, dtv.C32_45, dtv.C1_5_VLSNR_SF2, dtv.C11_45_VLSNR_SF2,
-            dtv.C1_5_VLSNR, dtv.C4_15_VLSNR, dtv.C1_3_VLSNR]
+        val: [dvbs2rx.C1_4, dvbs2rx.C1_3, dvbs2rx.C2_5, dvbs2rx.C1_2, dvbs2rx.C3_5, dvbs2rx.C2_3, dvbs2rx.C3_4,
+            dvbs2rx.C4_5, dvbs2rx.C5_6, dvbs2rx.C8_9, dvbs2rx.C11_45, dvbs2rx.C4_15, dvbs2rx.C14_45, dvbs2rx.C7_15,
+            dvbs2rx.C8_15, dvbs2rx.C26_45, dvbs2rx.C32_45, dvbs2rx.C1_5_VLSNR_SF2, dvbs2rx.C11_45_VLSNR_SF2,
+            dvbs2rx.C1_5_VLSNR, dvbs2rx.C4_15_VLSNR, dvbs2rx.C1_3_VLSNR]
     hide: ${ (framesize2.hide_short if str(standard) == 'STANDARD_DVBS2' else 'all')
         }
 
