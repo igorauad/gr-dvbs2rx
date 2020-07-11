@@ -44,6 +44,8 @@ target_include_directories(gnuradio-dvbs2rx
   )
 set_target_properties(gnuradio-dvbs2rx PROPERTIES DEFINE_SYMBOL "gnuradio_dvbs2rx_EXPORTS")
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall")
+
 if(APPLE)
     set_target_properties(gnuradio-dvbs2rx PROPERTIES
         INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib"
