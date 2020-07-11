@@ -36,7 +36,7 @@ namespace gr {
     class DVBS2RX_API bbdescrambler_bb : virtual public gr::sync_block
     {
      public:
-      typedef boost::shared_ptr<bbdescrambler_bb> sptr;
+      typedef std::shared_ptr<bbdescrambler_bb> sptr;
 
       /*!
        * \brief Return a shared_ptr to a new instance of dvbs2rx::bbdescrambler_bb.

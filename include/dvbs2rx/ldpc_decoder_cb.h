@@ -37,7 +37,7 @@ namespace gr {
     class DVBS2RX_API ldpc_decoder_cb : virtual public gr::block
     {
      public:
-      typedef boost::shared_ptr<ldpc_decoder_cb> sptr;
+      typedef std::shared_ptr<ldpc_decoder_cb> sptr;
 
       /*!
        * \brief Return a shared_ptr to a new instance of dvbs2rx::ldpc_decoder_cb.
