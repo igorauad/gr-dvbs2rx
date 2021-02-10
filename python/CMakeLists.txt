@@ -31,7 +31,3 @@ GR_PYTHON_INSTALL(
 include(GrTest)
 
 set(GR_TEST_TARGET_DEPS gnuradio-dvbs2rx)
-GR_ADD_TEST(qa_bbdeheader_bb ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_bbdeheader_bb.py)
-GR_ADD_TEST(qa_bbdescrambler_bb ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_bbdescrambler_bb.py)
-GR_ADD_TEST(qa_bch_decoder_bb ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_bch_decoder_bb.py)
-GR_ADD_TEST(qa_ldpc_decoder_cb ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_ldpc_decoder_cb.py)
