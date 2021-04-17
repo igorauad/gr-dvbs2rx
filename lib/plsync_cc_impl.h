@@ -8,20 +8,10 @@
 #ifndef INCLUDED_DVBS2RX_PLSYNC_CC_IMPL_H
 #define INCLUDED_DVBS2RX_PLSYNC_CC_IMPL_H
 
+#include "pl_defs.h"
+#include "pl_descrambler.h"
 #include "util.h"
 #include <dvbs2rx/plsync_cc.h>
-
-#define SOF_LEN 26
-#define PLSC_LEN 64
-#define PILOT_BLK_LEN 36
-#define MAX_PILOT_BLKS 22
-#define MAX_SLOTS 360
-#define PLHEADER_LEN (SOF_LEN + PLSC_LEN)
-#define SLOT_LEN 90
-#define SLOTS_PER_PILOT_BLK 16
-#define PILOT_BLK_INTERVAL (SLOTS_PER_PILOT_BLK * SLOT_LEN)
-#define PILOT_BLK_PERIOD (PILOT_BLK_INTERVAL + PILOT_BLK_LEN)
-#define MAX_PLFRAME_PAYLOAD (MAX_SLOTS * SLOT_LEN) + (MAX_PILOT_BLKS * PILOT_BLK_LEN)
 
 
 /* correlator lengths, based on the number of differentials that we know in
@@ -273,38 +263,6 @@ public:
     void decode(const gr_complex* in, bool coherent);
 
     const uint64_t* get_codewords() { return codewords; }
-};
-
-class pl_descrambler
-{
-private:
-    int gold_code;               /** Gold code (scrambling code) */
-    int Rn[MAX_PLFRAME_PAYLOAD]; /** Pre-computed int-valued sequence
-                                  * that defines the scrambling symbol
-                                  * mapping table (c.f. Section 5.4.4 of
-                                  * the standard) */
-    int parity_chk(long a, long b);
-
-    /**
-     * \brief Pre-compute the scrambler table
-     * \return Void
-     */
-    void build_symbol_scrambler_table();
-
-public:
-    pl_descrambler(int gold_code);
-    ~pl_descrambler(){};
-
-    /**
-     * \brief De-scramble input symbol
-     * \param in (const gr_complex&) Input symbol
-     * \param out (gr_complex&) Output (descrambled) symbol
-     * \param i (int) Symbol index
-     *
-     * \note Symbol index is relative to the start of the "payload",
-     * i.e. is 0 on the first symbol past the PLHEADER.
-     */
-    void step(const gr_complex& in, gr_complex& out, int i);
 };
 
 class plsync_cc_impl : public plsync_cc

@@ -16,6 +16,7 @@ list(APPEND dvbs2rx_sources
     bbdescrambler_bb_impl.cc
     bch_decoder_bb_impl.cc
     ldpc_decoder_cb_impl.cc
+	pl_descrambler.cc
     plsync_cc_impl.cc
     util.cc
 )
