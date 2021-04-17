@@ -22,4 +22,4 @@ except ImportError:
     from .dvbs2rx_python import *
 
 # import any pure python here
-#
+from .params import *
