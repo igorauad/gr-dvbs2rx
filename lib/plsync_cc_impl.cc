@@ -25,14 +25,13 @@ frame_sync::frame_sync(int debug_level)
       timing_metric(0.0),
       locked(false),
       locked_prev(false),
-      frame_len(0)
+      frame_len(0),
+      d_plsc_delay_buf(PLSC_LEN + 1),
+      d_sof_buf(SOF_CORR_LEN),
+      d_plsc_e_buf(PLSC_CORR_LEN),
+      d_plsc_o_buf(PLSC_CORR_LEN),
+      d_plheader_buf(PLHEADER_LEN)
 {
-    d_plsc_delay_buf = new buffer(PLSC_LEN + 1);
-    d_sof_buf = new buffer(SOF_CORR_LEN);
-    d_plsc_e_buf = new buffer(PLSC_CORR_LEN);
-    d_plsc_o_buf = new buffer(PLSC_CORR_LEN);
-    d_plheader_buf = new buffer(PLHEADER_LEN);
-
     /* SOF and PLSC correlator taps */
     d_sof_taps = { (+0.0 - 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j),
                    (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j),
@@ -55,15 +54,6 @@ frame_sync::frame_sync(int debug_level)
     assert(d_plsc_o_buf.get_length() == d_plsc_taps.size());
 }
 
-frame_sync::~frame_sync()
-{
-    delete d_plsc_delay_buf;
-    delete d_sof_buf;
-    delete d_plsc_e_buf;
-    delete d_plsc_o_buf;
-    delete d_plheader_buf;
-}
-
 void frame_sync::correlate(buffer* buf, gr_complex* taps, gr_complex* res)
 {
     volk_32fc_x2_dot_prod_32fc(res, buf->get_tail(), taps, buf->get_length());
@@ -83,7 +73,7 @@ bool frame_sync::step(const gr_complex& in)
 
     /* Save raw input symbol into buffer. When we finally find the start
      * of frame, we will have the PLHEADER symbols in this buffer */
-    d_plheader_buf->push(in);
+    d_plheader_buf.push(in);
 
     /* Differential value */
     const gr_complex diff = conj(in) * last_in;
@@ -93,11 +83,11 @@ bool frame_sync::step(const gr_complex& in)
      * that the SOF correlator and the PLSC correlator peak at the same time, so
      * that their outputs can be summed together and yield an even stronger
      * peak. */
-    d_plsc_delay_buf->push(diff);
-    const gr_complex diff_d = *d_plsc_delay_buf->get_tail();
+    d_plsc_delay_buf.push(diff);
+    const gr_complex diff_d = *d_plsc_delay_buf.get_tail();
 
     /* Put current diff values on SOF correlator buffer */
-    d_sof_buf->push(diff_d);
+    d_sof_buf.push(diff_d);
 
     /* Push diff into PLS even/odd circular correlator buffer.
      *
@@ -108,9 +98,9 @@ bool frame_sync::step(const gr_complex& in)
      * that are known in advance.
      **/
     if (sym_cnt & 1)
-        d_plsc_o_buf->push(diff);
+        d_plsc_o_buf.push(diff);
     else
-        d_plsc_e_buf->push(diff);
+        d_plsc_e_buf.push(diff);
 
     /* Everything past this point is only necessary exactly when the correlators
      * are expected to peak */
@@ -119,14 +109,14 @@ bool frame_sync::step(const gr_complex& in)
 
     /* SOF correlation */
     gr_complex sof_corr;
-    correlate(d_sof_buf, d_sof_taps.data(), &sof_corr);
+    correlate(&d_sof_buf, d_sof_taps.data(), &sof_corr);
 
     /* PLSC correlation */
     gr_complex plsc_corr;
     if (sym_cnt & 1)
-        correlate(d_plsc_o_buf, d_plsc_taps.data(), &plsc_corr);
+        correlate(&d_plsc_o_buf, d_plsc_taps.data(), &plsc_corr);
     else
-        correlate(d_plsc_e_buf, d_plsc_taps.data(), &plsc_corr);
+        correlate(&d_plsc_e_buf, d_plsc_taps.data(), &plsc_corr);
 
     /* Final timing metric
      *
@@ -169,12 +159,12 @@ bool frame_sync::step(const gr_complex& in)
 
         if (debug_level > 3) {
             dump_complex_vec(
-                d_sof_buf->get_tail(), d_sof_buf->get_length(), "Frame sync: SOF buffer");
-            dump_complex_vec(d_plsc_e_buf->get_tail(),
-                             d_plsc_e_buf->get_length(),
+                d_sof_buf.get_tail(), d_sof_buf.get_length(), "Frame sync: SOF buffer");
+            dump_complex_vec(d_plsc_e_buf.get_tail(),
+                             d_plsc_e_buf.get_length(),
                              "Frame sync: PLSC even buffer");
-            dump_complex_vec(d_plsc_o_buf->get_tail(),
-                             d_plsc_o_buf->get_length(),
+            dump_complex_vec(d_plsc_o_buf.get_tail(),
+                             d_plsc_o_buf.get_length(),
                              "Frame sync: PLSC odd buffer");
         }
 
@@ -198,14 +188,14 @@ bool frame_sync::step(const gr_complex& in)
                            plsc_corr.imag());
 
                 if (debug_level > 3) {
-                    dump_complex_vec(d_sof_buf->get_tail(),
-                                     d_sof_buf->get_length(),
+                    dump_complex_vec(d_sof_buf.get_tail(),
+                                     d_sof_buf.get_length(),
                                      "Frame sync: SOF buffer");
-                    dump_complex_vec(d_plsc_e_buf->get_tail(),
-                                     d_plsc_e_buf->get_length(),
+                    dump_complex_vec(d_plsc_e_buf.get_tail(),
+                                     d_plsc_e_buf.get_length(),
                                      "Frame sync: PLSC even buffer");
-                    dump_complex_vec(d_plsc_o_buf->get_tail(),
-                                     d_plsc_o_buf->get_length(),
+                    dump_complex_vec(d_plsc_o_buf.get_tail(),
+                                     d_plsc_o_buf.get_length(),
                                      "Frame sync: PLSC odd buffer");
                 }
             }

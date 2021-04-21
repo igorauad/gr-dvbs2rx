@@ -51,11 +51,11 @@ private:
     bool locked_prev;       /** previous locked state */
     unsigned int frame_len; /** current PLFRAME length */
 
-    buffer* d_plsc_delay_buf;             /** buffer used as delay line */
-    buffer* d_sof_buf;                    /** SOF correlator buffer */
-    buffer* d_plsc_e_buf;                 /** Even PLSC correlator buffer  */
-    buffer* d_plsc_o_buf;                 /** Odd PLSC correlator buffer */
-    buffer* d_plheader_buf;               /** buffer used to store PLHEADER syms */
+    buffer d_plsc_delay_buf;              /** buffer used as delay line */
+    buffer d_sof_buf;                     /** SOF correlator buffer */
+    buffer d_plsc_e_buf;                  /** Even PLSC correlator buffer  */
+    buffer d_plsc_o_buf;                  /** Odd PLSC correlator buffer */
+    buffer d_plheader_buf;                /** buffer used to store PLHEADER syms */
     volk::vector<gr_complex> d_sof_taps;  /** SOF cross-correlation taps */
     volk::vector<gr_complex> d_plsc_taps; /** PLSC cross-correlation taps */
 
@@ -81,7 +81,6 @@ private:
 
 public:
     frame_sync(int debug_level);
-    ~frame_sync();
 
     /**
      * \brief Step frame timing recovery loop
@@ -94,7 +93,7 @@ public:
     bool get_locked() { return locked; }
     void set_frame_len(unsigned int len) { frame_len = len; }
 
-    const gr_complex* get_plheader() { return d_plheader_buf->get_tail(); }
+    const gr_complex* get_plheader() { return d_plheader_buf.get_tail(); }
 };
 
 class freq_sync
