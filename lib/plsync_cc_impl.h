@@ -12,7 +12,7 @@
 #include "pl_descrambler.h"
 #include "util.h"
 #include <dvbs2rx/plsync_cc.h>
-
+#include <volk/volk_alloc.hh>
 
 /* correlator lengths, based on the number of differentials that we know in
  * advance (25 for SOF and only 32 for PLSC) */
@@ -51,13 +51,13 @@ private:
     bool locked_prev;       /** previous locked state */
     unsigned int frame_len; /** current PLFRAME length */
 
-    buffer* d_plsc_delay_buf; /** buffer used as delay line */
-    buffer* d_sof_buf;        /** SOF correlator buffer */
-    buffer* d_plsc_e_buf;     /** Even PLSC correlator buffer  */
-    buffer* d_plsc_o_buf;     /** Odd PLSC correlator buffer */
-    buffer* d_plheader_buf;   /** buffer used to store PLHEADER syms */
-    gr_complex* d_sof_taps;   /** SOF cross-correlation taps */
-    gr_complex* d_plsc_taps;  /** PLSC cross-correlation taps */
+    buffer* d_plsc_delay_buf;             /** buffer used as delay line */
+    buffer* d_sof_buf;                    /** SOF correlator buffer */
+    buffer* d_plsc_e_buf;                 /** Even PLSC correlator buffer  */
+    buffer* d_plsc_o_buf;                 /** Odd PLSC correlator buffer */
+    buffer* d_plheader_buf;               /** buffer used to store PLHEADER syms */
+    volk::vector<gr_complex> d_sof_taps;  /** SOF cross-correlation taps */
+    volk::vector<gr_complex> d_plsc_taps; /** PLSC cross-correlation taps */
 
     /* Timing metric threshold for inferring a start of frame.
      *
@@ -121,25 +121,28 @@ private:
 
     /* Fine frequency offset estimation state */
     double fine_foffset;
+    float w_angle_avg; /** weighted angle average */
 
     /* Volk buffers */
-    gr_complex* plheader_conj; /** conjugate of PLHEADER symbols */
-    gr_complex* pilot_mod_rm;  /** modulation-removed received pilots */
-    gr_complex* pilot_corr;    /** mod-removed autocorrelation */
-    float* angle_corr;         /** autocorrelation angles */
-    float* angle_diff;         /** angle differences */
-    float* w_window_l;         /** weighting window when locked */
-    float* w_window_u;         /** weighting window when unlocked */
-    float* w_angle_diff;       /** weighted angle differences */
-    float* w_angle_avg;        /** weighted angle average */
-    gr_complex* unmod_pilots;  /** conjugate of un-modulated pilots */
-    float* angle_pilot;        /** average angle of pilot segments */
-    float* angle_diff_f;       /** diff of average pilot angles */
-    gr_complex* pp_plheader;   /** derotated PLHEADER symbols */
+    volk::vector<gr_complex> plheader_conj; /** conjugate of PLHEADER symbols */
+    volk::vector<gr_complex> pilot_mod_rm;  /** modulation-removed received pilots */
+    volk::vector<gr_complex> pp_plheader;   /** derotated PLHEADER symbols */
+
+    /* Coarse estimation only */
+    volk::vector<gr_complex> pilot_corr;   /** mod-removed autocorrelation */
+    volk::vector<float> angle_corr;        /** autocorrelation angles */
+    volk::vector<float> angle_diff;        /** angle differences */
+    volk::vector<float> w_window_l;        /** weighting window when locked */
+    volk::vector<float> w_window_u;        /** weighting window when unlocked */
+    volk::vector<float> w_angle_diff;      /** weighted angle differences */
+    volk::vector<gr_complex> unmod_pilots; /** conjugate of un-modulated pilots */
+
+    /* Fine estimation only */
+    volk::vector<float> angle_pilot;  /** average angle of pilot segments */
+    volk::vector<float> angle_diff_f; /** diff of average pilot angles */
 
 public:
     freq_sync(unsigned int period, int debug_level, const uint64_t* codewords);
-    ~freq_sync();
 
     /**
      * \brief Data-aided coarse frequency offset estimation
@@ -211,7 +214,7 @@ public:
     double get_coarse_foffset() { return coarse_foffset; }
     double get_fine_foffset() { return fine_foffset; }
     bool is_coarse_corrected() { return coarse_corrected; }
-    const gr_complex* get_plheader() { return pp_plheader; }
+    const gr_complex* get_plheader() { return pp_plheader.data(); }
 };
 
 class plsc_decoder
@@ -294,7 +297,7 @@ private:
     pl_descrambler* d_pl_descrambler; /** PL descrambler */
 
     /* Buffers */
-    gr_complex* d_rx_pilots; /** Received pilot symbols */
+    volk::vector<gr_complex> d_rx_pilots; /** Received pilot symbols */
 
 public:
     plsync_cc_impl(int gold_code, int freq_est_period, float sps, int debug_level);

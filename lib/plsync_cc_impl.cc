@@ -13,7 +13,7 @@
 #include <gnuradio/expj.h>
 #include <gnuradio/io_signature.h>
 #include <gnuradio/math.h>
-#include <volk/volk.h>
+#include <cassert>
 
 namespace gr {
 namespace dvbs2rx {
@@ -34,36 +34,25 @@ frame_sync::frame_sync(int debug_level)
     d_plheader_buf = new buffer(PLHEADER_LEN);
 
     /* SOF and PLSC correlator taps */
-    d_sof_taps =
-        (gr_complex*)volk_malloc(SOF_CORR_LEN * sizeof(gr_complex), volk_get_alignment());
-    d_plsc_taps = (gr_complex*)volk_malloc(PLSC_CORR_LEN * sizeof(gr_complex),
-                                           volk_get_alignment());
-
-    /* Copy taps */
-    gr_complex sof_taps[SOF_CORR_LEN] = {
-        (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i),
-        (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i),
-        (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i),
-        (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i),
-        (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i)
-    };
-
-    gr_complex plsc_taps[PLSC_CORR_LEN] = {
-        (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i),
-        (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i),
-        (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i),
-        (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i),
-        (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i),
-        (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i),
-        (+0.0 - 1.0i), (+0.0 - 1.0i)
-    };
-
-    for (int i = 0; i < SOF_CORR_LEN; i++) {
-        d_sof_taps[i] = sof_taps[i];
-    }
-    for (int i = 0; i < PLSC_CORR_LEN; i++) {
-        d_plsc_taps[i] = plsc_taps[i];
-    }
+    d_sof_taps = { (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i),
+                   (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i),
+                   (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i),
+                   (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i),
+                   (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i),
+                   (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i),
+                   (+0.0 - 1.0i) };
+    d_plsc_taps = { (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i),
+                    (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i),
+                    (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i),
+                    (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i),
+                    (+0.0 - 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i),
+                    (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i),
+                    (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i),
+                    (+0.0 + 1.0i), (+0.0 + 1.0i), (+0.0 - 1.0i), (+0.0 - 1.0i) };
+    assert(d_sof_taps.size() == SOF_CORR_LEN);
+    assert(d_plsc_taps.size() == PLSC_CORR_LEN);
+    assert(d_plsc_e_buf.get_length() == d_plsc_taps.size());
+    assert(d_plsc_o_buf.get_length() == d_plsc_taps.size());
 }
 
 frame_sync::~frame_sync()
@@ -73,8 +62,6 @@ frame_sync::~frame_sync()
     delete d_plsc_e_buf;
     delete d_plsc_o_buf;
     delete d_plheader_buf;
-    volk_free(d_sof_taps);
-    volk_free(d_plsc_taps);
 }
 
 void frame_sync::correlate(buffer* buf, gr_complex* taps, gr_complex* res)
@@ -132,14 +119,14 @@ bool frame_sync::step(const gr_complex& in)
 
     /* SOF correlation */
     gr_complex sof_corr;
-    correlate(d_sof_buf, d_sof_taps, &sof_corr);
+    correlate(d_sof_buf, d_sof_taps.data(), &sof_corr);
 
     /* PLSC correlation */
     gr_complex plsc_corr;
     if (sym_cnt & 1)
-        correlate(d_plsc_o_buf, d_plsc_taps, &plsc_corr);
+        correlate(d_plsc_o_buf, d_plsc_taps.data(), &plsc_corr);
     else
-        correlate(d_plsc_e_buf, d_plsc_taps, &plsc_corr);
+        correlate(d_plsc_e_buf, d_plsc_taps.data(), &plsc_corr);
 
     /* Final timing metric
      *
@@ -236,30 +223,21 @@ freq_sync::freq_sync(unsigned int period, int debug_level, const uint64_t* codew
       N(PLHEADER_LEN),
       L(PLHEADER_LEN - 1),
       coarse_corrected(false),
-      fine_foffset(0.0)
+      fine_foffset(0.0),
+      w_angle_avg(0.0),
+      plheader_conj(PLHEADER_LEN * n_codewords),
+      pilot_mod_rm(PLHEADER_LEN),
+      pp_plheader(PLHEADER_LEN),
+      pilot_corr(L + 1),
+      angle_corr(L + 1),
+      angle_diff(L),
+      w_window_l(PLHEADER_LEN - 1),
+      w_window_u(SOF_LEN - 1),
+      w_angle_diff(L),
+      unmod_pilots(PILOT_BLK_LEN),
+      angle_pilot(MAX_PILOT_BLKS + 1),
+      angle_diff_f(MAX_PILOT_BLKS)
 {
-    /* Buffers  */
-    int alignment = volk_get_alignment();
-    /* Common */
-    plheader_conj = (gr_complex*)volk_malloc(
-        PLHEADER_LEN * n_codewords * sizeof(gr_complex), alignment);
-    pilot_mod_rm = (gr_complex*)volk_malloc(PLHEADER_LEN * sizeof(gr_complex), alignment);
-    /* Coarse estimation only */
-    pilot_corr = (gr_complex*)volk_malloc((L + 1) * sizeof(gr_complex), alignment);
-    angle_corr = (float*)volk_malloc((L + 1) * sizeof(float), alignment);
-    angle_diff = (float*)volk_malloc(L * sizeof(float), alignment);
-    w_window_l = (float*)volk_malloc((PLHEADER_LEN - 1) * sizeof(float), alignment);
-    w_window_u = (float*)volk_malloc((SOF_LEN - 1) * sizeof(float), alignment);
-    w_angle_diff = (float*)volk_malloc(L * sizeof(float), alignment);
-    w_angle_avg = (float*)volk_malloc(sizeof(float), alignment);
-    /* Fine estimation only */
-    unmod_pilots =
-        (gr_complex*)volk_malloc(PILOT_BLK_LEN * sizeof(gr_complex), alignment);
-    angle_pilot = (float*)volk_malloc((MAX_PILOT_BLKS + 1) * sizeof(float), alignment);
-    angle_diff_f = (float*)volk_malloc(MAX_PILOT_BLKS * sizeof(float), alignment);
-    /* Other */
-    pp_plheader = (gr_complex*)volk_malloc(PLHEADER_LEN * sizeof(gr_complex), alignment);
-
     /* Initialize the vector containing the complex conjugate of all 128
      * possible PLHEADER BPSK symbol sequences */
     gr_complex conj_mod_sof[SOF_LEN] = {
@@ -317,9 +295,9 @@ freq_sync::freq_sync(unsigned int period, int debug_level, const uint64_t* codew
         }
     }
 
-    /* Zero-initialize the preamble corr buffer - we will use it as an
-     * accumulator */
-    memset(pilot_corr, 0, (L + 1) * sizeof(gr_complex));
+    /* Make sure the preamble correlation buffer is zero-initialized, as it is
+     * later used as an accumulator */
+    std::fill(pilot_corr.begin(), pilot_corr.end(), 0);
 
     /* Zero-initialize the first index of the autocorrelation angle buffer - it
      * will need to remain 0 forever */
@@ -345,39 +323,23 @@ freq_sync::freq_sync(unsigned int period, int debug_level, const uint64_t* codew
         unmod_pilots[i] = (+0.7071068 - 0.7071068i);
 }
 
-freq_sync::~freq_sync()
-{
-    volk_free(plheader_conj);
-    volk_free(pilot_mod_rm);
-    volk_free(pilot_corr);
-    volk_free(angle_corr);
-    volk_free(angle_diff);
-    volk_free(w_window_l);
-    volk_free(w_window_u);
-    volk_free(w_angle_diff);
-    volk_free(w_angle_avg);
-    volk_free(unmod_pilots);
-    volk_free(angle_pilot);
-    volk_free(angle_diff_f);
-    volk_free(pp_plheader);
-}
-
 bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool locked)
 {
-    float* w_window;
+    /* TODO: we could also average over pilot blocks */
+    const float* w_window;
     if (locked) {
         N = PLHEADER_LEN;
         L = PLHEADER_LEN - 1;
-        w_window = w_window_l;
+        w_window = w_window_l.data();
     } else {
         N = SOF_LEN;
         L = SOF_LEN - 1;
-        w_window = w_window_u;
+        w_window = w_window_u.data();
     }
 
     /* "Remove" modulation from pilots to obtain a "CW" signal */
     volk_32fc_x2_multiply_32fc(
-        pilot_mod_rm, in, &plheader_conj[i_codeword * PLHEADER_LEN], N);
+        pilot_mod_rm.data(), in, &plheader_conj[i_codeword * PLHEADER_LEN], N);
 
     /* Auto-correlation of the "modulation-removed" pilot symbols
      *
@@ -391,7 +353,7 @@ bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool l
     gr_complex r_sum;
     for (unsigned int m = 1; m <= L; m++) {
         volk_32fc_x2_conjugate_dot_prod_32fc(
-            &r_sum, pilot_mod_rm + m, pilot_mod_rm, (N - m));
+            &r_sum, pilot_mod_rm.data() + m, pilot_mod_rm.data(), (N - m));
         // Accumulate
         pilot_corr[m] += r_sum;
     }
@@ -421,7 +383,8 @@ bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool l
      * angle_corr[1]. Due to the trick described above (of leaving
      * angle_corr[0]=0), we will also get this after the line that follows:
      */
-    volk_32f_x2_subtract_32f(angle_diff, angle_corr + 1, angle_corr, L);
+    volk_32f_x2_subtract_32f(
+        angle_diff.data(), angle_corr.data() + 1, angle_corr.data(), L);
 
     /* Put angle differences within [-pi, pi]
      *
@@ -442,17 +405,17 @@ bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool l
     /* TODO maybe use volk_32f_s32f_s32f_mod_range_32f or fmod */
 
     /* Weighted average */
-    volk_32f_x2_multiply_32f(w_angle_diff, angle_diff, w_window, L);
+    volk_32f_x2_multiply_32f(w_angle_diff.data(), angle_diff.data(), w_window, L);
 
     /* Sum of weighted average */
-    volk_32f_accumulator_s32f(w_angle_avg, w_angle_diff, L);
+    volk_32f_accumulator_s32f(&w_angle_avg, w_angle_diff.data(), L);
 
     /* Final freq offset estimate
      *
      * Due to angle in range [-pi,pi], the freq. offset lies within
      * [-0.5,0.5]. Enforce that to avoid numerical problems.
      */
-    coarse_foffset = branchless_clip(*w_angle_avg / (2 * M_PI), 0.5f);
+    coarse_foffset = branchless_clip(w_angle_avg / (2 * M_PI), 0.5f);
 
     if (debug_level > 1) {
         printf("Frequency offset estimation:\n");
@@ -467,7 +430,7 @@ bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool l
     }
 
     /* Reset autocorrelation accumulator */
-    memset(pilot_corr, 0, (L + 1) * sizeof(gr_complex));
+    std::fill(pilot_corr.begin(), pilot_corr.end(), 0);
 
     /* Declare that the frequency offset is coarsely corrected once the residual
      * offset falls within the fine correction range */
@@ -480,7 +443,7 @@ float freq_sync::estimate_plheader_phase(const gr_complex* in, uint8_t i_codewor
 {
     /* "Remove" modulation */
     volk_32fc_x2_multiply_32fc(
-        pilot_mod_rm, in, &plheader_conj[i_codeword * PLHEADER_LEN], PLHEADER_LEN);
+        pilot_mod_rm.data(), in, &plheader_conj[i_codeword * PLHEADER_LEN], PLHEADER_LEN);
 
     /* Angle of the sum of the PLHEADER symbols */
     gr_complex ck_sum = 0;
@@ -521,7 +484,8 @@ float freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
 void freq_sync::estimate_fine(const gr_complex* pilots, uint8_t n_pilot_blks)
 {
     /* Angle differences */
-    volk_32f_x2_subtract_32f(angle_diff_f, angle_pilot + 1, angle_pilot, n_pilot_blks);
+    volk_32f_x2_subtract_32f(
+        angle_diff_f.data(), angle_pilot.data() + 1, angle_pilot.data(), n_pilot_blks);
 
     /* Put angle differences within [-pi, pi] */
     for (int i = 0; i < n_pilot_blks; i++) {
@@ -533,7 +497,7 @@ void freq_sync::estimate_fine(const gr_complex* pilots, uint8_t n_pilot_blks)
 
     /* Sum of all angles differences */
     float sum_diff;
-    volk_32f_accumulator_s32f(&sum_diff, angle_diff_f, n_pilot_blks);
+    volk_32f_accumulator_s32f(&sum_diff, angle_diff_f.data(), n_pilot_blks);
 
     /* Final estimate */
     fine_foffset = sum_diff / (2.0 * GR_M_PI * PILOT_BLK_PERIOD * n_pilot_blks);
@@ -544,7 +508,7 @@ void freq_sync::estimate_fine(const gr_complex* pilots, uint8_t n_pilot_blks)
     if (debug_level > 3) {
         dump_complex_vec(
             pilots, PLHEADER_LEN + (n_pilot_blks * PILOT_BLK_LEN), "Rx Pilots");
-        dump_real_vec(angle_pilot, n_pilot_blks + 1, "Pilot angles");
+        dump_real_vec(angle_pilot.data(), n_pilot_blks + 1, "Pilot angles");
     }
 }
 
@@ -580,7 +544,7 @@ void freq_sync::derotate_plheader(const gr_complex* in)
      * simply rely on the MODCOD info of the previous frame, since VCM could be
      * used and, as a result, the current frame may have a distinct MODCOD.
      */
-    volk_32fc_x2_multiply_32fc(pilot_mod_rm, in, plheader_conj, SOF_LEN);
+    volk_32fc_x2_multiply_32fc(pilot_mod_rm.data(), in, plheader_conj.data(), SOF_LEN);
     gr_complex ck_sum = 0;
     for (int i = 0; i < SOF_LEN; i++)
         ck_sum += pilot_mod_rm[i];
@@ -595,7 +559,8 @@ void freq_sync::derotate_plheader(const gr_complex* in)
     gr_complex phasor_0 = gr_expj(-plheader_phase);
 
     /* De-rotate and save into the post-processed PLHEADER buffer */
-    volk_32fc_s32fc_x2_rotator_32fc(pp_plheader, in, phasor, &phasor_0, PLHEADER_LEN);
+    volk_32fc_s32fc_x2_rotator_32fc(
+        pp_plheader.data(), in, phasor, &phasor_0, PLHEADER_LEN);
 }
 
 plsc_decoder::plsc_decoder(int debug_level)
@@ -898,9 +863,7 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
     d_pl_descrambler = new pl_descrambler(gold_code);
 
     /* Buffer to store received pilots (PLHEADER and pilot blocks) */
-    d_rx_pilots = (gr_complex*)volk_malloc(
-        (PLHEADER_LEN + (MAX_PILOT_BLKS * PILOT_BLK_LEN)) * sizeof(gr_complex),
-        volk_get_alignment());
+    d_rx_pilots.resize(PLHEADER_LEN + (MAX_PILOT_BLKS * PILOT_BLK_LEN));
 
     /* Message port */
     message_port_register_out(d_port_id);
@@ -919,7 +882,6 @@ plsync_cc_impl::~plsync_cc_impl()
     delete d_plsc_decoder;
     delete d_freq_sync;
     delete d_pl_descrambler;
-    volk_free(d_rx_pilots);
 }
 
 void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_required)
@@ -989,7 +951,8 @@ int plsync_cc_impl::general_work(int noutput_items,
             /* Once all symbols of the current pilot block have been
              * acquired, estimate the average phase of the block */
             if (i_in_pilot_blk == (PILOT_BLK_LEN - 1)) {
-                d_da_phase = d_freq_sync->estimate_pilot_phase(d_rx_pilots, i_pilot_blk);
+                d_da_phase =
+                    d_freq_sync->estimate_pilot_phase(d_rx_pilots.data(), i_pilot_blk);
             }
         }
 
@@ -1026,8 +989,10 @@ int plsync_cc_impl::general_work(int noutput_items,
              * pilots (nor the PLHEADER). Yet, the current PLHEADER right now
              * (in this iteration) is available within the frame sync buffer
              * (p_plheader). So this is what we use when unlocked. */
-            new_coarse_est = d_freq_sync->estimate_coarse(
-                d_locked ? d_rx_pilots : p_plheader, d_plsc_decoder->dec_plsc, d_locked);
+            new_coarse_est =
+                d_freq_sync->estimate_coarse(d_locked ? d_rx_pilots.data() : p_plheader,
+                                             d_plsc_decoder->dec_plsc,
+                                             d_locked);
 
             /* Fine frequency offset based on the previous frame
              *
@@ -1051,7 +1016,7 @@ int plsync_cc_impl::general_work(int noutput_items,
              */
             new_fine_est = d_locked && d_plsc_decoder->has_pilots;
             if (new_fine_est) {
-                d_freq_sync->estimate_fine(d_rx_pilots, d_plsc_decoder->n_pilots);
+                d_freq_sync->estimate_fine(d_rx_pilots.data(), d_plsc_decoder->n_pilots);
             }
 
             /* Try to de-rotate the PLHEADER's pi/2 BPSK symbols */
@@ -1198,7 +1163,7 @@ int plsync_cc_impl::general_work(int noutput_items,
              * overwrite the previous PLHEADER that is needed for fine
              * estimation based on the previous frame.
              */
-            memcpy(d_rx_pilots, p_plheader, PLHEADER_LEN * sizeof(gr_complex));
+            memcpy(d_rx_pilots.data(), p_plheader, PLHEADER_LEN * sizeof(gr_complex));
 
             /* Estimate the phase of this PLHEADER - this phase estimate
              * can be used for fine frequency offset estimation in the
