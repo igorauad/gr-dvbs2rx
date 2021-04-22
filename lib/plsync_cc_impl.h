@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /*
- * Copyright 2019-2021 Igor Freire.
+ * Copyright (c) 2019-2021 Igor Freire
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
