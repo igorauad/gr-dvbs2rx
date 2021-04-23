@@ -6,6 +6,7 @@
  */
 
 #include "pl_frame_sync.h"
+#include "util.h"
 #include <cassert>
 
 namespace gr {
@@ -47,9 +48,11 @@ frame_sync::frame_sync(int debug_level)
     assert(d_plsc_o_buf.get_length() == d_plsc_taps.size());
 }
 
-void frame_sync::correlate(buffer* buf, gr_complex* taps, gr_complex* res)
+void frame_sync::correlate(delay_line<gr_complex>* d_line,
+                           gr_complex* taps,
+                           gr_complex* res)
 {
-    volk_32fc_x2_dot_prod_32fc(res, buf->get_tail(), taps, buf->get_length());
+    volk_32fc_x2_dot_prod_32fc(res, d_line->get_tail(), taps, d_line->get_length());
 }
 
 bool frame_sync::step(const gr_complex& in)

@@ -8,8 +8,9 @@
 #ifndef INCLUDED_DVBS2RX_PL_FRAME_SYNC_H
 #define INCLUDED_DVBS2RX_PL_FRAME_SYNC_H
 
+#include "delay_line.h"
 #include "pl_defs.h"
-#include "util.h"
+#include <gnuradio/gr_complex.h>
 
 /* correlator lengths, based on the number of differentials that we know in
  * advance (25 for SOF and only 32 for PLSC) */
@@ -34,13 +35,13 @@ private:
     bool locked_prev;       /** previous locked state */
     unsigned int frame_len; /** current PLFRAME length */
 
-    buffer d_plsc_delay_buf;              /** buffer used as delay line */
-    buffer d_sof_buf;                     /** SOF correlator buffer */
-    buffer d_plsc_e_buf;                  /** Even PLSC correlator buffer  */
-    buffer d_plsc_o_buf;                  /** Odd PLSC correlator buffer */
-    buffer d_plheader_buf;                /** buffer used to store PLHEADER syms */
-    volk::vector<gr_complex> d_sof_taps;  /** SOF cross-correlation taps */
-    volk::vector<gr_complex> d_plsc_taps; /** PLSC cross-correlation taps */
+    delay_line<gr_complex> d_plsc_delay_buf; /** buffer used as delay line */
+    delay_line<gr_complex> d_sof_buf;        /** SOF correlator buffer */
+    delay_line<gr_complex> d_plsc_e_buf;     /** Even PLSC correlator buffer  */
+    delay_line<gr_complex> d_plsc_o_buf;     /** Odd PLSC correlator buffer */
+    delay_line<gr_complex> d_plheader_buf;   /** buffer used to store PLHEADER syms */
+    volk::vector<gr_complex> d_sof_taps;     /** SOF cross-correlation taps */
+    volk::vector<gr_complex> d_plsc_taps;    /** PLSC cross-correlation taps */
 
     /* Timing metric threshold for inferring a start of frame.
      *
@@ -56,12 +57,12 @@ private:
 
     /**
      * \brief Compute cross-correlation
-     * \param buf (buffer*) Pointer to tapped-delay line buffer
-     * \param taps (gr_complex *) Pointer to taps for cross-correlation
-     * \param res (gr_complex *) Pointer where to store result
+     * \param d_line (delay_line*) Pointer to delay line buffer
+     * \param taps (gr_complex*) Pointer to taps for cross-correlation
+     * \param res (gr_complex*) Pointer where to store result
      * \return Void.
      */
-    void correlate(buffer* buf, gr_complex* taps, gr_complex* res);
+    void correlate(delay_line<gr_complex>* d_line, gr_complex* taps, gr_complex* res);
 
 public:
     frame_sync(int debug_level);
