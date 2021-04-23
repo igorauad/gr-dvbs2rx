@@ -31,16 +31,12 @@ int pl_descrambler::parity_chk(long a, long b) const
 void pl_descrambler::build_symbol_scrambler_table()
 {
     /* From gr-dtv's dvbs2_physical_cc_impl.cc */
-    long x, y;
-    int xa, xb, xc, ya, yb, yc;
-    int zna, znb;
-
     // Initialisation
-    x = 0x00001;
-    y = 0x3FFFF;
+    long x = 0x00001;
+    long y = 0x3FFFF;
 
     for (int n = 0; n < d_gold_code; n++) {
-        xb = parity_chk(x, 0x0081);
+        int xb = parity_chk(x, 0x0081);
 
         x >>= 1;
         if (xb) {
@@ -49,26 +45,26 @@ void pl_descrambler::build_symbol_scrambler_table()
     }
 
     for (int i = 0; i < MAX_PLFRAME_PAYLOAD; i++) {
-        xa = parity_chk(x, 0x8050);
-        xb = parity_chk(x, 0x0081);
-        xc = x & 1;
+        int xa = parity_chk(x, 0x8050);
+        int xb = parity_chk(x, 0x0081);
+        int xc = x & 1;
 
         x >>= 1;
         if (xb) {
             x |= 0x20000;
         }
 
-        ya = parity_chk(y, 0x04A1);
-        yb = parity_chk(y, 0xFF60);
-        yc = y & 1;
+        int ya = parity_chk(y, 0x04A1);
+        int yb = parity_chk(y, 0xFF60);
+        int yc = y & 1;
 
         y >>= 1;
         if (ya) {
             y |= 0x20000;
         }
 
-        zna = xc ^ yc;
-        znb = xa ^ yb;
+        int zna = xc ^ yc;
+        int znb = xa ^ yb;
         d_Rn[i] = (znb << 1) + zna;
     }
 }
