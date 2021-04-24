@@ -7,6 +7,7 @@
 
 #include "pl_frame_sync.h"
 #include "util.h"
+#include <algorithm>
 #include <cassert>
 
 namespace gr {
@@ -26,7 +27,8 @@ frame_sync::frame_sync(int debug_level)
       d_plsc_o_buf(PLSC_CORR_LEN),
       d_plheader_buf(PLHEADER_LEN)
 {
-    /* SOF and PLSC correlator taps */
+    /* SOF and PLSC matched filter (correlator) taps: the folded (or reversed)
+     * version of the target SOF and PLSC symbols */
     d_sof_taps = { (+0.0 - 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j),
                    (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j),
                    (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j),
@@ -42,17 +44,19 @@ frame_sync::frame_sync(int debug_level)
                     (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j),
                     (+0.0 + 1.0j), (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j),
                     (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j) };
+    std::reverse(d_sof_taps.begin(), d_sof_taps.end());
+    std::reverse(d_plsc_taps.begin(), d_plsc_taps.end());
     assert(d_sof_taps.size() == SOF_CORR_LEN);
     assert(d_plsc_taps.size() == PLSC_CORR_LEN);
-    assert(d_plsc_e_buf.get_length() == d_plsc_taps.size());
-    assert(d_plsc_o_buf.get_length() == d_plsc_taps.size());
+    assert(d_plsc_e_buf.length() == d_plsc_taps.size());
+    assert(d_plsc_o_buf.length() == d_plsc_taps.size());
 }
 
-void frame_sync::correlate(delay_line<gr_complex>* d_line,
-                           gr_complex* taps,
+void frame_sync::correlate(delay_line<gr_complex>& d_line,
+                           volk::vector<gr_complex>& taps,
                            gr_complex* res)
 {
-    volk_32fc_x2_dot_prod_32fc(res, d_line->get_tail(), taps, d_line->get_length());
+    volk_32fc_x2_dot_prod_32fc(res, &d_line.back(), taps.data(), d_line.length());
 }
 
 bool frame_sync::step(const gr_complex& in)
@@ -80,7 +84,7 @@ bool frame_sync::step(const gr_complex& in)
      * that their outputs can be summed together and yield an even stronger
      * peak. */
     d_plsc_delay_buf.push(diff);
-    const gr_complex diff_d = *d_plsc_delay_buf.get_tail();
+    const gr_complex& diff_d = d_plsc_delay_buf.back();
 
     /* Put current diff values on SOF correlator buffer */
     d_sof_buf.push(diff_d);
@@ -105,14 +109,14 @@ bool frame_sync::step(const gr_complex& in)
 
     /* SOF correlation */
     gr_complex sof_corr;
-    correlate(&d_sof_buf, d_sof_taps.data(), &sof_corr);
+    correlate(d_sof_buf, d_sof_taps, &sof_corr);
 
     /* PLSC correlation */
     gr_complex plsc_corr;
     if (sym_cnt & 1)
-        correlate(&d_plsc_o_buf, d_plsc_taps.data(), &plsc_corr);
+        correlate(d_plsc_o_buf, d_plsc_taps, &plsc_corr);
     else
-        correlate(&d_plsc_e_buf, d_plsc_taps.data(), &plsc_corr);
+        correlate(d_plsc_e_buf, d_plsc_taps, &plsc_corr);
 
     /* Final timing metric
      *
@@ -154,14 +158,9 @@ bool frame_sync::step(const gr_complex& in)
                    plsc_corr.imag());
 
         if (debug_level > 3) {
-            dump_complex_vec(
-                d_sof_buf.get_tail(), d_sof_buf.get_length(), "Frame sync: SOF buffer");
-            dump_complex_vec(d_plsc_e_buf.get_tail(),
-                             d_plsc_e_buf.get_length(),
-                             "Frame sync: PLSC even buffer");
-            dump_complex_vec(d_plsc_o_buf.get_tail(),
-                             d_plsc_o_buf.get_length(),
-                             "Frame sync: PLSC odd buffer");
+            dump_complex_vec(d_sof_buf, "Frame sync: SOF buffer");
+            dump_complex_vec(d_plsc_e_buf, "Frame sync: PLSC even buffer");
+            dump_complex_vec(d_plsc_o_buf, "Frame sync: PLSC odd buffer");
         }
 
         sym_cnt = 0;
@@ -184,15 +183,9 @@ bool frame_sync::step(const gr_complex& in)
                            plsc_corr.imag());
 
                 if (debug_level > 3) {
-                    dump_complex_vec(d_sof_buf.get_tail(),
-                                     d_sof_buf.get_length(),
-                                     "Frame sync: SOF buffer");
-                    dump_complex_vec(d_plsc_e_buf.get_tail(),
-                                     d_plsc_e_buf.get_length(),
-                                     "Frame sync: PLSC even buffer");
-                    dump_complex_vec(d_plsc_o_buf.get_tail(),
-                                     d_plsc_o_buf.get_length(),
-                                     "Frame sync: PLSC odd buffer");
+                    dump_complex_vec(d_sof_buf, "Frame sync: SOF buffer");
+                    dump_complex_vec(d_plsc_e_buf, "Frame sync: PLSC even buffer");
+                    dump_complex_vec(d_plsc_o_buf, "Frame sync: PLSC odd buffer");
                 }
             }
         }

@@ -56,13 +56,18 @@ private:
     const float threshold_l = 25; /** locked threshold */
 
     /**
-     * \brief Compute cross-correlation
-     * \param d_line (delay_line*) Pointer to delay line buffer
-     * \param taps (gr_complex*) Pointer to taps for cross-correlation
-     * \param res (gr_complex*) Pointer where to store result
+     * \brief Cross-correlation between a delay line buffer and a given vector.
+     * \param d_line Reference to a delay line buffer with the newest sample at
+     *               index 0 and the oldest sample at the last index.
+     * \param taps Reference to a volk vector with taps for cross-correlation.
+     * \param res Pointer to result.
+     * \note The tap vector should consist of the folded version of the target
+     * sequence (SOF or PLSC).
      * \return Void.
      */
-    void correlate(delay_line<gr_complex>* d_line, gr_complex* taps, gr_complex* res);
+    void correlate(delay_line<gr_complex>& d_line,
+                   volk::vector<gr_complex>& taps,
+                   gr_complex* res);
 
 public:
     frame_sync(int debug_level);
@@ -78,7 +83,7 @@ public:
     bool get_locked() { return locked; }
     void set_frame_len(unsigned int len) { frame_len = len; }
 
-    const gr_complex* get_plheader() { return d_plheader_buf.get_tail(); }
+    const gr_complex* get_plheader() { return &d_plheader_buf.back(); }
 };
 
 } // namespace dvbs2rx

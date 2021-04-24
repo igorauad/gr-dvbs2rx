@@ -10,6 +10,7 @@
 namespace gr {
 namespace dvbs2rx {
 
+
 void dump_real_vec(const float* vec, unsigned int N, const char* label)
 {
     printf("- %10s: [", label);
@@ -23,6 +24,11 @@ void dump_real_vec(const volk::vector<float>& vec, unsigned int N, const char* l
     if (vec.size() < N)
         throw std::runtime_error("Invalid vector size");
     dump_real_vec(vec.data(), N, label);
+}
+
+void dump_real_vec(const delay_line<float>& vec, const char* label)
+{
+    dump_real_vec(&vec.back(), vec.length(), label);
 }
 
 void dump_complex_vec(const gr_complex* vec, unsigned int N, const char* label)
@@ -40,6 +46,11 @@ void dump_complex_vec(const volk::vector<gr_complex>& vec,
     if (vec.size() < N)
         throw std::runtime_error("Invalid vector size");
     dump_complex_vec(vec.data(), N, label);
+}
+
+void dump_complex_vec(const delay_line<gr_complex>& vec, const char* label)
+{
+    dump_complex_vec(&vec.back(), vec.length(), label);
 }
 
 } // namespace dvbs2rx
