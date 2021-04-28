@@ -23,22 +23,6 @@ private:
     /* Constants */
     uint64_t codewords[n_plsc_codewords]; // all possible 64-bit codewords
 
-    /**
-     * \brief Coherent pi/2 BPSK demapping
-     * \param in (const gr_complex *) Incoming PLHEADER BPSK symbols
-     * \return (uin64_t) Demapped bits of the scrambled PLSC
-     * \note Pointer *in must point to the start of the PLHEADER.
-     */
-    uint64_t demap_bpsk(const gr_complex* in);
-
-    /**
-     * \brief Differential pi/2 BPSK demapping
-     * \param in (const gr_complex *) Incoming PLHEADER BPSK symbols
-     * \return (uin64_t) Demapped bits of the scrambled PLSC
-     * \note Pointer *in must point to the start of the PLHEADER.
-     */
-    uint64_t demap_bpsk_diff(const gr_complex* in);
-
 public:
     /* State - made public to speed up access */
     uint8_t dec_plsc;     /** 7-bit decoded PLSC dataword */
@@ -56,7 +40,7 @@ public:
 
     /**
      * \brief Decode the incoming pi/2 BPSK symbols of the PLSC
-     * \param in (const gr_complex *) Input pi/2 BPSK symbols
+     * \param in (const gr_complex *) Input pi/2 BPSK symbols of the PLSC
      * \param coherent (bool) Whether to use coherent BPSK demapping
      * \return Void.
      */

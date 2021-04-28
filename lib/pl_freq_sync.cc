@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "pi2_bpsk.h"
 #include "pl_defs.h"
 #include "pl_freq_sync.h"
 #include "util.h"
@@ -39,59 +40,16 @@ freq_sync::freq_sync(unsigned int period, int debug_level, const uint64_t* codew
 {
     /* Initialize the vector containing the complex conjugate of all 128
      * possible PLHEADER BPSK symbol sequences */
-    gr_complex conj_mod_sof[SOF_LEN] = {
-        (+0.7071068 - 0.7071068j), (+0.7071068 + 0.7071068j), (-0.7071068 + 0.7071068j),
-        (-0.7071068 - 0.7071068j), (+0.7071068 - 0.7071068j), (-0.7071068 - 0.7071068j),
-        (-0.7071068 + 0.7071068j), (+0.7071068 + 0.7071068j), (+0.7071068 - 0.7071068j),
-        (+0.7071068 + 0.7071068j), (+0.7071068 - 0.7071068j), (-0.7071068 - 0.7071068j),
-        (-0.7071068 + 0.7071068j), (-0.7071068 - 0.7071068j), (-0.7071068 + 0.7071068j),
-        (+0.7071068 + 0.7071068j), (-0.7071068 + 0.7071068j), (-0.7071068 - 0.7071068j),
-        (-0.7071068 + 0.7071068j), (-0.7071068 - 0.7071068j), (+0.7071068 - 0.7071068j),
-        (-0.7071068 - 0.7071068j), (+0.7071068 - 0.7071068j), (-0.7071068 - 0.7071068j),
-        (-0.7071068 + 0.7071068j), (-0.7071068 - 0.7071068j)
-    };
-
     for (int i = 0; i < n_plsc_codewords; i++) { // codewords
-        /* Conjugate of the SOF symbols */
-        for (int j = 0; j < SOF_LEN; j++) { // symbol
-            plheader_conj[(i * PLHEADER_LEN) + j] = conj_mod_sof[j];
-        }
+        gr_complex* ptr = plheader_conj.data() + (i * PLHEADER_LEN);
+        map_bpsk(sof_big_endian, ptr, SOF_LEN); // SOF
+        map_bpsk(
+            codewords[i] ^ plsc_scrambler, ptr + SOF_LEN, PLSC_LEN); // scrambled PLSC
+    }
 
-        /* Conjugate of the scrambled PLSC codeword symbols */
-        for (int j = 0; j < PLSC_LEN; j++) { // symbol
-            /* scramble first */
-            uint64_t scrambled_codeword = codewords[i] ^ plsc_scrambler;
-
-            /* NOTE: even/oddness below is according to the standard, which
-             * starts from 1, rather than 0. Hence, it is the opposite of the
-             * even/oddness of index j. */
-            gr_complex mod_sym;
-            if (scrambled_codeword >> (63 - j) & 1) {
-                /*
-                 * Bit = 1
-                 * Odd index:  (-0.707 -0.707i)
-                 * Even index: (+0.707 -0.707i)
-                 */
-                if (j & 1) // even index
-                    mod_sym = (+0.7071068 - 0.7071068j);
-                else // odd index
-                    mod_sym = (-0.7071068 - 0.7071068j);
-
-            } else {
-                /*
-                 * Bit = 0
-                 * Odd index:  (+0.707 +0.707i)
-                 * Even index: (-0.707 +0.707i)
-                 */
-                if (j & 1) // even index
-                    mod_sym = (-0.7071068 + 0.7071068j);
-                else // odd index
-                    mod_sym = (+0.7071068 + 0.7071068j);
-            }
-
-            // Save the conjugate of that
-            plheader_conj[(i * PLHEADER_LEN) + SOF_LEN + j] = conj(mod_sym);
-        }
+    // Conjugate the entire vector
+    for (auto& x : plheader_conj) {
+        x = conj(x);
     }
 
     /* Make sure the preamble correlation buffer is zero-initialized, as it is
@@ -119,7 +77,7 @@ freq_sync::freq_sync(unsigned int period, int debug_level, const uint64_t* codew
     /* Initialize the complex conjugate of unmodulated pilots. This is used to
      * "remove" the modulation of pilot blocks. */
     for (int i = 0; i < PILOT_BLK_LEN; i++)
-        unmod_pilots[i] = (+0.7071068 - 0.7071068j);
+        unmod_pilots[i] = (+SQRT2_2 - SQRT2_2i);
 }
 
 bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool locked)

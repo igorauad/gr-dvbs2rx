@@ -5,9 +5,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "pi2_bpsk.h"
 #include "plsc_decoder.h"
-#include <gnuradio/expj.h>
-#include <gnuradio/math.h>
 #include <volk/volk.h>
 
 namespace gr {
@@ -59,154 +58,14 @@ plsc_decoder::plsc_decoder(int debug_level)
     }
 }
 
-uint64_t plsc_decoder::demap_bpsk(const gr_complex* in)
-{
-    /*
-     * The standard mapping is as follows:
-     *
-     * Odd indexes:
-     *
-     * (0.707 +0.707i) if bit = 0
-     * (-0.707 -0.707i) if bit = 1
-     *
-     * Even indexes:
-     *
-     * (-0.707 +0.707i) if bit = 0
-     * (0.707 -0.707i) if bit = 1
-     *
-     * If we rotate symbols by -pi/4, the mapping becomes:
-     *
-     * Odd indexes:
-     *
-     * +1 if bit = 0
-     * -1 if bit = 1
-     *
-     * Even indexes:
-     *
-     * +j if bit = 0
-     * -j if bit = 1
-     *
-     */
-    gr_complex rot_sym;
-    const gr_complex rotation = gr_expj(-GR_M_PI / 4);
-    uint8_t bit;
-    uint64_t scrambled_plsc = 0;
-
-    if (debug_level > 4)
-        printf("%s: pi/2 BPSK syms [", __func__);
-
-    for (int i = 26; i < 90; i++) {
-        int j = (i - 26); // 0, 1, 2 ... 63
-        rot_sym = in[i] * rotation;
-
-        /* The PLSC here starts at index 26 and ends at 89. In the standard, in
-         * contrast, it starts at 27 and ends at 90. */
-        if (i & 1) // odd here, even for the standard
-            bit = (rot_sym.imag() < 0);
-        else // even here, odd for the standard
-            bit = (rot_sym.real() < 0);
-
-        if (debug_level > 4)
-            printf("%+.2f %+.2fi, ", rot_sym.real(), rot_sym.imag());
-
-        if (bit)
-            scrambled_plsc |= (uint64_t)(1LU << (63 - j));
-    }
-
-    if (debug_level > 4) {
-        printf("]\n");
-        printf("%s: scrambled PLSC: 0x%016lX\n", __func__, scrambled_plsc);
-    }
-
-    return scrambled_plsc;
-}
-
-uint64_t plsc_decoder::demap_bpsk_diff(const gr_complex* in)
-{
-    /*
-     * Here the pi/2 BPSK demodulation is done differentially. This is robust in
-     * the presence of frequency offset.
-     *
-     * In order to decode pi/2 BPSK differentially, we need to know all possible
-     * results for "conj(in[i]) * in[i-1]", where in[i] is the i-th IQ symbol of
-     * the PLHEADER.
-     *
-     * Section 5.2.2 of the standard defines the pi/2 BPDK constellation mapping
-     * based on indexes from 1 to 90. So, for example, the first symbol of the
-     * PLSC has index 27. Based on the standard constellation mapping, it turns
-     * out that:
-     *
-     *   - On an odd to even index transition (like 27 to 28),
-     *     conj(y(2i))*y(2i-1) can result in either -j or +j, depending on the
-     *     bit sequence, as follows:
-     *
-     *     00 -> -j
-     *     01 -> +j
-     *     10 -> +j
-     *     11 -> -j
-     *
-     *   - On an even to odd index transition (like 28 to 29), in turn,
-     *     conj(y(2i+1))*y(2i) yields:
-     *
-     *     00 -> +j
-     *     01 -> -j
-     *     10 -> -j
-     *     11 -> +j
-     *
-     * Thus, to decode differentially, we always need to check: 1) the current
-     * index (whether even or odd); 2) the previous bit; 3) whether the current
-     * differential is +j or -j.
-     *
-     * Also, we can only decode the exact bits because we also know the last bit
-     * of the SOF, which is 0. The first differential we take into account is
-     * from the last SOF bit to the first PLSC bit. This first transition is an
-     * "even to odd" transition, from bit 26 (last SOF bit) to bit 27 (first
-     * PLSC bit).
-     */
-    gr_complex diff;
-    uint8_t bit = 0; // last bit of SOF is 0
-    uint64_t scrambled_plsc = 0;
-
-    if (debug_level > 4)
-        printf("%s: differentials [", __func__);
-
-    for (int i = 26; i < 90; i++) {
-        int j = (i - 26); // 0, 1, 2 ... 63
-        diff = conj(in[i]) * in[i - 1];
-
-        /* Our index here ranges from 0 to 89, hence it is not the same as in
-         * the standard. The even/oddness according to the standard is,
-         * therefore, the opposite of the even/oddness that we find here. The
-         * labels below refer to the standard and match with the tables given
-         * above: */
-        if (i & 1)
-            bit = (diff.imag() > 0) ? !bit : bit; // odd to even
-        else
-            bit = (diff.imag() > 0) ? bit : !bit; // even to odd
-
-        if (debug_level > 4)
-            printf("%+.2f %+.2fi, ", diff.real(), diff.imag());
-
-        if (bit)
-            scrambled_plsc |= (uint64_t)(1LU << (63 - j));
-    }
-
-    if (debug_level > 4) {
-        printf("]\n");
-        printf("%s: scrambled PLSC: 0x%016lX\n", __func__, scrambled_plsc);
-    }
-
-    return scrambled_plsc;
-}
-
 void plsc_decoder::decode(const gr_complex* in, bool coherent)
 {
     /* First demap the pi/2 BPSK PLSC */
     uint64_t rx_scrambled_plsc;
     if (coherent)
-        rx_scrambled_plsc = demap_bpsk(in);
+	    rx_scrambled_plsc = demap_bpsk(in, PLSC_LEN);
     else
-        rx_scrambled_plsc = demap_bpsk_diff(in);
+        rx_scrambled_plsc = demap_bpsk_diff(in, PLSC_LEN);
 
     /* Descramble */
     uint64_t rx_plsc = rx_scrambled_plsc ^ plsc_scrambler;

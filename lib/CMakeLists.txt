@@ -16,6 +16,7 @@ list(APPEND dvbs2rx_sources
     bbdescrambler_bb_impl.cc
     bch_decoder_bb_impl.cc
     ldpc_decoder_cb_impl.cc
+    pi2_bpsk.cc
     pl_descrambler.cc
     pl_frame_sync.cc
     pl_freq_sync.cc
@@ -69,6 +70,7 @@ include(GrTest)
 list(APPEND test_dvbs2rx_sources
   qa_cdeque.cc
   qa_delay_line.cc
+  qa_pi2_bpsk.cc
 )
 # Anything we need to link to for the unit tests go here
 list(APPEND GR_TEST_TARGET_DEPS gnuradio-dvbs2rx)
