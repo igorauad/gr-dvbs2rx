@@ -8,6 +8,7 @@
 #ifndef INCLUDED_DVBS2RX_PL_FRAME_SYNC_H
 #define INCLUDED_DVBS2RX_PL_FRAME_SYNC_H
 
+#include "cdeque.h"
 #include "delay_line.h"
 #include "pl_defs.h"
 #include <gnuradio/gr_complex.h>
@@ -39,7 +40,7 @@ private:
     delay_line<gr_complex> d_sof_buf;        /** SOF correlator buffer */
     delay_line<gr_complex> d_plsc_e_buf;     /** Even PLSC correlator buffer  */
     delay_line<gr_complex> d_plsc_o_buf;     /** Odd PLSC correlator buffer */
-    delay_line<gr_complex> d_plheader_buf;   /** buffer used to store PLHEADER syms */
+    cdeque<gr_complex> d_plheader_buf;       /** buffer used to store PLHEADER syms */
     volk::vector<gr_complex> d_sof_taps;     /** SOF cross-correlation taps */
     volk::vector<gr_complex> d_plsc_taps;    /** PLSC cross-correlation taps */
 

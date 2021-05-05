@@ -73,7 +73,7 @@ bool frame_sync::step(const gr_complex& in)
 
     /* Save raw input symbol into buffer. When we finally find the start
      * of frame, we will have the PLHEADER symbols in this buffer */
-    d_plheader_buf.push(in);
+    d_plheader_buf.push_front(in);
 
     /* Differential value */
     const gr_complex diff = conj(in) * last_in;
@@ -84,7 +84,7 @@ bool frame_sync::step(const gr_complex& in)
      * that their outputs can be summed together and yield an even stronger
      * peak. */
     d_plsc_delay_buf.push(diff);
-    const gr_complex& diff_d = d_plsc_delay_buf.back();
+    const gr_complex& diff_d = d_plsc_delay_buf.front();
 
     /* Put current diff values on SOF correlator buffer */
     d_sof_buf.push(diff_d);
