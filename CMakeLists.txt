@@ -135,6 +135,19 @@ else(DOXYGEN_FOUND)
 endif(DOXYGEN_FOUND)
 
 ########################################################################
+# Setup benchmarking
+# Based on https://github.com/google/benchmark
+########################################################################
+find_package(benchmark REQUIRED)
+if(benchmark_FOUND)
+  message(STATUS "Benchmarking enabled.")
+  option(ENABLE_BENCHMARK "Enable benchmarking" ON)
+else(benchmark_FOUND)
+  message(STATUS "Could NOT find benchmark library. Benchmarking disabled.")
+  option(ENABLE_BENCHMARK "Enable benchmarking" OFF)
+endif(benchmark_FOUND)
+
+########################################################################
 # Create uninstall target
 ########################################################################
 configure_file(
