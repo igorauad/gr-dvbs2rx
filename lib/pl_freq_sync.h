@@ -70,7 +70,12 @@ private:
     volk::vector<float> angle_diff_f; /** diff of average pilot angles */
 
 public:
-    freq_sync(unsigned int period, int debug_level, const uint64_t* codewords);
+    /**
+     * \brief Construct the frequency synchronizer object.
+     * \param period Interval in PLFRAMEs between frequency offset corrections.
+     * \param debug_level Integer with debug logging level (0 disables logs).
+     */
+    freq_sync(unsigned int period, int debug_level);
 
     /**
      * \brief Data-aided coarse frequency offset estimation

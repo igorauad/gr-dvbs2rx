@@ -44,8 +44,7 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
 {
     d_frame_sync = new frame_sync(debug_level);
     d_plsc_decoder = new plsc_decoder(debug_level);
-    d_freq_sync =
-        new freq_sync(freq_est_period, debug_level, d_plsc_decoder->get_codewords());
+    d_freq_sync = new freq_sync(freq_est_period, debug_level);
     d_pl_descrambler = new pl_descrambler(gold_code);
 
     /* Buffer to store received pilots (PLHEADER and pilot blocks) */

@@ -31,8 +31,6 @@ namespace dvbs2rx {
 
 // number of codewords for the 7-bit PLSC dataword
 const int n_plsc_codewords = 128;
-// PLSC scrambler sequence
-const uint64_t plsc_scrambler = 0x719d83c953422dfa;
 // Start of Frame field in bit-level big endian format (MSB transmitted first)
 constexpr uint64_t sof_big_endian = 0x18D2E82ll << 38;
 

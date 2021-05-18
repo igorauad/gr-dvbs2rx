@@ -12,7 +12,7 @@
 #include "pl_descrambler.h"
 #include "pl_frame_sync.h"
 #include "pl_freq_sync.h"
-#include "plsc_decoder.h"
+#include "pl_signaling.h"
 #include <dvbs2rx/plsync_cc.h>
 #include <volk/volk_alloc.hh>
 

@@ -8,6 +8,7 @@
 #include "pi2_bpsk.h"
 #include "pl_defs.h"
 #include "pl_freq_sync.h"
+#include "pl_signaling.h"
 #include "util.h"
 #include <gnuradio/expj.h>
 #include <gnuradio/math.h>
@@ -15,7 +16,7 @@
 namespace gr {
 namespace dvbs2rx {
 
-freq_sync::freq_sync(unsigned int period, int debug_level, const uint64_t* codewords)
+freq_sync::freq_sync(unsigned int period, int debug_level)
     : debug_level(debug_level),
       period(period),
       coarse_foffset(0.0),
@@ -40,11 +41,13 @@ freq_sync::freq_sync(unsigned int period, int debug_level, const uint64_t* codew
 {
     /* Initialize the vector containing the complex conjugate of all 128
      * possible PLHEADER BPSK symbol sequences */
+    plsc_encoder plsc_mapper;
     for (int i = 0; i < n_plsc_codewords; i++) { // codewords
         gr_complex* ptr = plheader_conj.data() + (i * PLHEADER_LEN);
-        map_bpsk(sof_big_endian, ptr, SOF_LEN); // SOF
-        map_bpsk(
-            codewords[i] ^ plsc_scrambler, ptr + SOF_LEN, PLSC_LEN); // scrambled PLSC
+        // SOF symbols:
+        map_bpsk(sof_big_endian, ptr, SOF_LEN);
+        // Scrambled PLSC symbols:
+        plsc_mapper.encode(ptr + SOF_LEN, i /* assume i is the PLSC */);
     }
 
     // Conjugate the entire vector
