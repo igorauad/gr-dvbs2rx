@@ -13,3 +13,5 @@ install(FILES
     dvbs2rx_ldpc_decoder_cb.block.yml
     dvbs2rx_plsync_cc.block.yml DESTINATION share/gnuradio/grc/blocks
 )
+
+add_subdirectory(hier)
