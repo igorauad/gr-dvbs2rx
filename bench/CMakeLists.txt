@@ -2,6 +2,7 @@
 # Setup benchmarking
 #
 # * The CPU benchmarking requires https://github.com/google/benchmark
+# * The BER benchmarking requires https://github.com/aff3ct/aff3ct
 # ##############################################################################
 option(BENCHMARK_CPU "Enable CPU benchmarking" ON)
 if(BENCHMARK_CPU)
@@ -13,3 +14,14 @@ if(BENCHMARK_CPU)
   endif(NOT benchmark_FOUND)
   add_subdirectory(cpu)
 endif(BENCHMARK_CPU)
+
+option(BENCHMARK_BER "Enable BER benchmarking" ON)
+if(BENCHMARK_BER)
+  find_package(AFF3CT CONFIG 2.3.2)
+  if(NOT AFF3CT_FOUND)
+    message(
+      FATAL_ERROR
+        "Could not find libaff3ct. Install it or set -DBENCHMARK_BER=OFF")
+  endif(NOT AFF3CT_FOUND)
+  add_subdirectory(ber)
+endif(BENCHMARK_BER)
