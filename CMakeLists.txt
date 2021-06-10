@@ -136,16 +136,9 @@ endif(DOXYGEN_FOUND)
 
 ########################################################################
 # Setup benchmarking
-# Based on https://github.com/google/benchmark
 ########################################################################
-find_package(benchmark REQUIRED)
-if(benchmark_FOUND)
-  message(STATUS "Benchmarking enabled.")
-  option(ENABLE_BENCHMARK "Enable benchmarking" ON)
-else(benchmark_FOUND)
-  message(STATUS "Could NOT find benchmark library. Benchmarking disabled.")
-  option(ENABLE_BENCHMARK "Enable benchmarking" OFF)
-endif(benchmark_FOUND)
+option(BENCHMARK "Enable benchmarking" OFF)
+message(STATUS "Benchmarking ${BENCHMARK}")
 
 ########################################################################
 # Create uninstall target
@@ -168,6 +161,9 @@ add_subdirectory(apps)
 add_subdirectory(docs)
 add_subdirectory(python)
 add_subdirectory(grc)
+if(BENCHMARK)
+  add_subdirectory(bench)
+endif(BENCHMARK)
 
 ########################################################################
 # Install cmake search helper for this library

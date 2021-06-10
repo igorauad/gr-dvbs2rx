@@ -88,11 +88,3 @@ foreach(qa_file ${test_dvbs2rx_sources})
         ${CMAKE_CURRENT_SOURCE_DIR}/${qa_file}
     )
 endforeach(qa_file)
-
-########################################################################
-# Build benchmarking executable
-########################################################################
-if(ENABLE_BENCHMARK)
-  add_executable(benchmark benchmark.cc)
-  target_link_libraries(benchmark benchmark::benchmark gnuradio-dvbs2rx)
-endif(ENABLE_BENCHMARK)
