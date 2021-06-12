@@ -105,7 +105,8 @@ void init_buffers(const params& p, buffers& b)
 {
     b.ref_bits = std::vector<int>(p.K);
     b.dec_bits = std::vector<int>(p.K);
-    b.bpsk_syms = std::vector<gr_complex>(PLSC_LEN);
+    b.bpsk_syms = std::vector<gr_complex>(PLSC_LEN + 1);
+    // Note: the extra BPSK symbol allows for differential detection.
 }
 
 void init_utils(const modules& m, utils& u)
@@ -132,14 +133,15 @@ void plsc_loopback(modules& m, buffers& b)
     uint8_t plsc = rand() % 128;
 
     // Encode and map to pi/2 BPSK symbols
-    m.encoder->encode(b.bpsk_syms.data(), plsc);
+    m.encoder->encode(b.bpsk_syms.data() + 1, plsc); // PLSC symbols only
 
-    // Add noise
-    for (size_t i = 0; i < PLSC_LEN; i++) {
+    // Add noise over the PLSC symbols. Skip the first symbol, which represents
+    // the last SOF symbol and is only used when detecting differentially.
+    for (size_t i = 1; i < PLSC_LEN + 1; i++) {
         b.bpsk_syms[i] += m.channel->noise();
     }
 
-    // Decode the noisy pi/2 BPSK symbols
+    // Decode the noisy pi/2 BPSK symbols coherently
     m.decoder->decode(b.bpsk_syms.data());
 
     // Unpack the PLSC bits

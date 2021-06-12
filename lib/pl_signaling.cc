@@ -45,10 +45,14 @@ void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent)
 {
     /* First demap the pi/2 BPSK PLSC */
     uint64_t rx_scrambled_plsc;
-    if (coherent)
-        rx_scrambled_plsc = demap_bpsk(bpsk_in, PLSC_LEN);
-    else
+    // Assume bpsk_in points to a contiguous complex array starting at the
+    // last SOF symbol and followed by the PLSC symbols. Use the last SOF
+    // symbol for differential demapping and skip it otherwise.
+    if (coherent) {
+        rx_scrambled_plsc = demap_bpsk(bpsk_in + 1, PLSC_LEN);
+    } else {
         rx_scrambled_plsc = demap_bpsk_diff(bpsk_in, PLSC_LEN);
+    }
 
     /* Descramble */
     uint64_t rx_plsc = rx_scrambled_plsc ^ plsc_scrambler;

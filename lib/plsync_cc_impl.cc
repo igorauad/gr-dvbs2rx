@@ -213,7 +213,7 @@ int plsync_cc_impl::general_work(int noutput_items,
             /* Decode the pi/2 BPSK-mapped and scrambled PLSC symbols */
             bool coarse_corrected = d_freq_sync->is_coarse_corrected();
             bool coherent_demap = d_locked && coarse_corrected;
-            d_plsc_decoder->decode(p_pp_plheader + SOF_LEN, coherent_demap);
+            d_plsc_decoder->decode(p_pp_plheader + SOF_LEN - 1, coherent_demap);
 
             /* Tag the beginning of a XFECFRAME and include both the MODCOD and
              * whether FECFRAME is short, so that the downstream blocks can

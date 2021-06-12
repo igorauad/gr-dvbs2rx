@@ -142,32 +142,33 @@ uint64_t demap_bpsk_diff(const gr_complex* in, unsigned int N)
      *    - Flip the bit if imag(conj(in[i]) * in[i-1]) < 0.
      *    - Flip the bit if i is odd (i.e., on an even-to-odd transition).
      *
-     * Importantly, note that we can only decode the exact bits starting from
-     * the pointer *in when we know the symbol and bit preceding this
-     * symbol. This works when decoding the PLSC, since we know the last bit of
-     * the SOF, which is 0. Besides, note the last SOF bit is at index
-     * 25. Hence, the first transition is an odd-to-even transition when
-     * decoding the PLSC, from bit 25 (last SOF bit) to bit 26 (first PLSC bit).
+     * Importantly, note this function assumes the complex array pointed by
+     * parameter *in starts with the last SOF symbol and points to a sequence of
+     * up to 65 symbols. That's because it requires 65 symbols to
+     * differentially-decode the 64 PLSC symbols. As a result, the first
+     * transition is always assumed to be an odd-to-even transition, from
+     * PLHEADER bit 25 (last SOF bit) to bit 26 (first PLSC bit).
+     *
+     * The last SOF symbol is known to be expj(3pi/4), as it lies on an odd
+     * index (25) and represents bit=0. However, note the whole point of
+     * differential detection is that the symbols can be rotated/rotating, so
+     * the actual incoming phase is unknown. Hence, this function needs to
+     * process the last SOF symbol too, instead of simply starting with its
+     * hard-coded value expj(3pi/4).
      */
     if (N > 64) {
         throw std::runtime_error("N has to be <= 64");
     }
 
-    gr_complex diff;
     uint64_t bit = 0; // last SOF bit is 0
     uint64_t code = 0;
-
-    // The first index is at the SOF-to-PLSC transition, an odd-to-even
-    // transition whose previous bit and symbol are known to be bit[i-1]=0 and
-    // in[i=1]=(-SQRT2_2 + SQRT2_2i), respectively:
-    unsigned int j = 0;
-    diff = conj(in[j]) * gr_complex(-SQRT2_2 + SQRT2_2i);
-    bit = diff.imag() < 0;
-    code |= (bit << 63);
-
-    // Subsequent indexes follow the general decision rule stated above:
-    for (j = 1; j < N; j++) {
-        diff = conj(in[j]) * in[j - 1];
+    for (unsigned int j = 0; j < N; j++) { // index of the PLSC symbols only
+        gr_complex diff = conj(in[j + 1]) * in[j];
+        // NOTE: the above indexes are [j+1] and [j] instead of [j] and [j-1]
+        // because j starts as zero (where the last SOF symbol is stored within
+        // vector "in"). This choice ensures that j has the parity (i.e.,
+        // evenness/oddness) of the PLSC symbol being decoded. That is, j starts
+        // even, as it should for the first PLSC symbol).
         bit = bit ^ (diff.imag() < 0) ^ (j & 1);
         code |= (bit << (63 - j));
     }

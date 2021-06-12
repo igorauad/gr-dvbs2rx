@@ -31,19 +31,26 @@ DVBS2RX_API uint64_t demap_bpsk(const gr_complex* in, unsigned int N);
 /**
  * @brief Differentially demap N pi/2 BPSK symbols from the PSLC into bits.
  *
- * The differential (non-coherent) demapping is an attractive alternative in the
- * presence of significant frequency offset. However, it is limited to work only
- * with PLSC symbols. It assumes the first input symbol pointed by argument *in
- * corresponds to the first PLSC symbol, namely the symbol following the last
- * SOF symbol. Do not use this function if the goal is to demap any arbitrary
- * pi/2 BPSK sequence, such as the SOF sequence. For that, use "demap_bpsk"
- * (i.e., the coherent demapping) instead.
+ * The differential (non-coherent) demapping is an interesting alternative in
+ * the presence of significant frequency offset. However, it is designed to work
+ * with the PLSC symbols and may not work with an arbitrary pi/2 BPSK
+ * sequence. It assumes the first pi/2 BPSK symbol pointed by argument *in lies
+ * at an odd index and corresponds to the last SOF symbol. Correspondingly, it
+ * assumes the second symbol in the input array represents an even PLHEADER
+ * index and encodes the first PLSC symbol. Do not use this function to demap
+ * any arbitrary pi/2 BPSK sequence. For that, use "demap_bpsk" (i.e., the
+ * coherent demapping) instead.
  *
- * @param in (const gr_complex *) Pointer to the array of pi/2 BPSK symbols 
-          composing the PSLC, starting from the first PLSC symbol.
+ * @param in (const gr_complex *) Pointer to the array of pi/2 BPSK symbols,
+ *        starting from the last SOF symbol and followed by the PLSC symbols.
  * @param N (unsigned int) Number of pi/2 BPSK symbols to demap.
- * @return Demapped bits packed on a bit-level big-endian uint64_t.
- * @note N must be <= 64.
+ *
+ * @return Demapped bits corresponding to symbols in[1] to in[N] (i.e., the N
+ *         symbols past the first input symbol in[0]). The result is packed on a
+ *         bit-level big-endian uint64_t.
+ *
+ * @note N must be <= 64, and the complex input array must hold at least N+1
+ * pi/2 BPSK symbols, starting from an odd-indexed symbol.
  */
 DVBS2RX_API uint64_t demap_bpsk_diff(const gr_complex* in, unsigned int N);
 

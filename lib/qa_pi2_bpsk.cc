@@ -96,15 +96,15 @@ BOOST_AUTO_TEST_CASE(test_demapping_range)
 
     // Demap a single symbol:
     BOOST_CHECK(demap_bpsk(symbols.data() + 1, 1) == 0x8000000000000000);
-    BOOST_CHECK(demap_bpsk_diff(symbols.data() + 1, 1) == 0x8000000000000000);
+    BOOST_CHECK(demap_bpsk_diff(symbols.data(), 1) == 0x8000000000000000);
 
     // Demap two symbols:
-    BOOST_CHECK(demap_bpsk_diff(symbols.data() + 1, 2) == 0xC000000000000000);
     BOOST_CHECK(demap_bpsk(symbols.data() + 1, 2) == 0xC000000000000000);
+    BOOST_CHECK(demap_bpsk_diff(symbols.data(), 2) == 0xC000000000000000);
 
     // Demap all 64 symbols of the "PLSC part":
     BOOST_CHECK(demap_bpsk(symbols.data() + 1, 64) == 0xFFFFFFFFFFFFFFFF);
-    BOOST_CHECK(demap_bpsk_diff(symbols.data() + 1, 64) == 0xFFFFFFFFFFFFFFFF);
+    BOOST_CHECK(demap_bpsk_diff(symbols.data(), 64) == 0xFFFFFFFFFFFFFFFF);
 
     // Try to demap more than 64 elements:
     BOOST_CHECK_THROW(demap_bpsk(symbols.data(), 65), std::runtime_error);

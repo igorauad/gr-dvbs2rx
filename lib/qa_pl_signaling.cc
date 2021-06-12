@@ -48,7 +48,7 @@ BOOST_DATA_TEST_CASE(test_plsc_decode, bdata::make({ false, true }), coherent)
     // Decode and check that the original PLSC corresponds to the all-zeros
     // dataword, namely modcod=0, fecframe=normal, and pilots=0.
     plsc_decoder decoder;
-    decoder.decode(p_plsc, coherent);
+    decoder.decode(in_symbols.data(), coherent);
 
     BOOST_CHECK_EQUAL(decoder.modcod, 0);
     BOOST_CHECK_EQUAL(decoder.short_fecframe, false);
@@ -60,9 +60,9 @@ BOOST_AUTO_TEST_CASE(test_plsc_round_trip)
     // Encode and decode all possible datawords
     plsc_encoder encoder;
     plsc_decoder decoder;
-    std::vector<gr_complex> bpsk_syms(PLSC_LEN);
+    std::vector<gr_complex> bpsk_syms(PLSC_LEN + 1);
     for (uint8_t i = 0; i < n_plsc_codewords; i++) {
-        encoder.encode(bpsk_syms.data(), i);
+        encoder.encode(bpsk_syms.data() + 1, i);
         decoder.decode(bpsk_syms.data());
         BOOST_CHECK_EQUAL(decoder.dec_plsc, i);
     }
@@ -72,14 +72,14 @@ BOOST_AUTO_TEST_CASE(test_plsc_parsing)
 {
     plsc_encoder encoder;
     plsc_decoder decoder;
-    std::vector<gr_complex> bpsk_syms(PLSC_LEN);
+    std::vector<gr_complex> bpsk_syms(PLSC_LEN + 1);
 
     // Encode and decode all possible PLSC values, except modcod=0 (dummy
     // frame), which is an exceptional case that does not support pilots.
     for (uint8_t modcod = 1; modcod < 32; modcod++) {
         for (bool short_fecframe : { false, true }) {
             for (bool has_pilots : { false, true }) {
-                encoder.encode(bpsk_syms.data(), modcod, short_fecframe, has_pilots);
+                encoder.encode(bpsk_syms.data() + 1, modcod, short_fecframe, has_pilots);
                 decoder.decode(bpsk_syms.data());
                 BOOST_CHECK_EQUAL(decoder.modcod, modcod);
                 BOOST_CHECK_EQUAL(decoder.short_fecframe, short_fecframe);
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(test_plsc_parsing)
     uint8_t modcod = 0;
     for (bool short_fecframe : { false, true }) {
         for (bool has_pilots : { false, true }) {
-            encoder.encode(bpsk_syms.data(), modcod, short_fecframe, has_pilots);
+            encoder.encode(bpsk_syms.data() + 1, modcod, short_fecframe, has_pilots);
             decoder.decode(bpsk_syms.data());
             BOOST_CHECK_EQUAL(decoder.modcod, modcod);
             BOOST_CHECK_EQUAL(decoder.short_fecframe, short_fecframe);

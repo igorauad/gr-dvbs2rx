@@ -82,9 +82,14 @@ public:
 
     /**
      * \brief Decode the incoming pi/2 BPSK symbols of the PLSC.
-     * \param bpsk_in (const gr_complex *) Input pi/2 BPSK symbols of the PLSC.
-     * \param coherent (bool) Whether to use coherent BPSK demapping.
+     * \param bpsk_in (const gr_complex *) Input pi/2 BPSK symbols, starting
+     *                from the last SOF symbol and followed by the PLSC symbols.
+     * \param coherent (bool) Whether to use coherent BPSK demapping. When set
+     *                 to false, the implementation uses differential demapping.
      * \return Void.
+     * \note The last SOF symbol is required when coherent=false. In contrast,
+     * when coherent=true, the implementation simply skips this symbol. However,
+     * note "bpsk_in" must start at the last SOF symbol regardless.
      */
     void decode(const gr_complex* bpsk_in, bool coherent = true);
 };
