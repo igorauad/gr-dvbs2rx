@@ -32,6 +32,42 @@ options:
     state: enabled
 
 blocks:
+- name: Es
+  id: variable
+  parameters:
+    comment: ''
+    value: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1024, 372.0]
+    rotation: 0
+    state: enabled
+- name: EsN0
+  id: variable
+  parameters:
+    comment: ''
+    value: 10 ** (esn0_db / 10)
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [952, 372.0]
+    rotation: 0
+    state: enabled
+- name: N0
+  id: variable
+  parameters:
+    comment: ''
+    value: Es / EsN0
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1096, 372.0]
+    rotation: 0
+    state: enabled
 - name: code_rate
   id: variable
   parameters:
@@ -54,6 +90,27 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [600, 212.0]
+    rotation: 0
+    state: true
+- name: esn0_db
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: tabs@0
+    label: Es/N0 (dB)
+    min_len: '200'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '0'
+    step: '0.1'
+    stop: '20'
+    value: snr
+    widget: counter_slider
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [184, 308.0]
     rotation: 0
     state: true
 - name: n_rrc_taps
@@ -125,27 +182,6 @@ blocks:
     coordinate: [304, 308.0]
     rotation: 0
     state: true
-- name: qtgui_snr
-  id: variable_qtgui_range
-  parameters:
-    comment: ''
-    gui_hint: tabs@0
-    label: SNR (dB)
-    min_len: '200'
-    orient: QtCore.Qt.Horizontal
-    rangeType: float
-    start: '0'
-    step: '0.1'
-    stop: '20'
-    value: snr
-    widget: counter_slider
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [184, 308.0]
-    rotation: 0
-    state: true
 - name: samp_rate
   id: variable
   parameters:
@@ -214,7 +250,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    amp: 1.0/(10**(qtgui_snr/10))
+    amp: 'sqrt(N0 / sps) '
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -605,7 +641,7 @@ blocks:
   parameters:
     alias: ''
     comment: ''
-    imports: from math import pi
+    imports: from math import pi, sqrt
   states:
     bus_sink: false
     bus_source: false
