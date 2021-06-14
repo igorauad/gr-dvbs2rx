@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include <gnuradio/expj.h>
 #include <gnuradio/gr_complex.h>
 #include <aff3ct.hpp>
 #include <pl_signaling.h>
@@ -19,10 +20,11 @@ struct params {
     float ebn0_min;     // minimum SNR value
     float ebn0_max;     // maximum SNR value
     float ebn0_step;    // SNR step
+    float foffset;      // Normalized symbol-spaced frequency offset
     float R;            // code rate (R=K/N)
 
-    params(float ebn0_min, float ebn0_max, float ebn0_step)
-        : ebn0_min(ebn0_min), ebn0_max(ebn0_max), ebn0_step(ebn0_step)
+    params(float ebn0_min, float ebn0_max, float ebn0_step, float foffset)
+        : ebn0_min(ebn0_min), ebn0_max(ebn0_max), ebn0_step(ebn0_step), foffset(foffset)
     {
         R = (float)K / (float)N;
         std::cout << "# * Simulation parameters: " << std::endl;
@@ -35,11 +37,13 @@ struct params {
         std::cout << "#    ** SNR min   (dB) = " << ebn0_min << std::endl;
         std::cout << "#    ** SNR max   (dB) = " << ebn0_max << std::endl;
         std::cout << "#    ** SNR step  (dB) = " << ebn0_step << std::endl;
+        std::cout << "#    ** Freq. offset   = " << foffset << std::endl;
         std::cout << "#" << std::endl;
     };
 };
 
 struct AwgnChannel {
+    float freq_offset = 0;   // normalized frequency offset
     std::random_device seed; // random seed generator
     std::mt19937 prgn;       // pseudo-random number engine
     std::normal_distribution<float> normal_dist_gen;
@@ -66,11 +70,28 @@ struct AwgnChannel {
         normal_dist_gen = std::normal_distribution<float>(0, sdev_per_dim);
     }
 
-    explicit AwgnChannel(double esn0_db) : prgn(seed()) { set_esn0(esn0_db); }
-
-    gr_complex noise()
+    explicit AwgnChannel(double esn0_db, float foffset)
+        : freq_offset(foffset), prgn(seed())
     {
-        return gr_complex(normal_dist_gen(prgn), normal_dist_gen(prgn));
+        set_esn0(esn0_db);
+    }
+
+    void add_noise(gr_complex* in, unsigned int n_symbols)
+    {
+        for (size_t i = 0; i < n_symbols; i++) {
+            in[i] += gr_complex(normal_dist_gen(prgn), normal_dist_gen(prgn));
+        }
+    }
+
+    // Memoryless rotation: rotate the given symbols and do not keep track of
+    // the phase between calls.
+    void rotate(gr_complex* in, unsigned int n_symbols)
+    {
+        float phase_accum = 0;
+        for (size_t i = 0; i < n_symbols; i++) {
+            in[i] *= gr_expj(phase_accum);
+            phase_accum += 2 * M_PI * freq_offset;
+        }
     }
 };
 
@@ -101,7 +122,7 @@ void init_modules(const params& p, modules& m)
     m.decoder = std::unique_ptr<gr::dvbs2rx::plsc_decoder>(new gr::dvbs2rx::plsc_decoder);
     m.monitor = std::unique_ptr<module::Monitor_BFER<>>(
         new module::Monitor_BFER<>(p.K, p.fe, p.n_frames));
-    m.channel = std::unique_ptr<AwgnChannel>(new AwgnChannel(p.ebn0_min));
+    m.channel = std::unique_ptr<AwgnChannel>(new AwgnChannel(p.ebn0_min, p.foffset));
 };
 
 void init_buffers(const params& p, buffers& b)
@@ -149,9 +170,8 @@ void plsc_loopback_coherent(modules& m, buffers& b)
 
     // Add noise over the PLSC symbols. Skip the first symbol, which represents
     // the last SOF symbol and is only used when detecting differentially.
-    for (size_t i = 1; i < PLSC_LEN + 1; i++) {
-        b.bpsk_syms[i] += m.channel->noise();
-    }
+    m.channel->add_noise(b.bpsk_syms.data() + 1, PLSC_LEN);
+    m.channel->rotate(b.bpsk_syms.data() + 1, PLSC_LEN);
 
     // Decode the noisy pi/2 BPSK symbols coherently
     m.decoder->decode(b.bpsk_syms.data());
@@ -170,9 +190,8 @@ void plsc_loopback_differential(modules& m, buffers& b)
     m.encoder->encode(b.bpsk_syms.data() + 1, plsc); // PLSC symbols
 
     // Add noise over the 65 symbols (the last SOF symbol and the PLSC symbols)
-    for (size_t i = 0; i < PLSC_LEN + 1; i++) {
-        b.bpsk_syms[i] += m.channel->noise();
-    }
+    m.channel->add_noise(b.bpsk_syms.data(), PLSC_LEN + 1);
+    m.channel->rotate(b.bpsk_syms.data(), PLSC_LEN + 1);
 
     // Decode the noisy pi/2 BPSK symbols differentially
     m.decoder->decode(b.bpsk_syms.data(), false /* non-coherent */);
@@ -189,6 +208,9 @@ int parse_opts(int ac, char* av[], po::variables_map& vm)
             "ebn0-min", po::value<float>()->default_value(0), "Etarting Eb/N0 in dB")(
             "ebn0-max", po::value<float>()->default_value(10), "Ending Eb/N0 in dB")(
             "ebn0-step", po::value<float>()->default_value(1), "Eb/N0 step in dB")(
+            "foffset",
+            po::value<float>()->default_value(0),
+            "Normalized frequency offset")(
             "differential",
             po::bool_switch(),
             "try differential detection instead of coherent");
@@ -227,7 +249,8 @@ int main(int argc, char** argv)
     // create and initialize the parameters defined by the user
     params p(args["ebn0-min"].as<float>(),
              args["ebn0-max"].as<float>(),
-             args["ebn0-step"].as<float>());
+             args["ebn0-step"].as<float>(),
+             args["foffset"].as<float>());
 
     // Decide which PLSC loopback encoder-decoder wrapper to use (with coherent
     // or differential pi/2 BPSK de-mapping)
