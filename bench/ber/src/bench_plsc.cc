@@ -99,13 +99,11 @@ struct AwgnChannel {
 
     // Memoryless rotation: rotate the given symbols and do not keep track of
     // the phase between calls.
-    void rotate(gr_complex* in, unsigned int n_symbols)
+    void rotate(gr_complex* out, const gr_complex* in, unsigned int n_symbols)
     {
-        float phase_accum = 0;
-        for (size_t i = 0; i < n_symbols; i++) {
-            in[i] *= gr_expj(phase_accum);
-            phase_accum += 2 * M_PI * freq_offset;
-        }
+        const gr_complex phase_inc = gr_expj(2 * M_PI * freq_offset);
+        gr_complex phase = gr_expj(0);
+        volk_32fc_s32fc_x2_rotator_32fc(out, in, phase_inc, &phase, n_symbols);
     }
 };
 
@@ -117,9 +115,10 @@ struct modules {
 };
 
 struct buffers {
-    std::vector<int> ref_bits;         // reference/input bits
-    std::vector<int> dec_bits;         // decoded bits
-    std::vector<gr_complex> bpsk_syms; // PLSC BPSK symbols
+    std::vector<int> ref_bits;             // reference/input bits
+    std::vector<int> dec_bits;             // decoded bits
+    volk::vector<gr_complex> tx_bpsk_syms; // Tx (clean) PLSC BPSK symbols
+    volk::vector<gr_complex> rx_bpsk_syms; // Rx (noisy) PLSC BPSK symbols
 };
 
 struct utils {
@@ -143,7 +142,8 @@ void init_buffers(const params& p, buffers& b)
 {
     b.ref_bits = std::vector<int>(p.K);
     b.dec_bits = std::vector<int>(p.K);
-    b.bpsk_syms = std::vector<gr_complex>(PLSC_LEN + 1);
+    b.tx_bpsk_syms = volk::vector<gr_complex>(PLSC_LEN + 1);
+    b.rx_bpsk_syms = volk::vector<gr_complex>(PLSC_LEN + 1);
     // Note: the extra BPSK symbol allows for differential detection.
 }
 
@@ -180,8 +180,8 @@ void plsc_loopback(modules& m, buffers& b, const params& p)
     uint8_t plsc = rand() % 128;
 
     // Encode and map to pi/2 BPSK symbols
-    b.bpsk_syms[0] = (-SQRT2_2 + SQRT2_2i);          // last SOF symbol
-    m.encoder->encode(b.bpsk_syms.data() + 1, plsc); // PLSC symbols
+    b.tx_bpsk_syms[0] = (-SQRT2_2 + SQRT2_2i);          // last SOF symbol
+    m.encoder->encode(b.tx_bpsk_syms.data() + 1, plsc); // PLSC symbols
 
     // Add noise and rotate the 65 symbols (the last SOF symbol and the PLSC
     // symbols). The last SOF symbol is only used with differential pi/2 BPSK
@@ -189,11 +189,11 @@ void plsc_loopback(modules& m, buffers& b, const params& p)
     // that both demapping approaches (coherent and differential) take about the
     // same amount of prep work outside the main function under test, which is
     // the decoder->decode function.
-    m.channel->add_noise(b.bpsk_syms.data(), PLSC_LEN + 1);
-    m.channel->rotate(b.bpsk_syms.data(), PLSC_LEN + 1);
+    m.channel->rotate(b.rx_bpsk_syms.data(), b.tx_bpsk_syms.data(), PLSC_LEN + 1);
+    m.channel->add_noise(b.rx_bpsk_syms.data(), PLSC_LEN + 1);
 
-    // Decode the noisy pi/2 BPSK symbols
-    m.decoder->decode(b.bpsk_syms.data(), p.coherent, p.soft_dec);
+    // Decode the noisy Rx pi/2 BPSK symbols
+    m.decoder->decode(b.rx_bpsk_syms.data(), p.coherent, p.soft_dec);
 
     // Unpack the PLSC bits
     unpack_plsc_bits(plsc, m.decoder->dec_plsc, b);
