@@ -176,6 +176,22 @@ uint64_t demap_bpsk_diff(const gr_complex* in, unsigned int N)
     return code;
 }
 
+void derotate_bpsk(const gr_complex* in, float* out, unsigned int N)
+{
+    // Refer to the notes in the implementation of demap_bpsk.
+    constexpr gr_complex rot[2] = {
+        (SQRT2_2 - SQRT2_2i), // rotation factor for even indexes
+        (-SQRT2_2 - SQRT2_2i) // rotation factor for odd indexes
+    };
+
+    if (N > 64) {
+        throw std::runtime_error("N has to be <= 64");
+    }
+
+    for (unsigned int j = 0; j < N; j++) {
+        out[j] = real(in[j] * rot[j & 1]);
+    }
+}
 
 } // namespace dvbs2rx
 } // namespace gr

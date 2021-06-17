@@ -36,6 +36,21 @@ BOOST_AUTO_TEST_CASE(test_sof_map_demap)
     BOOST_CHECK(sof_big_endian == demapped_sof);
 }
 
+BOOST_AUTO_TEST_CASE(test_pi2bpsk_to_bpsk)
+{
+    // Binary sequence: 0, 0, 1, 1
+    std::vector<gr_complex> pi2_bpsk_syms = { (SQRT2_2 + SQRT2_2i),
+                                              (-SQRT2_2 + SQRT2_2i),
+                                              (-SQRT2_2 - SQRT2_2i),
+                                              (SQRT2_2 - SQRT2_2i) };
+    std::vector<float> expected_bpsk_syms = { +1, +1, -1, -1 };
+    std::vector<float> out_bpsk_syms(4);
+    derotate_bpsk(pi2_bpsk_syms.data(), out_bpsk_syms.data(), pi2_bpsk_syms.size());
+
+    for (unsigned int i = 0; i < out_bpsk_syms.size(); i++)
+        BOOST_CHECK_CLOSE(out_bpsk_syms[i], expected_bpsk_syms[i], 0.0001);
+}
+
 BOOST_AUTO_TEST_CASE(test_mapping_range)
 {
     // Allocate 2 elements

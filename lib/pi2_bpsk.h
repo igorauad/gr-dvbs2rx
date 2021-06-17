@@ -54,6 +54,23 @@ DVBS2RX_API uint64_t demap_bpsk(const gr_complex* in, unsigned int N);
  */
 DVBS2RX_API uint64_t demap_bpsk_diff(const gr_complex* in, unsigned int N);
 
+
+/**
+ * @brief Derotate N complex-valued pi/2 BPSK into regular real BPSK symbols
+ *
+ * Converts a sequence of complex-valued pi/2 BPSK symbols with values
+ * originating from the +-0.707 +-j*0.707 constellation points into the
+ * corresponding sequence of ordinary real-valued BPSK symbols around +-1. If
+ * the input pi/2 BPSK symbols are noisy, naturally the resulting real-valued
+ * BPSK symbols are noisy too and deviate from the nominal +-1 values.
+ *
+ * @param in (const gr_complex *) Input complex pi/2 BPSK symbols.
+ * @param out (float *) Output real-valued BPSK symbols.
+ * @param N (unsigned int) Number of pi/2 BPSK symbols to derotate.
+ * @return Void.
+ */
+DVBS2RX_API void derotate_bpsk(const gr_complex* in, float* out, unsigned int N);
+
 } // namespace dvbs2rx
 } // namespace gr
 

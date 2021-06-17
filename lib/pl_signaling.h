@@ -65,7 +65,8 @@ class DVBS2RX_API plsc_decoder
 private:
     int d_debug_level; /** debug level */
     reed_muller d_reed_muller_decoder;
-    volk::vector<gr_complex> d_plsc_bpsk_lut; // LUT with BPSK-mapped PLSC codewords
+    volk::vector<float> d_plsc_bpsk_lut; // LUT with BPSK-mapped PLSC codewords
+    volk::vector<float> d_soft_dec_buf;  // Buffer with pi/2 BPSK's soft decisions
 
 public:
     /* State - made public to speed up access */
