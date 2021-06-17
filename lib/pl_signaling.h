@@ -11,6 +11,7 @@
 #include "reed_muller.h"
 #include <gnuradio/gr_complex.h>
 #include <dvbs2rx/api.h>
+#include <volk/volk_alloc.hh>
 
 namespace gr {
 namespace dvbs2rx {
@@ -64,6 +65,7 @@ class DVBS2RX_API plsc_decoder
 private:
     int d_debug_level; /** debug level */
     reed_muller d_reed_muller_decoder;
+    volk::vector<gr_complex> d_plsc_bpsk_lut; // LUT with BPSK-mapped PLSC codewords
 
 public:
     /* State - made public to speed up access */
@@ -86,12 +88,13 @@ public:
      *                from the last SOF symbol and followed by the PLSC symbols.
      * \param coherent (bool) Whether to use coherent BPSK demapping. When set
      *                 to false, the implementation uses differential demapping.
+     * \param soft (bool) Whether to use soft decoding instead of hard decoding.
      * \return Void.
      * \note The last SOF symbol is required when coherent=false. In contrast,
      * when coherent=true, the implementation simply skips this symbol. However,
      * note "bpsk_in" must start at the last SOF symbol regardless.
      */
-    void decode(const gr_complex* bpsk_in, bool coherent = true);
+    void decode(const gr_complex* bpsk_in, bool coherent = true, bool soft = true);
 };
 
 } // namespace dvbs2rx

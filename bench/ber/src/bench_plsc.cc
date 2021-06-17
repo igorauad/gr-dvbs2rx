@@ -21,10 +21,22 @@ struct params {
     float ebn0_max;     // maximum SNR value
     float ebn0_step;    // SNR step
     float foffset;      // Normalized symbol-spaced frequency offset
+    bool coherent;      // Coherent pi/2 BPSK demapping
+    bool soft_dec;      // Whether to use soft decoding
     float R;            // code rate (R=K/N)
 
-    params(float ebn0_min, float ebn0_max, float ebn0_step, float foffset)
-        : ebn0_min(ebn0_min), ebn0_max(ebn0_max), ebn0_step(ebn0_step), foffset(foffset)
+    params(float ebn0_min,
+           float ebn0_max,
+           float ebn0_step,
+           float foffset,
+           bool coherent,
+           bool soft)
+        : ebn0_min(ebn0_min),
+          ebn0_max(ebn0_max),
+          ebn0_step(ebn0_step),
+          foffset(foffset),
+          coherent(coherent),
+          soft_dec(soft)
     {
         R = (float)K / (float)N;
         std::cout << "# * Simulation parameters: " << std::endl;
@@ -38,6 +50,8 @@ struct params {
         std::cout << "#    ** SNR max   (dB) = " << ebn0_max << std::endl;
         std::cout << "#    ** SNR step  (dB) = " << ebn0_step << std::endl;
         std::cout << "#    ** Freq. offset   = " << foffset << std::endl;
+        std::cout << "#    ** Coherent demap = " << coherent << std::endl;
+        std::cout << "#    ** Soft decoding  = " << soft_dec << std::endl;
         std::cout << "#" << std::endl;
     };
 };
@@ -160,27 +174,7 @@ void unpack_plsc_bits(uint8_t plsc, uint8_t dec_plsc, buffers& b)
     }
 }
 
-void plsc_loopback_coherent(modules& m, buffers& b)
-{
-    // Pick a random PLSC
-    uint8_t plsc = rand() % 128;
-
-    // Encode and map to pi/2 BPSK symbols
-    m.encoder->encode(b.bpsk_syms.data() + 1, plsc); // PLSC symbols only
-
-    // Add noise over the PLSC symbols. Skip the first symbol, which represents
-    // the last SOF symbol and is only used when detecting differentially.
-    m.channel->add_noise(b.bpsk_syms.data() + 1, PLSC_LEN);
-    m.channel->rotate(b.bpsk_syms.data() + 1, PLSC_LEN);
-
-    // Decode the noisy pi/2 BPSK symbols coherently
-    m.decoder->decode(b.bpsk_syms.data());
-
-    // Unpack the PLSC bits
-    unpack_plsc_bits(plsc, m.decoder->dec_plsc, b);
-}
-
-void plsc_loopback_differential(modules& m, buffers& b)
+void plsc_loopback(modules& m, buffers& b, const params& p)
 {
     // Pick a random PLSC
     uint8_t plsc = rand() % 128;
@@ -189,12 +183,17 @@ void plsc_loopback_differential(modules& m, buffers& b)
     b.bpsk_syms[0] = (-SQRT2_2 + SQRT2_2i);          // last SOF symbol
     m.encoder->encode(b.bpsk_syms.data() + 1, plsc); // PLSC symbols
 
-    // Add noise over the 65 symbols (the last SOF symbol and the PLSC symbols)
+    // Add noise and rotate the 65 symbols (the last SOF symbol and the PLSC
+    // symbols). The last SOF symbol is only used with differential pi/2 BPSK
+    // demapping. Nevertheless, add noise and rotate this symbol regardless so
+    // that both demapping approaches (coherent and differential) take about the
+    // same amount of prep work outside the main function under test, which is
+    // the decoder->decode function.
     m.channel->add_noise(b.bpsk_syms.data(), PLSC_LEN + 1);
     m.channel->rotate(b.bpsk_syms.data(), PLSC_LEN + 1);
 
-    // Decode the noisy pi/2 BPSK symbols differentially
-    m.decoder->decode(b.bpsk_syms.data(), false /* non-coherent */);
+    // Decode the noisy pi/2 BPSK symbols
+    m.decoder->decode(b.bpsk_syms.data(), p.coherent, p.soft_dec);
 
     // Unpack the PLSC bits
     unpack_plsc_bits(plsc, m.decoder->dec_plsc, b);
@@ -205,15 +204,18 @@ int parse_opts(int ac, char* av[], po::variables_map& vm)
     try {
         po::options_description desc("Program options");
         desc.add_options()("help,h", "produce help message")(
-            "ebn0-min", po::value<float>()->default_value(0), "Etarting Eb/N0 in dB")(
-            "ebn0-max", po::value<float>()->default_value(10), "Ending Eb/N0 in dB")(
-            "ebn0-step", po::value<float>()->default_value(1), "Eb/N0 step in dB")(
+            "ebn0-min", po::value<float>()->default_value(0), "Starting Eb/N0 in dB.")(
+            "ebn0-max", po::value<float>()->default_value(10), "Ending Eb/N0 in dB.")(
+            "ebn0-step", po::value<float>()->default_value(1), "Eb/N0 step in dB.")(
             "foffset",
             po::value<float>()->default_value(0),
-            "Normalized frequency offset")(
+            "Normalized frequency offset.")(
             "differential",
             po::bool_switch(),
-            "try differential detection instead of coherent");
+            "Try differential pi/2 BPSK demapping instead of coherent.")(
+            "hard",
+            po::bool_switch(),
+            "Try with hard pi/2 BPSK decisions instead of soft decisions.");
 
         po::store(po::parse_command_line(ac, av, desc), vm);
         po::notify(vm);
@@ -250,19 +252,9 @@ int main(int argc, char** argv)
     params p(args["ebn0-min"].as<float>(),
              args["ebn0-max"].as<float>(),
              args["ebn0-step"].as<float>(),
-             args["foffset"].as<float>());
-
-    // Decide which PLSC loopback encoder-decoder wrapper to use (with coherent
-    // or differential pi/2 BPSK de-mapping)
-    void (*plsc_loopback)(modules & m, buffers & b);
-    bool differential_demapping = args["differential"].as<bool>();
-    if (differential_demapping) {
-        std::cout << "# * pi/2 BPSK de-mapping: differential\n#" << std::endl;
-        plsc_loopback = &plsc_loopback_differential;
-    } else {
-        std::cout << "# * pi/2 BPSK de-mapping: coherent\n#" << std::endl;
-        plsc_loopback = &plsc_loopback_coherent;
-    }
+             args["foffset"].as<float>(),
+             !args["differential"].as<bool>(),
+             !args["hard"].as<bool>());
 
     modules m;
     init_modules(p, m); // create and initialize the modules
@@ -291,7 +283,7 @@ int main(int argc, char** argv)
         // run the simulation chain
         while (!m.monitor->fe_limit_achieved() && !m.monitor->frame_limit_achieved() &&
                !u.terminal->is_interrupt()) {
-            plsc_loopback(m, b);
+            plsc_loopback(m, b, p);
             m.monitor->check_errors(b.dec_bits, b.ref_bits);
         }
 
