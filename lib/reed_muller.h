@@ -31,6 +31,8 @@ private:
     uint64_t d_codeword_lut[n_plsc_codewords];
     // LUT with the Euclidean-space image of the codewords (real vectors):
     volk::vector<float> d_euclidean_img_lut;
+    // Buffer used by the maximum inner product soft decoder:
+    volk::vector<float> d_dot_prod_buf;
 
 public:
     // Function used to map binary codewords into the corresponding real vector:

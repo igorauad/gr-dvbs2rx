@@ -26,7 +26,7 @@ uint64_t bit_interleave(uint32_t a, uint32_t b)
 }
 
 reed_muller::reed_muller(euclidean_map_func_ptr p_custom_map)
-    : d_euclidean_img_lut(n_plsc_codewords * PLSC_LEN)
+    : d_euclidean_img_lut(n_plsc_codewords * PLSC_LEN), d_dot_prod_buf(n_plsc_codewords)
 {
     /* Generator matrix (see Figure 13b on the standard) */
     uint32_t G[6] = { 0x55555555, 0x33333333, 0x0f0f0f0f,
@@ -172,18 +172,13 @@ uint8_t reed_muller::decode(const float* soft_dec)
     // between the real part of the input symbols (even if they are originally
     // complex) and the real Euclidean-space s(x) of each codeword x, provided
     // that the above two assumptions hold.
-    uint8_t out_dataword = 0;
-    float dot_prod;
-    float max_dot_prod = -1e12; // arbitrarily low initialization value
-    for (uint8_t i = 0; i < n_plsc_codewords; i++) { // codewords
+    for (uint8_t i = 0; i < n_plsc_codewords; i++) {
         const float* p_euclidean_img = d_euclidean_img_lut.data() + (i * 64);
-        volk_32f_x2_dot_prod_32f(&dot_prod, soft_dec, p_euclidean_img, 64);
-        if (dot_prod > max_dot_prod) {
-            max_dot_prod = dot_prod;
-            out_dataword = i;
-        }
+        volk_32f_x2_dot_prod_32f(&d_dot_prod_buf[i], soft_dec, p_euclidean_img, 64);
     }
-    return out_dataword;
+    uint32_t argmax;
+    volk_32f_index_max_32u(&argmax, d_dot_prod_buf.data(), n_plsc_codewords);
+    return (uint8_t)argmax;
 }
 
 } // namespace dvbs2rx
