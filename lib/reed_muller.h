@@ -10,9 +10,13 @@
 
 #include "pl_defs.h"
 #include <dvbs2rx/api.h>
+#include <volk/volk_alloc.hh>
 
 namespace gr {
 namespace dvbs2rx {
+
+// Pointer to an Euclidean-space mapping function:
+typedef void (*euclidean_map_func_ptr)(float* dptr, uint64_t codeword);
 
 /**
  * @brief Interleaved (64, 7, 32) Reed-Muller encoder/decoder.
@@ -23,10 +27,32 @@ namespace dvbs2rx {
 class DVBS2RX_API reed_muller
 {
 private:
-    uint64_t d_codeword_lut[n_plsc_codewords]; // LUT with all 64-bit codewords
+    // LUT with all the 64-bit codewords:
+    uint64_t d_codeword_lut[n_plsc_codewords];
+    // LUT with the Euclidean-space image of the codewords (real vectors):
+    volk::vector<float> d_euclidean_img_lut;
 
 public:
-    reed_muller();
+    // Function used to map binary codewords into the corresponding real vector:
+    euclidean_map_func_ptr euclidean_map;
+
+    /**
+     * @brief Construct the Reed-Muller encoder/decoder.
+     * @param p_custom_map Pointer to a custom mapping function used to map the
+     *        binary the codewords into real-valued Euclidean-space images. If
+     *        not defined, method "default_euclidean_map" is used.
+     */
+    explicit reed_muller(euclidean_map_func_ptr p_custom_map = nullptr);
+
+    /**
+     * @brief Map codeword to a real vector using 2-PAM.
+     * @param dptr Destination pointer for the 64 real 2-PAM mapped symbols.
+     * @param codeword 64-bit (64, 7, 32) Reed-Muller codeword to be mapped.
+     * @note This is the default Euclidean-space mapping if another custom
+     *       mapping is not provided through the constructor.
+     * @return Void.
+     */
+    static void default_euclidean_map(float* dptr, uint64_t codeword);
 
     /**
      * @brief Encode a given dataword (PLSC) into the corresponding codeword.
@@ -36,11 +62,18 @@ public:
     uint64_t encode(uint8_t in_dataword);
 
     /**
-     * @brief Decode a received codeword into the corresponding dataword (PLSC).
-     * @param in_codeword Received noisy 64-bit RM codeword to be decoded.
-     * @return Decoded 7-bit dataword (PLSC).
+     * @brief Decode a binary hard decision into the corresponding dataword.
+     * @param hard_dec Received 64-bit hard decision to be decoded.
+     * @return Decoded 7-bit dataword.
      */
-    uint8_t decode(uint64_t in_codeword);
+    uint8_t decode(uint64_t hard_dec);
+
+    /**
+     * @brief Decode a real soft decision vector into the corresponding dataword.
+     * @param soft_dec Received 64-element soft decision real vector to be decoded.
+     * @return Decoded 7-bit dataword.
+     */
+    uint8_t decode(const float* soft_dec);
 };
 
 } // namespace dvbs2rx
