@@ -78,4 +78,38 @@ static void BM_demap_bpsk_diff(benchmark::State& state)
 }
 BENCHMARK(BM_demap_bpsk_diff);
 
+static void BM_derotate_bpsk(benchmark::State& state)
+{
+    std::vector<gr_complex> pi2_bpsk = {
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
+        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
+        (SQRT2_2 - SQRT2_2i)
+    };
+    std::vector<float> bpsk(64);
+
+    for (auto _ : state) {
+        gr::dvbs2rx::derotate_bpsk(pi2_bpsk.data(), bpsk.data(), PLSC_LEN);
+    }
+}
+BENCHMARK(BM_derotate_bpsk);
+
 BENCHMARK_MAIN();
