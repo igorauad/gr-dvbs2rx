@@ -12,26 +12,28 @@ using namespace aff3ct;
 namespace po = boost::program_options;
 
 struct params {
-    int K = 7;          // number of information bits
-    int N = 64;         // codeword size
-    int fe = 100;       // number of frame errors
-    int n_frames = 1e7; // max number of frames to simulate per ebn0
-    int seed = 0;       // PRNG seed for the AWGN channel
-    float ebn0_min;     // minimum SNR value
-    float ebn0_max;     // maximum SNR value
-    float ebn0_step;    // SNR step
-    float foffset;      // Normalized symbol-spaced frequency offset
-    bool coherent;      // Coherent pi/2 BPSK demapping
-    bool soft_dec;      // Whether to use soft decoding
-    float R;            // code rate (R=K/N)
+    int K = 7;       // number of information bits
+    int N = 64;      // codeword size
+    int fe = 100;    // number of frame errors
+    int seed = 0;    // PRNG seed for the AWGN channel
+    int n_frames;    // max number of frames to simulate per ebn0
+    float ebn0_min;  // minimum SNR value
+    float ebn0_max;  // maximum SNR value
+    float ebn0_step; // SNR step
+    float foffset;   // Normalized symbol-spaced frequency offset
+    bool coherent;   // Coherent pi/2 BPSK demapping
+    bool soft_dec;   // Whether to use soft decoding
+    float R;         // code rate (R=K/N)
 
-    params(float ebn0_min,
+    params(int n_frames,
+           float ebn0_min,
            float ebn0_max,
            float ebn0_step,
            float foffset,
            bool coherent,
            bool soft)
-        : ebn0_min(ebn0_min),
+        : n_frames(n_frames),
+          ebn0_min(ebn0_min),
           ebn0_max(ebn0_max),
           ebn0_step(ebn0_step),
           foffset(foffset),
@@ -204,6 +206,9 @@ int parse_opts(int ac, char* av[], po::variables_map& vm)
     try {
         po::options_description desc("Program options");
         desc.add_options()("help,h", "produce help message")(
+            "nframes",
+            po::value<int>()->default_value(1e7),
+            "Max number of frames to simulate per Eb/N0.")(
             "ebn0-min", po::value<float>()->default_value(0), "Starting Eb/N0 in dB.")(
             "ebn0-max", po::value<float>()->default_value(10), "Ending Eb/N0 in dB.")(
             "ebn0-step", po::value<float>()->default_value(1), "Eb/N0 step in dB.")(
@@ -249,7 +254,8 @@ int main(int argc, char** argv)
     std::cout << "#" << std::endl;
 
     // create and initialize the parameters defined by the user
-    params p(args["ebn0-min"].as<float>(),
+    params p(args["nframes"].as<int>(),
+             args["ebn0-min"].as<float>(),
              args["ebn0-max"].as<float>(),
              args["ebn0-step"].as<float>(),
              args["foffset"].as<float>(),
