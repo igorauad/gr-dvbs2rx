@@ -73,7 +73,7 @@ static void BM_demap_bpsk_diff(benchmark::State& state)
     };
 
     for (auto _ : state) {
-        gr::dvbs2rx::demap_bpsk(bpsk.data() + 1, PLSC_LEN);
+        gr::dvbs2rx::demap_bpsk_diff(bpsk.data(), PLSC_LEN);
     }
 }
 BENCHMARK(BM_demap_bpsk_diff);
