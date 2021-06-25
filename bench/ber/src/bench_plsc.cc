@@ -42,7 +42,15 @@ struct params {
           coherent(coherent),
           soft_dec(soft)
     {
-        R = (float)K / (float)N;
+        R = (float)K / (float)(N); // Code rate
+        // NOTE: the code rate is assumed equal to the spectral efficiency, as
+        // the tools::ebn0_to_esn0 function assumes "EsN0 = EbN0 * R". With
+        // 2-PAM mapping in baseband, the spectral efficiency of a block code is
+        // actually 2K/N (see Section 6.3 on Forney's book), because there are K
+        // bits for every N/2 pairs of real dimensions (note the spectral
+        // efficiency is in units of bits/2D). In contrast, when considering
+        // pi/2 BPSK in passband, we have K bits for every N complex
+        // dimensions. Hence, the spectral efficiency is really K/N.
         std::cout << "# * Simulation parameters: " << std::endl;
         std::cout << "#    ** Frame errors   = " << fe << std::endl;
         std::cout << "#    ** Max frames     = " << n_frames << std::endl;
