@@ -14,8 +14,8 @@ namespace po = boost::program_options;
 struct params {
     int K = 7;       // number of information bits
     int N = 64;      // codeword size
-    int fe = 100;    // number of frame errors
     int seed = 0;    // PRNG seed for the AWGN channel
+    int fe;          // number of frame errors
     int n_frames;    // max number of frames to simulate per ebn0
     float ebn0_min;  // minimum SNR value
     float ebn0_max;  // maximum SNR value
@@ -25,14 +25,16 @@ struct params {
     bool soft_dec;   // Whether to use soft decoding
     float R;         // code rate (R=K/N)
 
-    params(int n_frames,
+    params(int fe,
+           int n_frames,
            float ebn0_min,
            float ebn0_max,
            float ebn0_step,
            float foffset,
            bool coherent,
            bool soft)
-        : n_frames(n_frames),
+        : fe(fe),
+          n_frames(n_frames),
           ebn0_min(ebn0_min),
           ebn0_max(ebn0_max),
           ebn0_step(ebn0_step),
@@ -206,6 +208,9 @@ int parse_opts(int ac, char* av[], po::variables_map& vm)
     try {
         po::options_description desc("Program options");
         desc.add_options()("help,h", "produce help message")(
+            "fe",
+            po::value<int>()->default_value(1e2),
+            "Max number of frame errors to simulate per Eb/N0.")(
             "nframes",
             po::value<int>()->default_value(1e7),
             "Max number of frames to simulate per Eb/N0.")(
@@ -254,7 +259,8 @@ int main(int argc, char** argv)
     std::cout << "#" << std::endl;
 
     // create and initialize the parameters defined by the user
-    params p(args["nframes"].as<int>(),
+    params p(args["fe"].as<int>(),
+             args["nframes"].as<int>(),
              args["ebn0-min"].as<float>(),
              args["ebn0-max"].as<float>(),
              args["ebn0-step"].as<float>(),
