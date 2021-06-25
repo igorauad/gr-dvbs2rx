@@ -34,7 +34,10 @@ BOOST_AUTO_TEST_CASE(test_plsc_encode)
                                   expected_bpsk_syms.end());
 }
 
-BOOST_DATA_TEST_CASE(test_plsc_decode, bdata::make({ false, true }), coherent)
+BOOST_DATA_TEST_CASE(test_plsc_decode,
+                     bdata::make({ false, true }) * bdata::make({ false, true }),
+                     coherent,
+                     soft)
 {
     // Assume the input pi/2 BPSK symbols correspond to the all-zeros PLSC,
     // whose scrambled version is identical to the scrambler sequence (again,
@@ -48,8 +51,7 @@ BOOST_DATA_TEST_CASE(test_plsc_decode, bdata::make({ false, true }), coherent)
     // Decode and check that the original PLSC corresponds to the all-zeros
     // dataword, namely modcod=0, fecframe=normal, and pilots=0.
     plsc_decoder decoder;
-    decoder.decode(in_symbols.data(), coherent);
-
+    decoder.decode(in_symbols.data(), coherent, soft);
     BOOST_CHECK_EQUAL(decoder.modcod, 0);
     BOOST_CHECK_EQUAL(decoder.short_fecframe, false);
     BOOST_CHECK_EQUAL(decoder.has_pilots, false);

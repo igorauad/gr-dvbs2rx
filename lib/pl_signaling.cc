@@ -61,7 +61,7 @@ plsc_decoder::plsc_decoder(int debug_level)
 
 void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
 {
-    if (soft) {
+    if (soft && coherent) {
         // Soft decoding
         //
         // The Reed-Muller decoder assumes that the Euclidean-space image of

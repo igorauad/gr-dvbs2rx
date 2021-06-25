@@ -85,14 +85,32 @@ public:
     /**
      * \brief Decode the incoming pi/2 BPSK symbols of the PLSC.
      * \param bpsk_in (const gr_complex *) Input pi/2 BPSK symbols, starting
-     *                from the last SOF symbol and followed by the PLSC symbols.
-     * \param coherent (bool) Whether to use coherent BPSK demapping. When set
-     *                 to false, the implementation uses differential demapping.
-     * \param soft (bool) Whether to use soft decoding instead of hard decoding.
+     *                from the last SOF symbol and followed by the PLSC symbols
+     *                (see note 1).
+     * \param coherent (bool) Whether to use coherent BPSK demapping (the
+     *                 default). When set to false, the decoding uses hard
+     *                 decisions produced through differential demapping of the
+     *                 pi/2 BPSK symbols, even if soft=true (see note 2).
+     * \param soft (bool) Whether to decode the PLSC dataword using soft pi/2
+     *             BPSK decisions instead of hard decisions.
      * \return Void.
-     * \note The last SOF symbol is required when coherent=false. In contrast,
-     * when coherent=true, the implementation simply skips this symbol. However,
-     * note "bpsk_in" must start at the last SOF symbol regardless.
+     *
+     * \note 1 - The last SOF symbol is required when coherent=false. In
+     * contrast, when coherent=true, the implementation simply skips this
+     * symbol. However, note "bpsk_in" must start at the last SOF symbol
+     * regardless.
+     *
+     * \note 2 - The non-coherent (differential) demapping is only supported
+     * with hard decisions because there is negligible performance difference
+     * when differential demapping is used to produce soft decisions. On the
+     * contrary, based on some experiments, it seems that differential demapping
+     * with soft decisions would only be slower, and it would produce a similar
+     * (if not worse) performance than differential demapping with hard
+     * decisions. Ultimately, the supported parameter combinations are:
+     * (coherent=true, soft=false), (coherent=true, soft=true), and
+     * (coherent=false, soft=false). With (coherent=false, soft=true), the
+     * implementation will silently fall back to differential demapping with
+     * hard decisions (coherent=false, soft=false).
      */
     void decode(const gr_complex* bpsk_in, bool coherent = true, bool soft = true);
 };
