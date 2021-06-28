@@ -39,8 +39,7 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
       d_sps(sps),
       d_i_sym(0),
       d_locked(false),
-      d_da_phase(0.0),
-      d_tag_delay(0)
+      d_da_phase(0.0)
 {
     d_frame_sync = new frame_sync(debug_level);
     d_plsc_decoder = new plsc_decoder(debug_level);
@@ -72,6 +71,164 @@ plsync_cc_impl::~plsync_cc_impl()
 void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_required)
 {
     ninput_items_required[0] = noutput_items;
+}
+
+void plsync_cc_impl::calibrate_tag_delay(int sof_detection_idx,
+                                         int noutput_items,
+                                         int tolerance)
+{
+    // Search for tags that occurred since the last search up to the current
+    // range of indexes being processed by the work function.
+    static const pmt::pmt_t tag_key = pmt::intern("rot_phase_inc");
+    const uint64_t n_read = nitems_read(0);
+    const uint64_t tag_search_end = n_read + (uint64_t)(noutput_items);
+    std::vector<tag_t> tags;
+    get_tags_in_range(tags, 0, d_rot_ctrl.tag_search_start, tag_search_end, tag_key);
+
+    // Prepare for the next tag search
+    // NOTE: get_tags_in_range searches within the interval [start,end).
+    d_rot_ctrl.tag_search_start = tag_search_end;
+
+    // Convert the relative SOF detection index to an absolute index
+    // corresponding to the first SOF/PLHEADER symbol. Assume the SOF detection
+    // happens at the last PLHEADER symbol.
+    const uint64_t abs_sof_idx = n_read + sof_detection_idx - 89;
+
+    // Process the tags
+    for (unsigned j = 0; j < tags.size(); j++) {
+        // We don't expect the tag to come too often. The shortest PLFRAME has
+        // 3330 symbols (32 slots + PLHEADER), and we only update the rotator
+        // frequency once per PLFRAME at maximum. However, if the symbol_sync_cc
+        // block is used upstream, as of GR v3.9, it can replicate tags and
+        // produce artificial closely-spaced tags. Ignore them here.
+        const int tag_interval = tags[j].offset - d_rot_ctrl.current.idx;
+        if (d_rot_ctrl.current.idx > 0 &&
+            tag_interval < 1000) // 1000 is arbitrary (< 3330)
+            continue;
+        // NOTE: use "d_rot_ctrl.current" instead of "d_rot_ctrl.past" because
+        // the former is assigned here, whereas the latter is assigned in
+        // control_rotator_freq.
+
+        // Error between the observed and expected tag offsets. Since we correct
+        // this error on every PLFRAME, the observed error is the residual after
+        // correction, not the raw delay. The raw error (interpreted as the
+        // delay) is the cumulative sum of the residuals. Eventually, the
+        // residuals should converge to zero and oscillate around that.
+        const int error = abs_sof_idx - tags[j].offset;
+        d_rot_ctrl.tag_delay += error;
+
+        // The tag confirms the frequency currently configured in the rotator
+        const double current_phase_inc = pmt::to_double(tags[j].value);
+        d_rot_ctrl.current.freq = -d_sps * current_phase_inc / (2.0 * GR_M_PI);
+        d_rot_ctrl.current.idx = tags[j].offset;
+
+        if (abs(d_rot_ctrl.tag_delay) > tolerance) // sanity check
+            printf("Warning: rot_phase_inc tag delay %d seems too high\n",
+                   d_rot_ctrl.tag_delay);
+
+        if (d_debug_level > 2) {
+            printf("[Rotator ctrl] "
+                   "Phase inc tag: %f\t"
+                   "Offset: %lu\t"
+                   "Expected: %lu\t"
+                   "Error: %3d\t"
+                   "Delay: %3d\n",
+                   current_phase_inc,
+                   tags[j].offset,
+                   abs_sof_idx,
+                   error,
+                   d_rot_ctrl.tag_delay);
+        }
+    }
+}
+
+void plsync_cc_impl::control_rotator_freq(int sof_detection_idx,
+                                          bool coarse_corrected,
+                                          bool new_coarse_est,
+                                          bool new_fine_est)
+{
+    // Send control messages only when locked. Before that, the frequency offset
+    // estimates can be very poor and are only supposed to be used internally.
+    if (!d_locked)
+        return;
+
+    double rot_freq_adj = 0; // frequency adjustment
+    if (coarse_corrected && new_fine_est)
+        rot_freq_adj = d_freq_sync->get_fine_foffset();
+    else if (!coarse_corrected && new_coarse_est)
+        rot_freq_adj = d_freq_sync->get_coarse_foffset();
+    else
+        return;
+
+    // Convert the relative SOF detection index to the absolute index of the
+    // first symbol in the current PLHEADER/SOF:
+    const uint64_t n_read = nitems_read(0);
+    const uint64_t abs_sof_idx = n_read + sof_detection_idx - 89;
+
+    // Schedule the phase increment to take place at the start of the next frame
+    const uint64_t abs_next_sof_idx = abs_sof_idx + d_plsc_decoder->plframe_len;
+
+    // Assume the upstream rotator lies before a matched filter and, hence,
+    // operates on the sample stream (i.e. on samples, not symbols). Use the
+    // known oversampling ratio and the calibrated tag delay to schedule the
+    // phase increment update. */
+    d_rot_ctrl.next.idx = d_sps * (abs_next_sof_idx + d_rot_ctrl.tag_delay);
+
+    // Rotator frequency that should start taking effect on the next frame:
+    //
+    // NOTE: Extra caution is required when adding the frequency offset estimate
+    // to the rotator's frequency. Assuming we are now processing the i-th
+    // frame, note the fine estimate is based on frame i-1 and is only
+    // effectively corrected by the upstream rotator on the start of frame
+    // i+1. Hence, the fine estimate that was just obtained must be accumulated
+    // to the frequency that still existed in the rotator during frame i-1.
+    //
+    // In other words, there is a two-frame delay in the correction process. To
+    // overcome this, we track 3 stages of the rotator's frequency: at the
+    // previous frame, the current and the next frame. The next frequency is the
+    // correction scheduled via control message in the sequel.
+    d_rot_ctrl.next.freq = d_rot_ctrl.past.freq + rot_freq_adj;
+
+    // Sanity check
+    if (d_rot_ctrl.current.idx < d_rot_ctrl.past.idx ||
+        d_rot_ctrl.next.idx < d_rot_ctrl.current.idx) {
+        printf("Warning: rotator frequency state has unexpected index(es)\n");
+        return;
+    }
+
+    // Send the corresponding phase increment
+    static const pmt::pmt_t inc_key = pmt::intern("inc");
+    static const pmt::pmt_t offset_key = pmt::intern("offset");
+    const double phase_inc = -d_rot_ctrl.next.freq * 2.0 * GR_M_PI / d_sps;
+    pmt::pmt_t msg = pmt::make_dict();
+    msg = pmt::dict_add(msg, inc_key, pmt::from_double(phase_inc));
+    msg = pmt::dict_add(msg, offset_key, pmt::from_uint64(d_rot_ctrl.next.idx));
+    message_port_pub(d_port_id, msg);
+
+    if (d_debug_level > 1)
+        printf("- Cumulative frequency offset: %g "
+               "(coarse corrected? %u)\n",
+               d_rot_ctrl.next.freq,
+               coarse_corrected);
+
+    if (d_debug_level > 2) {
+        printf("[Rotator ctrl] "
+               "New phase inc: %f\t"
+               "Offset: %lu\t"
+               "Sample offset: %lu\n",
+               phase_inc,
+               abs_next_sof_idx,
+               d_rot_ctrl.next.idx);
+    }
+
+    // Prepare the state for the next frame
+    d_rot_ctrl.past = d_rot_ctrl.current;
+    /* NOTE: don't shift the "next" frequency correction into the "current". The
+     * next value (at d_rot_ctrl.next.freq) is just an expectation for what the
+     * next rotator frequency should be. We must receive the confirmation from
+     * the rotator that the new increment was applied (see
+     * calibrate_tag_delay). If there is no rotator upstream,
+     * d_rot_ctrl.past.freq will be 0 forever. */
 }
 
 int plsync_cc_impl::general_work(int noutput_items,
@@ -229,115 +386,10 @@ int plsync_cc_impl::general_work(int noutput_items,
              * knows when to expect a new SOF */
             d_frame_sync->set_frame_len(d_plsc_decoder->plframe_len);
 
-            /* Calibrate the delay between rotator and this block
-             *
-             * The rotator places a tag on the sample where the new phase
-             * increment starts to take effect. This sample typically traverses
-             * a matched filter and decimator block, which has an associated
-             * delay. We can calibrate this delay here by comparing the sample
-             * on which the tag came with respect to where we expected it (in
-             * the first symbol of the PLHEADER). Then we use this inferred tag
-             * delay when scheduling the next increment update below.
-             **/
-            std::vector<tag_t> tags;
-            const uint64_t n_read = nitems_read(0);
-            const uint64_t end_range = n_read + (uint64_t)(noutput_items);
-
-            get_tags_in_range(tags, 0, n_read, end_range, pmt::mp("rot_phase_inc"));
-
-            for (unsigned j = 0; j < tags.size(); j++) {
-                int tag_offset = tags[j].offset - n_read;
-                int expected_offset = i - 89; // first PLHEADER symbol
-                d_tag_delay += expected_offset - tag_offset;
-
-                /* This tag confirms the frequency that is configured in the
-                 * upstream rotator right now. */
-                d_rot_freq[1] = -d_sps * pmt::to_double(tags[j].value) / (2.0 * GR_M_PI);
-
-                if (abs(d_tag_delay) > 200) // sanity check
-                    printf("%s: Warning: tag delay %d seems too high\n",
-                           __func__,
-                           d_tag_delay);
-
-                if (d_debug_level > 2) {
-                    printf("Rotator phase inc tag: %f\t"
-                           "Offset: %4d (%lu)\t"
-                           "Expected: %4d\t"
-                           "Error: %3d\tDelay: %3d\n",
-                           pmt::to_float(tags[j].value),
-                           tag_offset,
-                           tag_offset + n_read,
-                           expected_offset,
-                           (expected_offset - tag_offset),
-                           d_tag_delay);
-                }
-            }
-
-            /* Send new frequency correction to upstream rotator
-             *
-             * Control the phase increment of an external de-rotator. Assume the
-             * de-rotator sits before a matched filter and, hence, operates on a
-             * sample stream (i.e. on samples, rather than symbols). Use the
-             * known oversampling ratio in order to schedule the sample index
-             * where the update is to be executed by the rotator.
-             *
-             * Only send such control messages when locked. Before that, the
-             * frequency offset estimates can be very poor and are only supposed
-             * to be used internally.
-             *
-             * Extra caution is required when adding the frequency offset
-             * estimate to the rotator's frequency. Assuming we are now
-             * processing the i-th frame, note the fine estimate is based on
-             * frame i-1 and is only effectively corrected by the upstream
-             * rotator on the start of frame i+1. Hence, the fine estimate that
-             * was just obtained must be accumulated to the frequency that still
-             * existed in the rotator during frame i-1.
-             *
-             * To accomplish this, we track 3 stages of the rotator's
-             * frequency. During the previous frame, the current and the one
-             * expected for the next frame.
-             */
-            double rot_freq_adj = 0; // frequency adjustment
-            if (d_locked && coarse_corrected && new_fine_est)
-                rot_freq_adj = d_freq_sync->get_fine_foffset();
-            else if (d_locked && !coarse_corrected && new_coarse_est)
-                rot_freq_adj = d_freq_sync->get_coarse_foffset();
-
-            if (rot_freq_adj != 0) {
-                /* Rotator frequency that is supposed to start taking
-                 * effect on the next frame: */
-                d_rot_freq[2] = d_rot_freq[0] + rot_freq_adj;
-
-                if (d_debug_level > 1)
-                    printf("- Cumulative frequency offset: %g "
-                           "(coarse corrected? %u)\n",
-                           d_rot_freq[2],
-                           coarse_corrected);
-
-                double phase_inc = -d_rot_freq[2] * 2.0 * GR_M_PI / d_sps;
-                uint64_t offset =
-                    d_sps * (n_read + i - 89 + d_tag_delay + d_plsc_decoder->plframe_len);
-
-                pmt::pmt_t msg = pmt::make_dict();
-                msg = pmt::dict_add(msg, pmt::intern("inc"), pmt::from_double(phase_inc));
-                msg = pmt::dict_add(msg, pmt::intern("offset"), pmt::from_uint64(offset));
-                message_port_pub(d_port_id, msg);
-
-                if (d_debug_level > 2) {
-                    printf("Send new phase inc to rotator: %f -"
-                           " offset: %lu\n",
-                           phase_inc,
-                           offset);
-                }
-            }
-
-            /* Update rotator's state for next frame */
-            d_rot_freq[0] = d_rot_freq[1];
-            /* NOTE: don't shift [2] into [1]. d_rot_freq[2] is really just an
-             * expectation for what the next rotator's frequency will be. But we
-             * must receive confirmation from the rotator that the new increment
-             * was applied. If there is no rotator upstream, d_rot_freq[0] will
-             * be 0 forever. */
+            /* Calibrate the delay between the upstream rotator and this
+             * block. Then, schedule a frequency update on the rotator. */
+            calibrate_tag_delay(i, noutput_items);
+            control_rotator_freq(i, coarse_corrected, new_coarse_est, new_fine_est);
 
             /* Save the symbols of the new PLHEADER into the pilot buffer, which
              * will be processed by the end of this frame for fine freq. offset
