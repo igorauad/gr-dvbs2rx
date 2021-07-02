@@ -37,7 +37,6 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
                 gr::io_signature::make(1, 1, sizeof(gr_complex))),
       d_debug_level(debug_level),
       d_sps(sps),
-      d_i_sym(0),
       d_locked(false),
       d_da_phase(0.0)
 {
@@ -231,6 +230,48 @@ void plsync_cc_impl::control_rotator_freq(int sof_detection_idx,
      * d_rot_ctrl.past.freq will be 0 forever. */
 }
 
+void plframe_idx_t::step(uint16_t plframe_len, bool has_pilots)
+{
+    i_in_frame++;
+    if (i_in_frame >= (plframe_len - PLHEADER_LEN)) {
+        // Already at the next PLHEADER
+        is_data_sym = false;
+        is_pilot_sym = false;
+    } else if (has_pilots) {
+        i_pilot_blk = i_in_frame / PILOT_BLK_PERIOD;
+        const int j =
+            i_in_frame - ((i_pilot_blk * PILOT_BLK_PERIOD) + PILOT_BLK_INTERVAL);
+        is_pilot_sym = (j >= 0);
+        i_in_pilot_blk = is_pilot_sym ? ((uint16_t)j) : 0;
+        const uint16_t k = (i_in_frame - (i_pilot_blk * PILOT_BLK_LEN) - i_in_pilot_blk);
+        i_in_slot = k % 90;
+        i_slot = k / 90;
+        is_data_sym = !is_pilot_sym;
+    } else {
+        i_in_slot = i_in_frame % 90;
+        i_slot = i_in_frame / 90;
+        is_data_sym = true;
+        is_pilot_sym = false;
+    }
+}
+
+void plframe_idx_t::reset()
+{
+    i_in_frame = -1;
+    i_in_slot = 0;
+    i_in_pilot_blk = 0;
+    i_slot = 0;
+    i_pilot_blk = 0;
+    is_pilot_sym = false;
+    is_data_sym = false;
+}
+
+bool plframe_idx_t::is_valid_pilot_idx()
+{
+    return is_pilot_sym && (i_pilot_blk < MAX_PILOT_BLKS) &&
+           (i_in_pilot_blk < PILOT_BLK_LEN);
+}
+
 int plsync_cc_impl::general_work(int noutput_items,
                                  gr_vector_int& ninput_items,
                                  gr_vector_const_void_star& input_items,
@@ -240,71 +281,43 @@ int plsync_cc_impl::general_work(int noutput_items,
     gr_complex* out = (gr_complex*)output_items[0];
     int n_produced = 0;
 
-    bool is_sof;         // flag the start of frame (SOF)
     bool new_coarse_est; // a new coarse freq. offset was estimated
     bool new_fine_est;   // a new fine freq. offset was estimated
     gr_complex descrambled_sym;
 
-    /* Tracking of data vs pilot symbols */
-    uint16_t i_in_slot = 0;      /** symbol index in data slot */
-    uint16_t i_slot = 0;         /** slot index */
-    uint16_t i_in_pilot_blk = 0; /** symbol index in pilot block */
-    uint16_t i_pilot_blk = 0;    /** pilot block index */
-    bool is_pilot_sym = false;   /** current symbol is pilot (non-plheader) symbol */
-    bool is_data_sym = false;    /** whether current symbol is data symbol */
-
     /* Symbol by symbol processing */
     for (int i = 0; i < noutput_items; i++) {
         /* Update indexes */
-        if (d_i_sym >= (d_plsc_decoder->plframe_len - 90)) {
-            // Already at the next PLHEADER
-            is_data_sym = false;
-            is_pilot_sym = false;
-        } else if (d_plsc_decoder->has_pilots) {
-            i_pilot_blk = d_i_sym / PILOT_BLK_PERIOD;
-            const int j =
-                d_i_sym - ((i_pilot_blk * PILOT_BLK_PERIOD) + PILOT_BLK_INTERVAL);
-            is_pilot_sym = (j >= 0);
-            i_in_pilot_blk = is_pilot_sym ? ((uint16_t)j) : 0;
-            const uint16_t k = (d_i_sym - (i_pilot_blk * PILOT_BLK_LEN) - i_in_pilot_blk);
-            i_in_slot = k % 90;
-            i_slot = k / 90;
-            is_data_sym = !is_pilot_sym;
-        } else {
-            i_in_slot = d_i_sym % 90;
-            i_slot = d_i_sym / 90;
-            is_data_sym = true;
-            is_pilot_sym = false;
-        }
+        if (d_frame_sync->is_locked_or_almost())
+            d_idx.step(d_plsc_decoder->plframe_len, d_plsc_decoder->has_pilots);
 
         /* PL Descrambling */
-        d_pl_descrambler->step(in[i], descrambled_sym, d_i_sym);
-        d_i_sym++;
+        d_pl_descrambler->step(in[i], descrambled_sym, d_idx.i_in_frame);
 
         /* Store symbols from pilot blocks (if any) for post-processing such as
          * fine frequency offset estimation
          *
          * NOTE: the descrambled symbols must be stored */
-        if (is_pilot_sym && (i_pilot_blk < MAX_PILOT_BLKS) &&
-            (i_in_pilot_blk < PILOT_BLK_LEN)) {
-            const uint16_t z = (i_pilot_blk * PILOT_BLK_LEN) + i_in_pilot_blk; // 0 to 791
+        if (d_idx.is_valid_pilot_idx()) {
+            const uint16_t z =
+                (d_idx.i_pilot_blk * PILOT_BLK_LEN) + d_idx.i_in_pilot_blk; // 0 to 791
             d_rx_pilots[PLHEADER_LEN + z] = descrambled_sym;
 
             /* Once all symbols of the current pilot block have been
              * acquired, estimate the average phase of the block */
-            if (i_in_pilot_blk == (PILOT_BLK_LEN - 1)) {
-                d_da_phase =
-                    d_freq_sync->estimate_pilot_phase(d_rx_pilots.data(), i_pilot_blk);
+            if (d_idx.i_in_pilot_blk == (PILOT_BLK_LEN - 1)) {
+                d_da_phase = d_freq_sync->estimate_pilot_phase(d_rx_pilots.data(),
+                                                               d_idx.i_pilot_blk);
             }
         }
 
         /* Frame timing recovery */
-        is_sof = d_frame_sync->step(in[i]);
+        bool is_sof = d_frame_sync->step(in[i]);
 
         if (is_sof) {
             /* If this SOF came where the previous PLSC told it would
              * be, we are still locked */
-            d_locked = d_frame_sync->get_locked();
+            d_locked = d_frame_sync->is_locked();
 
             /* "New PLHEADER" - of the frame whose start has just been
              * detected */
@@ -412,12 +425,8 @@ int plsync_cc_impl::general_work(int noutput_items,
              *
              * NOTE: the start of frame (SOF) is only detected when the
              * last (90th) symbol of the PLHEADER is processed by the
-             * frame synchronizer block. Reset the symbol indexes: */
-            d_i_sym = 0;
-            i_in_slot = 0;
-            i_slot = 0;
-            i_in_pilot_blk = 0;
-            i_pilot_blk = 0;
+             * frame synchronizer block. */
+            d_idx.reset();
         }
 
         /* Output symbols with data-aided phase correction based on last pilot
@@ -430,7 +439,7 @@ int plsync_cc_impl::general_work(int noutput_items,
          * evolves over time in between pilot blocks and use such time-varying
          * prediction for correction.
          **/
-        if (d_locked && is_data_sym & !d_plsc_decoder->dummy_frame) {
+        if (d_locked && d_idx.is_data_sym && !d_plsc_decoder->dummy_frame) {
             out[n_produced] = gr_expj(-d_da_phase) * descrambled_sym;
             n_produced++;
         }

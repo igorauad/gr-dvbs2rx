@@ -18,8 +18,7 @@ frame_sync::frame_sync(int debug_level)
       sym_cnt(0),
       last_in(0),
       timing_metric(0.0),
-      locked(false),
-      locked_prev(false),
+      state(frame_sync_state_t::searching),
       frame_len(0),
       d_plsc_delay_buf(PLSC_LEN + 1),
       d_sof_buf(SOF_CORR_LEN),
@@ -65,14 +64,16 @@ bool frame_sync::step(const gr_complex& in)
     /* NOTE: this index resets by the end of the PLHEADER, so it is 1 for the
      * first data symbol after the PLHEADER. */
 
-    /* Once locked, wait to compute the cross-correlation only when the right
-     * time comes. Within the 90 symbols prior to that, push some values into
-     * buffers. */
-    if (locked && (sym_cnt <= (frame_len - 90)))
+    /* Once a PLFRAME is found, wait to compute the next cross-correlation only
+     * when the right time comes to find the subsequent PLFRAME. More
+     * specifically, within the 90 symbols prior to the next frame timing peak,
+     * start pushing new values into the cross-correlators. */
+    const bool locked_or_almost = is_locked_or_almost();
+    if (locked_or_almost && (sym_cnt <= (frame_len - 90)))
         return false;
 
-    /* Save raw input symbol into buffer. When we finally find the start
-     * of frame, we will have the PLHEADER symbols in this buffer */
+    /* Save the raw input symbol into the PLHEADER buffer. When we finally find
+     * the start of frame, we will have the PLHEADER symbols in this buffer */
     d_plheader_buf.push_front(in);
 
     /* Differential value */
@@ -103,8 +104,10 @@ bool frame_sync::step(const gr_complex& in)
         d_plsc_e_buf.push(diff);
 
     /* Everything past this point is only necessary exactly when the correlators
-     * are expected to peak */
-    if (locked && (sym_cnt < frame_len))
+     * are expected to peak. If a PLFRAME has been found already (i.e., we are
+     * locked or almost locked), proceed only if this is the expected timing for
+     * the next PLFRAME timing peak. */
+    if (locked_or_almost && (sym_cnt < frame_len))
         return false;
 
     /* SOF correlation */
@@ -130,64 +133,67 @@ bool frame_sync::step(const gr_complex& in)
     timing_metric = (abs_sum > abs_diff) ? abs_sum : abs_diff;
 
     /* Is this a peak? */
-    bool is_peak = locked ? (timing_metric > threshold_l) : (timing_metric > threshold_u);
+    const bool is_peak =
+        locked_or_almost ? (timing_metric > threshold_l) : (timing_metric > threshold_u);
     /* TODO: check the average symbol magnitude and normalize */
 
+    /* Is a peak expected? */
+    const bool peak_expected = locked_or_almost;
+
+    /* Useful log separator */
+    if (debug_level > 1 && (is_peak || peak_expected)) {
+        printf("--\n");
+    }
+
+    /* State machine */
     if (is_peak) {
-        /* Frame locked if the peak is where it was expected to be */
-        locked = (sym_cnt == frame_len);
-
-        if (debug_level > 0) {
-            if (locked && !locked_prev)
-                printf("Frame lock acquired\n");
+        if (state == frame_sync_state_t::searching) {
+            state = frame_sync_state_t::found;
+            if (debug_level > 0) {
+                printf("Frame sync: PLFRAME found\n");
+            }
+        } else if (state == frame_sync_state_t::found) {
+            state = frame_sync_state_t::locked;
+            if (debug_level > 0) {
+                printf("Frame sync: PLFRAME lock acquired\n");
+            }
         }
-        locked_prev = locked;
 
-        if (debug_level > 1)
-            printf("--\nFrame sync: {Peak after: %u, Timing Metric: %f, Locked: %u}\r\n",
+        if (debug_level > 1) {
+            printf("Frame sync: {Peak after: %u, "
+                   "Timing Metric: %f, "
+                   "Locked: %u}\r\n",
                    sym_cnt,
                    timing_metric,
-                   locked);
+                   (state == frame_sync_state_t::locked));
+        }
 
-        if (debug_level > 2)
-            printf("Frame sync: {Sym: %u, SOF: %+.1f %+.1fj, PLSC: %+.1f %+.1fj}\r\n",
+        sym_cnt = 0;
+    } else if (peak_expected) {
+        state = frame_sync_state_t::searching;
+        if (debug_level > 0) {
+            printf("Frame sync: PLFRAME lock lost\n");
+            if (debug_level > 1) {
+                printf("Frame sync: Insufficient Timing Metric: %f\n", timing_metric);
+            }
+        }
+    }
+
+    /* Further debugging logs */
+    if (is_peak || peak_expected) {
+        if (debug_level > 2) {
+            printf("Frame sync: {Sym: %u, SOF: %+.1f %+.1fj, PLSC: %+.1f "
+                   "%+.1fj}\r\n",
                    sym_cnt,
                    sof_corr.real(),
                    sof_corr.imag(),
                    plsc_corr.real(),
                    plsc_corr.imag());
-
+        }
         if (debug_level > 3) {
             dump_complex_vec(d_sof_buf, "Frame sync: SOF buffer");
             dump_complex_vec(d_plsc_e_buf, "Frame sync: PLSC even buffer");
             dump_complex_vec(d_plsc_o_buf, "Frame sync: PLSC odd buffer");
-        }
-
-        sym_cnt = 0;
-    } else {
-        /* Was a peak expected? */
-        if (locked) {
-            locked = false;
-            if (debug_level > 0) {
-                printf("--\nFrame lock lost\n");
-                if (debug_level > 1)
-                    printf("Insufficient Timing Metric: %f\n", timing_metric);
-
-                if (debug_level > 2)
-                    printf("Frame sync: {Sym: %u, SOF: %+.1f %+.1fj, PLSC: %+.1f "
-                           "%+.1fj}\r\n",
-                           sym_cnt,
-                           sof_corr.real(),
-                           sof_corr.imag(),
-                           plsc_corr.real(),
-                           plsc_corr.imag());
-
-                if (debug_level > 3) {
-                    dump_complex_vec(d_sof_buf, "Frame sync: SOF buffer");
-                    dump_complex_vec(d_plsc_e_buf, "Frame sync: PLSC even buffer");
-                    dump_complex_vec(d_plsc_o_buf, "Frame sync: PLSC odd buffer");
-                }
-            }
         }
     }
 

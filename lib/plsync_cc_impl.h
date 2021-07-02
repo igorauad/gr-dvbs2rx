@@ -34,6 +34,20 @@ struct rot_ctrl_t {
     rot_freq_t next;               /** Frequency state expected for the next PLFRAME */
 };
 
+/** @brief Index tracking for various segments of a PLFRAME */
+struct plframe_idx_t {
+    uint16_t i_in_frame = -1;    /** Symbol index in PLFRAME */
+    uint16_t i_in_slot = 0;      /** Symbol index in data slot */
+    uint16_t i_in_pilot_blk = 0; /** Symbol index in pilot block */
+    uint16_t i_slot = 0;         /** Slot index */
+    uint16_t i_pilot_blk = 0;    /** pilot block index */
+    bool is_pilot_sym = false;   /** Current symbol is a pilot (non-plheader) symbol */
+    bool is_data_sym = false;    /** Current symbol is a data symbol */
+    void step(uint16_t plframe_len, bool has_pilots);
+    void reset();
+    bool is_valid_pilot_idx();
+};
+
 class plsync_cc_impl : public plsync_cc
 {
 private:
@@ -47,10 +61,10 @@ private:
      * can control the external rotator phase properly */
 
     /* State */
-    uint16_t d_i_sym;      /** Symbol index within PLFRAME */
     bool d_locked;         /** Whether frame timing is locked */
     float d_da_phase;      /** Last data-aided phase estimate */
     rot_ctrl_t d_rot_ctrl; /** Upstream rotator control */
+    plframe_idx_t d_idx;   /** PLFRAME indexes */
 
     const pmt::pmt_t d_port_id = pmt::mp("rotator_phase_inc");
 

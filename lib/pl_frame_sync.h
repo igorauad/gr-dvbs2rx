@@ -21,6 +21,13 @@
 namespace gr {
 namespace dvbs2rx {
 
+
+enum class frame_sync_state_t {
+    searching, // searching for a cross-correlation peak
+    found,     // found a peak but the lock is not confirmed yet
+    locked     // lock confirmed
+};
+
 class frame_sync
 {
 private:
@@ -32,9 +39,8 @@ private:
     gr_complex last_in;  /** last symbol in */
     float timing_metric; /** most recent timing metric */
 
-    bool locked;            /** whether frame timing is locked */
-    bool locked_prev;       /** previous locked state */
-    unsigned int frame_len; /** current PLFRAME length */
+    frame_sync_state_t state; /** frame timing recovery state */
+    unsigned int frame_len;   /** current PLFRAME length */
 
     delay_line<gr_complex> d_plsc_delay_buf; /** buffer used as delay line */
     delay_line<gr_complex> d_sof_buf;        /** SOF correlator buffer */
@@ -80,8 +86,9 @@ public:
      */
     bool step(const gr_complex& in);
 
+    bool is_locked() { return state == frame_sync_state_t::locked; }
+    bool is_locked_or_almost() { return state != frame_sync_state_t::searching; }
     float get_timing_metric() { return timing_metric; }
-    bool get_locked() { return locked; }
     void set_frame_len(unsigned int len) { frame_len = len; }
 
     const gr_complex* get_plheader() { return &d_plheader_buf.back(); }
