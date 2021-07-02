@@ -319,35 +319,48 @@ int plsync_cc_impl::general_work(int noutput_items,
              * be, we are still locked */
             d_locked = d_frame_sync->is_locked();
 
-            /* "New PLHEADER" - of the frame whose start has just been
-             * detected */
-            const gr_complex* p_plheader = d_frame_sync->get_plheader();
 
             /* Coarse frequency offset estimation
              *
-             * When locked, the estimation is based on the past PLHEADER as well
-             * as (freq_est_period - 1) PLHEADERs before it. The motivation for
-             * using the past PLHEADER is that it is a safer bet. The fact that
-             * frame sync is still locked suggests that the previous PLSC was
-             * correctly decoded, so it is now safer to trust on the vector of
-             * pilot symbols that were acquired throughout the previous frame.
+             * When locked, we feed the past PLHEADER on every call to
+             * estimate_coarse(). With that, the estimation is based on the
+             * **past** PLHEADER as well as (freq_est_period - 1) PLHEADERs
+             * before it. The motivation for using the past PLHEADER is that it
+             * is a safer bet. The fact that frame sync is still locked suggests
+             * that the previous PLSC was correctly decoded, whereas, the
+             * current PLHEADER could be wrongly decoded, and that will only be
+             * checked by the next PLFRAME.
              *
-             * In contrast, when frame timing is still unlocked, it is still
-             * somewhat beneficial to compute an estimate. We won't use this
-             * estimate to control the external rotator, as it could be a very
-             * poor estimate (e.g. on false positive SOF detection). Yet, we can
-             * use it locally to derotate the PLHEADER in attempt to facilitate
-             * PLSC decoding. For this unlocked estimation, only the SOF symbols
-             * are used, since this way there is no need to rely on correct
-             * decoding of the PLSC for the estimation itself. Also, while still
-             * unlocked, the vector of pilot symbols (d_rx_pilots) won't hold
-             * pilots (nor the PLHEADER). Yet, the current PLHEADER right now
-             * (in this iteration) is available within the frame sync buffer
-             * (p_plheader). So this is what we use when unlocked. */
-            new_coarse_est =
-                d_freq_sync->estimate_coarse(d_locked ? d_rx_pilots.data() : p_plheader,
-                                             d_plsc_decoder->dec_plsc,
-                                             d_locked);
+             * In contrast, while the frame timing recovery loop is unlocked, it
+             * is still somewhat beneficial to compute a coarse frequency offset
+             * estimate. We won't use this estimate to control the external
+             * rotator, as it could be a very poor estimate (e.g., based on a
+             * false positive SOF detection). Nevertheless, we can use it
+             * locally to derotate the PLHEADER in attempt to facilitate the
+             * PLSC decoding. Hence, while unlocked, we feed the current
+             * PLHEADER to "estimate_coarse()". As a result, the coarse
+             * frequency offset estimate will be based on the **current**
+             * PLHEADER and (freq_est_period - 1) PLHEADERs before it.
+             *
+             * Aside from the difference in terms of whether the current or past
+             * PLHEADER is fed to the estimator, there is also a difference in
+             * the symbols that are processed. When unlocked, only the SOF
+             * symbols are processed, such that there is no need to decode the
+             * PLSC correctly before the frequency offset estimation. The
+             * rationale is that we want to estimate the frequency offset to
+             * support the PLSC decoding, not the reverse. In contrast, when
+             * locked, the full PLHEADER is processed.
+             *
+             * Lastly, note the past PLHEADER is saved on the vector d_rx_pilots
+             * when locked. Hence, we read it from there. Meanwhile, the current
+             * PLHEADER is available within the frame sync buffer. */
+            assert(d_plsc_decoder->dec_plsc < n_plsc_codewords);
+            const gr_complex* p_current_plheader = d_frame_sync->get_plheader();
+            const gr_complex* p_past_plheader = d_rx_pilots.data();
+            new_coarse_est = d_freq_sync->estimate_coarse(d_locked ? p_past_plheader
+                                                                   : p_current_plheader,
+                                                          d_plsc_decoder->dec_plsc,
+                                                          d_locked);
 
             /* Fine frequency offset based on the previous frame
              *
@@ -375,7 +388,7 @@ int plsync_cc_impl::general_work(int noutput_items,
             }
 
             /* Try to de-rotate the PLHEADER's pi/2 BPSK symbols */
-            d_freq_sync->derotate_plheader(p_plheader);
+            d_freq_sync->derotate_plheader(p_current_plheader);
 
             /* Post-processed (de-rotated) PLHEADER pi/2 BPSK symbols */
             const gr_complex* p_pp_plheader = d_freq_sync->get_plheader();
@@ -413,12 +426,14 @@ int plsync_cc_impl::general_work(int noutput_items,
              * overwrite the previous PLHEADER that is needed for fine
              * estimation based on the previous frame.
              */
-            memcpy(d_rx_pilots.data(), p_plheader, PLHEADER_LEN * sizeof(gr_complex));
+            memcpy(d_rx_pilots.data(),
+                   p_current_plheader,
+                   PLHEADER_LEN * sizeof(gr_complex));
 
             /* Estimate the phase of this PLHEADER - this phase estimate
              * can be used for fine frequency offset estimation in the
-             * next frame in case it has pilots. e*/
-            d_da_phase = d_freq_sync->estimate_plheader_phase(p_plheader,
+             * next frame in case it has pilots. */
+            d_da_phase = d_freq_sync->estimate_plheader_phase(p_current_plheader,
                                                               d_plsc_decoder->dec_plsc);
 
             /* Reset the symbol indexes
