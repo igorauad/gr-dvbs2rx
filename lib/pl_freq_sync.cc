@@ -12,6 +12,7 @@
 #include "util.h"
 #include <gnuradio/expj.h>
 #include <gnuradio/math.h>
+#include <cassert>
 
 namespace gr {
 namespace dvbs2rx {
@@ -26,14 +27,16 @@ freq_sync::freq_sync(unsigned int period, int debug_level)
       coarse_corrected(false),
       fine_foffset(0.0),
       w_angle_avg(0.0),
+      fine_est_ready(false),
       plheader_conj(PLHEADER_LEN * n_plsc_codewords),
       pilot_mod_rm(PLHEADER_LEN),
+      pp_sof(SOF_LEN),
       pp_plheader(PLHEADER_LEN),
       pilot_corr(L + 1),
       angle_corr(L + 1),
       angle_diff(L),
-      w_window_l(PLHEADER_LEN - 1),
-      w_window_u(SOF_LEN - 1),
+      w_window_f(PLHEADER_LEN - 1),
+      w_window_s(SOF_LEN - 1),
       w_angle_diff(L),
       unmod_pilots(PILOT_BLK_LEN),
       angle_pilot(MAX_PILOT_BLKS + 1),
@@ -67,12 +70,12 @@ freq_sync::freq_sync(unsigned int period, int debug_level)
     unsigned int L_l = (PLHEADER_LEN - 1);
     unsigned int L_u = (SOF_LEN - 1);
     for (unsigned int m = 0; m < L_l; m++) {
-        w_window_l[m] =
+        w_window_f[m] =
             3.0 * ((2 * L_l + 1.0) * (2 * L_l + 1.0) - (2 * m + 1.0) * (2 * m + 1.0)) /
             (((2 * L_l + 1.0) * (2 * L_l + 1.0) - 1) * (2 * L_l + 1));
     }
     for (unsigned int m = 0; m < L_u; m++) {
-        w_window_u[m] =
+        w_window_s[m] =
             3.0 * ((2 * L_u + 1.0) * (2 * L_u + 1.0) - (2 * m + 1.0) * (2 * m + 1.0)) /
             (((2 * L_u + 1.0) * (2 * L_u + 1.0) - 1) * (2 * L_u + 1));
     }
@@ -83,23 +86,23 @@ freq_sync::freq_sync(unsigned int period, int debug_level)
         unmod_pilots[i] = (+SQRT2_2 - SQRT2_2i);
 }
 
-bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool locked)
+bool freq_sync::estimate_coarse(const gr_complex* in, bool full, uint8_t plsc)
 {
     /* TODO: we could also average over pilot blocks */
     const float* w_window;
-    if (locked) {
+    if (full) {
         N = PLHEADER_LEN;
         L = PLHEADER_LEN - 1;
-        w_window = w_window_l.data();
+        w_window = w_window_f.data();
     } else {
         N = SOF_LEN;
         L = SOF_LEN - 1;
-        w_window = w_window_u.data();
+        w_window = w_window_s.data();
     }
 
     /* "Remove" modulation from pilots to obtain a "CW" signal */
     volk_32fc_x2_multiply_32fc(
-        pilot_mod_rm.data(), in, &plheader_conj[i_codeword * PLHEADER_LEN], N);
+        pilot_mod_rm.data(), in, &plheader_conj[plsc * PLHEADER_LEN], N);
 
     /* Auto-correlation of the "modulation-removed" pilot symbols
      *
@@ -177,6 +180,10 @@ bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool l
      */
     coarse_foffset = branchless_clip(w_angle_avg / (2 * M_PI), 0.5f);
 
+    /* Declare that the frequency offset is coarsely corrected once the residual
+     * offset falls within the fine correction range */
+    coarse_corrected = abs(coarse_foffset) < fine_foffset_corr_range;
+
     if (debug_level > 1) {
         printf("Frequency offset estimation:\n");
         if (debug_level > 3) {
@@ -187,23 +194,57 @@ bool freq_sync::estimate_coarse(const gr_complex* in, uint8_t i_codeword, bool l
             dump_real_vec(angle_diff, L, "Angle diff");
         }
         printf("- Coarse frequency offset: %g\n", coarse_foffset);
+        printf("- Coarse corrected: %u\n", coarse_corrected);
     }
 
     /* Reset autocorrelation accumulator */
     std::fill(pilot_corr.begin(), pilot_corr.end(), 0);
 
-    /* Declare that the frequency offset is coarsely corrected once the residual
-     * offset falls within the fine correction range */
-    coarse_corrected = (abs(coarse_foffset) < fine_foffset_corr_range);
-
     return true;
 }
 
-float freq_sync::estimate_plheader_phase(const gr_complex* in, uint8_t i_codeword)
+float freq_sync::estimate_sof_phase(const gr_complex* in)
+{
+    // If the frequency offset is below the coarse correction threshold, assume
+    // the SOF phase will change slowly. The threshold for the normalized
+    // frequency offset is 3.3875e-4. At this level, the phase change over 26
+    // symbols is upper limited to +-0.055 degrees Hence, there is no need to
+    // de-rotate the SOF symbols before estimating the phase. On the other hand,
+    // while not coarse corrected, the SOF phase may change
+    // significantly. Hence, it is helpful to derotate the SOF symbols before
+    // attempting to estimate their initial phase.
+    const gr_complex* mod_rm_in = in;
+    if (!coarse_corrected) {
+        const float phase_inc = 2.0 * GR_M_PI * coarse_foffset;
+
+        /* De-rotate and save into the post-processed SOF buffer */
+        gr_complex phasor = gr_expj(-phase_inc);
+        gr_complex phasor_0 = gr_expj(0);
+        volk_32fc_s32fc_x2_rotator_32fc(pp_sof.data(), in, phasor, &phasor_0, SOF_LEN);
+
+        // In this case, remove the modulation from the de-rotated SOF symbols
+        // instead of the raw input SOF symbols.
+        mod_rm_in = pp_sof.data();
+    }
+
+    // Remove the modulation to obtain a noisy CW. At this point, the CW should
+    // be barely rotating.
+    volk_32fc_x2_multiply_32fc(
+        pilot_mod_rm.data(), mod_rm_in, plheader_conj.data(), SOF_LEN);
+
+    // Return the average angle of the modulation-removed CW symbols
+    gr_complex ck_sum = 0;
+    for (int i = 0; i < SOF_LEN; i++)
+        ck_sum += pilot_mod_rm[i];
+
+    return gr::fast_atan2f(ck_sum);
+}
+
+float freq_sync::estimate_plheader_phase(const gr_complex* in, uint8_t plsc)
 {
     /* "Remove" modulation */
     volk_32fc_x2_multiply_32fc(
-        pilot_mod_rm.data(), in, &plheader_conj[i_codeword * PLHEADER_LEN], PLHEADER_LEN);
+        pilot_mod_rm.data(), in, &plheader_conj[plsc * PLHEADER_LEN], PLHEADER_LEN);
 
     /* Angle of the sum of the PLHEADER symbols */
     gr_complex ck_sum = 0;
@@ -215,10 +256,17 @@ float freq_sync::estimate_plheader_phase(const gr_complex* in, uint8_t i_codewor
     return angle_pilot[0];
 }
 
-float freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
+void freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
 {
-    const gr_complex* pilot_sym = &in[PLHEADER_LEN + (i_blk * PILOT_BLK_LEN)];
-    /* No need to remove modulation, since pilot blocks are already
+    // This function should not be called before the initial coarse frequency
+    // offset correction, as it cannot produce reliable results at this state.
+    assert(coarse_corrected);
+
+    // Validate the pilot block index
+    assert(i_blk >= 0 && i_blk < MAX_PILOT_BLKS);
+
+    /* NOTE: Unlike the PLHEADER symbols, there is no need to remove the
+     * modulation from the pilot symbols, since the pilot blocks are already
      * un-modulated. However, do note that the original pilots have angle pi/4
      * (symbols are +0.707 +j0.707). So, in the end, pi/4 must be subtracted
      * from the resulting average phase. */
@@ -226,7 +274,7 @@ float freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
     /* Average phase is the angle of the sum of the pilot symbols */
     gr_complex ck_sum = 0;
     for (int i = 0; i < PILOT_BLK_LEN; i++)
-        ck_sum += pilot_sym[i];
+        ck_sum += in[i];
     float avg_phase = gr::fast_atan2f(ck_sum) - (GR_M_PI / 4.0);
 
     /* Keep it within -pi to pi */
@@ -237,12 +285,14 @@ float freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
     /* TODO find a branchless way of computing this - maybe with fmod */
 
     angle_pilot[i_blk + 1] = avg_phase;
-
-    return avg_phase;
 }
 
-void freq_sync::estimate_fine(const gr_complex* pilots, uint8_t n_pilot_blks)
+void freq_sync::estimate_fine_pilot_mode(uint8_t n_pilot_blks)
 {
+    // This function should not be called before the initial coarse frequency
+    // offset correction, as it cannot produce reliable results at this state.
+    assert(coarse_corrected);
+
     /* Angle differences */
     volk_32f_x2_subtract_32f(
         angle_diff_f.data(), angle_pilot.data() + 1, angle_pilot.data(), n_pilot_blks);
@@ -255,21 +305,37 @@ void freq_sync::estimate_fine(const gr_complex* pilots, uint8_t n_pilot_blks)
             angle_diff_f[i] += 2.0 * GR_M_PI;
     }
 
-    /* Sum of all angles differences */
+    /* Sum of the angle differences between pilot blocks
+     *
+     * NOTE: skip the angle difference between the PLHEADER and the first pilot
+     * block because this difference occurs over a slightly longer interval. */
     float sum_diff;
-    volk_32f_accumulator_s32f(&sum_diff, angle_diff_f.data(), n_pilot_blks);
+    volk_32f_accumulator_s32f(&sum_diff, angle_diff_f.data() + 1, n_pilot_blks - 1);
 
-    /* Final estimate */
-    fine_foffset = sum_diff / (2.0 * GR_M_PI * PILOT_BLK_PERIOD * n_pilot_blks);
+    /* Final estimate
+     *
+     * The phase difference between two pilot blocks accumulates over
+     * PILOT_BLK_PERIOD, namely over 1476 symbols. The phase difference between
+     * the PLHEADER and the first pilot block accumulates over (PLHEADER_LEN +
+     * PILOT_BLK_INTERVAL), namely over 1530 symbols. Each phase diference
+     * divided by (2*pi*interval) gives the corresponding frequency offset
+     * estimate over that interval. In total, there are n_pilot_blks
+     * estimates. The arithmetic average of them is computed by summing each
+     * estimate weighted by a factor of "1 / n_pilot_blks".
+     **/
+    fine_foffset = sum_diff / (2.0 * GR_M_PI * PILOT_BLK_PERIOD * n_pilot_blks) +
+                   angle_diff_f[0] / (2.0 * GR_M_PI *
+                                      (PLHEADER_LEN + PILOT_BLK_INTERVAL) * n_pilot_blks);
 
     if (debug_level > 1)
         printf("- Fine frequency offset: %g\n", fine_foffset);
 
     if (debug_level > 3) {
-        dump_complex_vec(
-            pilots, PLHEADER_LEN + (n_pilot_blks * PILOT_BLK_LEN), "Rx Pilots");
         dump_real_vec(angle_pilot.data(), n_pilot_blks + 1, "Pilot angles");
+        dump_real_vec(angle_diff_f.data(), n_pilot_blks, "Pilot angle diff");
     }
+
+    fine_est_ready = true;
 }
 
 void freq_sync::derotate_plheader(const gr_complex* in)
@@ -288,12 +354,16 @@ void freq_sync::derotate_plheader(const gr_complex* in)
      * applied to the upstream de-rotator in the next frame, due to how the
      * message port control mechanism works.
      *
+     * NOTE 2: if coarse_corrected is true, that does not imply a fine frequency
+     * offset estimate is available already. Check both.
+     *
      * Caveat: when de-rotating with the fine offset, note it does not
      * necessarily correspond to the estimation based on the previous frame. It
      * depends on whether the previous frame had pilots.
      **/
-    const float phase_inc = coarse_corrected ? (2.0 * GR_M_PI * fine_foffset)
-                                             : (2.0 * GR_M_PI * coarse_foffset);
+    const float phase_inc = (coarse_corrected && fine_est_ready)
+                                ? (2.0 * GR_M_PI * fine_foffset)
+                                : (2.0 * GR_M_PI * coarse_foffset);
 
     /* Phase:
      *
@@ -304,12 +374,7 @@ void freq_sync::derotate_plheader(const gr_complex* in)
      * simply rely on the MODCOD info of the previous frame, since VCM could be
      * used and, as a result, the current frame may have a distinct MODCOD.
      */
-    volk_32fc_x2_multiply_32fc(pilot_mod_rm.data(), in, plheader_conj.data(), SOF_LEN);
-    gr_complex ck_sum = 0;
-    for (int i = 0; i < SOF_LEN; i++)
-        ck_sum += pilot_mod_rm[i];
-
-    const float plheader_phase = gr::fast_atan2f(ck_sum);
+    const float plheader_phase = estimate_sof_phase(in);
 
     if (debug_level > 2)
         printf("PLHEADER phase: %g\n", plheader_phase);

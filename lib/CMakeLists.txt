@@ -72,6 +72,7 @@ list(APPEND test_dvbs2rx_sources
   qa_cdeque.cc
   qa_delay_line.cc
   qa_pi2_bpsk.cc
+  qa_pl_freq_sync.cc
   qa_pl_signaling.cc
   qa_reed_muller.cc
 )
