@@ -10,7 +10,8 @@
 namespace gr {
 namespace dvbs2rx {
 
-pl_descrambler::pl_descrambler(int gold_code) : d_gold_code(gold_code)
+pl_descrambler::pl_descrambler(int gold_code)
+    : d_gold_code(gold_code), d_payload_buf(MAX_PLFRAME_PAYLOAD)
 {
     build_symbol_scrambler_table();
 }
@@ -69,22 +70,24 @@ void pl_descrambler::build_symbol_scrambler_table()
     }
 }
 
-void pl_descrambler::step(const gr_complex& in, gr_complex& out, int i) const
+void pl_descrambler::descramble(const gr_complex* in, uint16_t payload_len)
 {
     // Undo the mapping given in Section 5.5.4 of the standard
-    switch (d_Rn[i]) {
-    case 0:
-        out = in;
-        break;
-    case 1:
-        out = gr_complex(in.imag(), -in.real());
-        break;
-    case 2:
-        out = -in;
-        break;
-    case 3:
-        out = gr_complex(-in.imag(), in.real());
-        break;
+    for (int i = 0; i < payload_len; i++) {
+        switch (d_Rn[i]) {
+        case 0:
+            d_payload_buf[i] = in[i]; // TODO remove (redudant)
+            break;
+        case 1:
+            d_payload_buf[i] = gr_complex(in[i].imag(), -in[i].real());
+            break;
+        case 2:
+            d_payload_buf[i] = -in[i];
+            break;
+        case 3:
+            d_payload_buf[i] = gr_complex(-in[i].imag(), in[i].real());
+            break;
+        }
     }
 }
 
