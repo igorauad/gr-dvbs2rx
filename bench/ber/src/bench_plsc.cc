@@ -208,7 +208,7 @@ void plsc_loopback(modules& m, buffers& b, const params& p)
     m.decoder->decode(b.rx_bpsk_syms.data(), p.coherent, p.soft_dec);
 
     // Unpack the PLSC bits
-    unpack_plsc_bits(plsc, m.decoder->dec_plsc, b);
+    unpack_plsc_bits(plsc, m.decoder->d_plsc, b);
 }
 
 int parse_opts(int ac, char* av[], po::variables_map& vm)

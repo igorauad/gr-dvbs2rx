@@ -52,6 +52,20 @@ public:
                 bool has_pilots);
 };
 
+struct pls_info_t {
+    uint8_t plsc = 0;            /**< Raw PLSC value */
+    uint8_t modcod = 0;          /**< MODCOD of the decoded PLSC */
+    bool short_fecframe = false; /**< Whether the FECFRAME size is short */
+    bool has_pilots = false;     /**< Whether the PLFRAME has pilot blocks */
+    bool dummy_frame = false;    /**< Whether the PLFRAME is a dummy frame */
+    uint8_t n_mod = 0;           /**< Bits per constellation symbol */
+    uint16_t S = 0;              /**< Number of slots */
+    uint16_t plframe_len = 0;    /**< PLFRAME length */
+    uint16_t payload_len = 0;    /**< Payload length */
+    uint16_t xfecframe_len = 0;  /**< XFECFRAME length */
+    uint8_t n_pilots = 0;        /**< Number of pilot blocks */
+    void parse(uint8_t dec_plsc);
+};
 
 /**
  * \brief PLSC Decoder
@@ -63,21 +77,13 @@ public:
 class DVBS2RX_API plsc_decoder
 {
 private:
-    int d_debug_level; /** debug level */
-    reed_muller d_reed_muller_decoder;
-    volk::vector<float> d_soft_dec_buf; // Buffer to store the soft decisions
+    int d_debug_level;                  /**< Debug level */
+    reed_muller d_reed_muller_decoder;  /**< Reed-Muller decoder */
+    volk::vector<float> d_soft_dec_buf; /**< Soft decisions buffer */
+    pls_info_t d_pls_info;              /**< PL signaling information */
 
 public:
-    /* State - made public to speed up access */
-    uint8_t dec_plsc;     /** Last decoded PLSC */
-    uint8_t modcod;       /** MODCOD of the decoded PLSC */
-    bool short_fecframe;  /** Wether FECFRAME size is short */
-    bool has_pilots;      /** Wether PLFRAME has pilot blocks */
-    bool dummy_frame;     /** Whether PLFRAME is a dummy frame */
-    uint8_t n_mod;        /** bits per const symbol */
-    uint16_t S;           /** number of slots */
-    uint16_t plframe_len; /** PLFRAME length */
-    uint8_t n_pilots;     /* number of pilot blocks */
+    uint8_t d_plsc; /**< Last decoded PLSC */
 
     explicit plsc_decoder(int debug_level = 0);
     ~plsc_decoder(){};
@@ -113,6 +119,14 @@ public:
      * hard decisions (coherent=false, soft=false).
      */
     void decode(const gr_complex* bpsk_in, bool coherent = true, bool soft = true);
+
+    /**
+     * Read the last decoded PLS information
+     *
+     * \param out (pls_info_t*) Pointer to a pls_info_t structure where the
+     * last decoded information will be written.
+     */
+    void get_info(pls_info_t* out) const;
 };
 
 } // namespace dvbs2rx

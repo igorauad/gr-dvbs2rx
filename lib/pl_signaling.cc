@@ -8,6 +8,7 @@
 #include "pi2_bpsk.h"
 #include "pl_signaling.h"
 #include <volk/volk.h>
+#include <cstring>
 
 namespace gr {
 namespace dvbs2rx {
@@ -46,59 +47,13 @@ void map_plsc_codeword_to_bpsk(float* dest_ptr, uint64_t codeword)
 plsc_decoder::plsc_decoder(int debug_level)
     : d_debug_level(debug_level),
       d_reed_muller_decoder(&map_plsc_codeword_to_bpsk),
-      d_soft_dec_buf(PLSC_LEN),
-      dec_plsc(0),
-      modcod(0),
-      short_fecframe(false),
-      has_pilots(false),
-      dummy_frame(false),
-      n_mod(0),
-      S(0),
-      plframe_len(0),
-      n_pilots(0)
+      d_soft_dec_buf(PLSC_LEN)
 {
 }
 
-void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
+void pls_info_t::parse(uint8_t dec_plsc)
 {
-    if (soft && coherent) {
-        // Soft decoding
-        //
-        // The Reed-Muller decoder assumes that the Euclidean-space image of
-        // each codeword is the real vector that results from scrambling the
-        // original codeword and mapping it to real using an ordinary 2-PAM/BPSK
-        // mapping instead of pi/2 BPSK. See the "map_plsc_codeword_to_bpsk"
-        // function defined above.
-        //
-        // Hence, the pi/2 BPSK sequence is first converted/derotated to obtain
-        // the corresponding real-valued 2-PAM/BPSK sequence. Then, this real
-        // BPSK sequence (called the vector of "soft decisions") is provided to
-        // the soft Reed-Muller decoder.
-        derotate_bpsk(bpsk_in + 1, d_soft_dec_buf.data(), PLSC_LEN);
-        dec_plsc = d_reed_muller_decoder.decode(d_soft_dec_buf.data());
-    } else {
-        // Hard decoding
-        uint64_t rx_scrambled_plsc;
-        // Demap the pi/2 BPSK PLSC
-        //
-        // Assume bpsk_in points to a contiguous complex array starting at the
-        // last SOF symbol and followed by the PLSC symbols. Use the last SOF
-        // symbol for differential demapping and skip it otherwise.
-        if (coherent) {
-            rx_scrambled_plsc = demap_bpsk(bpsk_in + 1, PLSC_LEN);
-        } else {
-            rx_scrambled_plsc = demap_bpsk_diff(bpsk_in, PLSC_LEN);
-        }
-
-        /* Descramble */
-        uint64_t rx_plsc = rx_scrambled_plsc ^ plsc_scrambler;
-
-        if (d_debug_level > 4)
-            printf("%s: descrambled PLSC: 0x%016lX\n", __func__, rx_plsc);
-
-        /* Decode and parse the decoded PLSC */
-        dec_plsc = d_reed_muller_decoder.decode(rx_plsc);
-    }
+    plsc = dec_plsc;
     modcod = dec_plsc >> 2;
     short_fecframe = dec_plsc & 0x2;
     has_pilots = dec_plsc & 0x1;
@@ -130,21 +85,78 @@ void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
     /* Number of pilot blocks */
     n_pilots = (has_pilots) ? ((S - 1) >> 4) : 0;
 
-    /* PLFRAME length including header */
+    /* PLFRAME length (header + data + pilots) */
     plframe_len = ((S + 1) * 90) + (36 * n_pilots);
+
+    /* Payload length (data + pilots) */
+    payload_len = plframe_len - 90;
+
+    /* XFECFRAME length */
+    xfecframe_len = S * 90;
+}
+
+void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
+{
+    if (soft && coherent) {
+        // Soft decoding
+        //
+        // The Reed-Muller decoder assumes that the Euclidean-space image of
+        // each codeword is the real vector that results from scrambling the
+        // original codeword and mapping it to real using an ordinary 2-PAM/BPSK
+        // mapping instead of pi/2 BPSK. See the "map_plsc_codeword_to_bpsk"
+        // function defined above.
+        //
+        // Hence, the pi/2 BPSK sequence is first converted/derotated to obtain
+        // the corresponding real-valued 2-PAM/BPSK sequence. Then, this real
+        // BPSK sequence (called the vector of "soft decisions") is provided to
+        // the soft Reed-Muller decoder.
+        derotate_bpsk(bpsk_in + 1, d_soft_dec_buf.data(), PLSC_LEN);
+        d_plsc = d_reed_muller_decoder.decode(d_soft_dec_buf.data());
+    } else {
+        // Hard decoding
+        uint64_t rx_scrambled_plsc;
+        // Demap the pi/2 BPSK PLSC
+        //
+        // Assume bpsk_in points to a contiguous complex array starting at the
+        // last SOF symbol and followed by the PLSC symbols. Use the last SOF
+        // symbol for differential demapping and skip it otherwise.
+        if (coherent) {
+            rx_scrambled_plsc = demap_bpsk(bpsk_in + 1, PLSC_LEN);
+        } else {
+            rx_scrambled_plsc = demap_bpsk_diff(bpsk_in, PLSC_LEN);
+        }
+
+        /* Descramble */
+        uint64_t rx_plsc = rx_scrambled_plsc ^ plsc_scrambler;
+
+        if (d_debug_level > 4)
+            printf("%s: descrambled PLSC: 0x%016lX\n", __func__, rx_plsc);
+
+        /* Decode the descrambled hard decisions */
+        d_plsc = d_reed_muller_decoder.decode(rx_plsc);
+    }
+
+    // Parse the PLSC
+    d_pls_info.parse(d_plsc);
+
 
     if (d_debug_level > 0) {
         printf("Decoded PLSC: {MODCOD: %2u, Short FECFRAME: %1u, Pilots: %1u}\n",
-               modcod,
-               short_fecframe,
-               has_pilots);
+               d_pls_info.modcod,
+               d_pls_info.short_fecframe,
+               d_pls_info.has_pilots);
     }
     if (d_debug_level > 1) {
         printf("Decoded PLSC: {n_mod: %1u, S: %3u, PLFRAME length: %u}\n",
-               n_mod,
-               S,
-               plframe_len);
+               d_pls_info.n_mod,
+               d_pls_info.S,
+               d_pls_info.plframe_len);
     }
+}
+
+void plsc_decoder::get_info(pls_info_t* out) const
+{
+    memcpy(out, &d_pls_info, sizeof(pls_info_t));
 }
 
 } // namespace dvbs2rx
