@@ -16,9 +16,6 @@
 namespace gr {
 namespace dvbs2rx {
 
-// PLSC scrambler sequence (see Section 5.5.2.4 of the standard)
-const uint64_t plsc_scrambler = 0x719d83c953422dfa;
-
 /**
  * \brief PLSC Encoder
  *
@@ -52,7 +49,7 @@ public:
                 bool has_pilots);
 };
 
-struct pls_info_t {
+struct DVBS2RX_API pls_info_t {
     uint8_t plsc = 0;            /**< Raw PLSC value */
     uint8_t modcod = 0;          /**< MODCOD of the decoded PLSC */
     bool short_fecframe = false; /**< Whether the FECFRAME size is short */
@@ -65,6 +62,7 @@ struct pls_info_t {
     uint16_t xfecframe_len = 0;  /**< XFECFRAME length */
     uint8_t n_pilots = 0;        /**< Number of pilot blocks */
     void parse(uint8_t dec_plsc);
+    void parse(uint8_t _modcod, bool _short_fecframe, bool _has_pilots);
 };
 
 /**

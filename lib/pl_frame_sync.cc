@@ -15,34 +15,30 @@ namespace dvbs2rx {
 
 frame_sync::frame_sync(int debug_level)
     : debug_level(debug_level),
-      sym_cnt(0),
-      last_in(0),
-      timing_metric(0.0),
-      state(frame_sync_state_t::searching),
-      frame_len(0),
+      d_sym_cnt(0),
+      d_last_in(0),
+      d_timing_metric(0.0),
+      d_sof_interval(0),
+      d_state(frame_sync_state_t::searching),
+      d_frame_len(0),
       d_plsc_delay_buf(PLSC_LEN + 1),
       d_sof_buf(SOF_CORR_LEN),
       d_plsc_e_buf(PLSC_CORR_LEN),
       d_plsc_o_buf(PLSC_CORR_LEN),
-      d_plheader_buf(PLHEADER_LEN)
+      d_plheader_buf(PLHEADER_LEN),
+      d_payload_buf(MAX_PLFRAME_PAYLOAD)
 {
     /* SOF and PLSC matched filter (correlator) taps: the folded (or reversed)
      * version of the target SOF and PLSC symbols */
-    d_sof_taps = { (+0.0 - 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j),
-                   (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j),
-                   (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j),
-                   (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j),
-                   (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j),
-                   (+0.0 + 1.0j), (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j),
-                   (+0.0 - 1.0j) };
-    d_plsc_taps = { (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j),
-                    (+0.0 - 1.0j), (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j),
-                    (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j),
-                    (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j),
-                    (+0.0 - 1.0j), (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j),
-                    (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j),
-                    (+0.0 + 1.0j), (+0.0 - 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j),
-                    (+0.0 + 1.0j), (+0.0 + 1.0j), (+0.0 - 1.0j), (+0.0 - 1.0j) };
+    d_sof_taps = { (-1.0j), (-1.0j), (-1.0j), (-1.0j), (+1.0j), (+1.0j), (+1.0j),
+                   (+1.0j), (-1.0j), (+1.0j), (+1.0j), (+1.0j), (-1.0j), (+1.0j),
+                   (+1.0j), (-1.0j), (-1.0j), (+1.0j), (-1.0j), (-1.0j), (+1.0j),
+                   (-1.0j), (+1.0j), (+1.0j), (-1.0j) };
+    d_plsc_taps = { (-1.0j), (+1.0j), (+1.0j), (-1.0j), (-1.0j), (-1.0j), (+1.0j),
+                    (-1.0j), (-1.0j), (+1.0j), (+1.0j), (+1.0j), (+1.0j), (+1.0j),
+                    (-1.0j), (-1.0j), (-1.0j), (-1.0j), (+1.0j), (+1.0j), (-1.0j),
+                    (+1.0j), (+1.0j), (-1.0j), (+1.0j), (-1.0j), (+1.0j), (-1.0j),
+                    (+1.0j), (+1.0j), (-1.0j), (-1.0j) };
     std::reverse(d_sof_taps.begin(), d_sof_taps.end());
     std::reverse(d_plsc_taps.begin(), d_plsc_taps.end());
     assert(d_sof_taps.size() == SOF_CORR_LEN);
@@ -60,25 +56,39 @@ void frame_sync::correlate(delay_line<gr_complex>& d_line,
 
 bool frame_sync::step(const gr_complex& in)
 {
-    sym_cnt++;
+    d_sym_cnt++;
     /* NOTE: this index resets by the end of the PLHEADER, so it is 1 for the
-     * first data symbol after the PLHEADER. */
+     * first data symbol after the PLHEADER (after the above ++ operator). Note
+     * d_sym_cnt is incremented here before anything else to make sure it
+     * increments even if this call hits one of the early return statements. */
 
-    /* Once a PLFRAME is found, wait to compute the next cross-correlation only
-     * when the right time comes to find the subsequent PLFRAME. More
-     * specifically, within the 90 symbols prior to the next frame timing peak,
-     * start pushing new values into the cross-correlators. */
+    /* Once a SOF is found, buffer the subsequent symbols until the next
+     * SOF. Since the SOF detection happens when the last PLHEADER symbol is
+     * processed, and since d_sym_cnt starts at 1 after a timing metric peak,
+     * this is equivalent to buffering the payload between consecutive SOFs. */
     const bool locked_or_almost = is_locked_or_almost();
-    if (locked_or_almost && (sym_cnt <= (frame_len - 90)))
+    if (locked_or_almost && (d_sym_cnt <= MAX_PLFRAME_PAYLOAD)) {
+        d_payload_buf[d_sym_cnt - 1] = in;
+    }
+
+    /* Once locked, wait to compute the next cross-correlation only when the
+     * right time comes to find the subsequent PLFRAME. More specifically,
+     * within the 90 symbols prior to the next expected frame timing peak, start
+     * pushing new values into the cross-correlators. This strategy reduces the
+     * computational cost and avoids false-positive SOF detections that could
+     * arise in the course of the frame. */
+    const bool locked = is_locked();
+    if (locked && ((d_sym_cnt + 90) <= d_frame_len)) {
         return false;
+    }
 
     /* Save the raw input symbol into the PLHEADER buffer. When we finally find
      * the start of frame, we will have the PLHEADER symbols in this buffer */
     d_plheader_buf.push_front(in);
 
     /* Differential value */
-    const gr_complex diff = conj(in) * last_in;
-    last_in = in;
+    const gr_complex diff = conj(in) * d_last_in;
+    d_last_in = in;
 
     /* Get the differential value 64 symbol intervals ago. We want to make sure
      * that the SOF correlator and the PLSC correlator peak at the same time, so
@@ -87,18 +97,16 @@ bool frame_sync::step(const gr_complex& in)
     d_plsc_delay_buf.push(diff);
     const gr_complex& diff_d = d_plsc_delay_buf.front();
 
-    /* Put current diff values on SOF correlator buffer */
+    /* Push the differential into the SOF correlator buffer */
     d_sof_buf.push(diff_d);
 
-    /* Push diff into PLS even/odd circular correlator buffer.
+    /* Push the differential into the PLSC correlator buffers.
      *
-     * NOTE: the even and odd buffers are used separately so that we can provide
-     * only the starting index to volk and let it operate on all values. Note we
-     * couldn't otherwise tell volk to iterate in steps of 2, and that we need
-     * to iterate in steps of 2 in order to process the differential PLSC values
-     * that are known in advance.
+     * NOTE: the PLSC correlation is based on the 32 differentials due to the
+     * pairs of PLSC symbols. At this point, we can't tell whether the pairs
+     * start on even d_sym_cnt or odd d_sym_cnt. Hence, we need to try both.
      **/
-    if (sym_cnt & 1)
+    if (d_sym_cnt & 1)
         d_plsc_o_buf.push(diff);
     else
         d_plsc_e_buf.push(diff);
@@ -107,7 +115,7 @@ bool frame_sync::step(const gr_complex& in)
      * are expected to peak. If a PLFRAME has been found already (i.e., we are
      * locked or almost locked), proceed only if this is the expected timing for
      * the next PLFRAME timing peak. */
-    if (locked_or_almost && (sym_cnt < frame_len))
+    if (locked && (d_sym_cnt < d_frame_len))
         return false;
 
     /* SOF correlation */
@@ -116,29 +124,46 @@ bool frame_sync::step(const gr_complex& in)
 
     /* PLSC correlation */
     gr_complex plsc_corr;
-    if (sym_cnt & 1)
+    if (d_sym_cnt & 1)
         correlate(d_plsc_o_buf, d_plsc_taps, &plsc_corr);
     else
         correlate(d_plsc_e_buf, d_plsc_taps, &plsc_corr);
 
     /* Final timing metric
      *
-     * Compute sum and difference between SOF and PLSC correlators. Note the LSB
-     * of the TYPE field is what defines the sign of the PLSC correlation. Since
-     * we can't know the sign in advance, we test for both by checking which
-     * sign leads to the largest sum.
+     * Compute the sum and difference between the SOF and PLSC correlators. Note
+     * the LSB of the TYPE field is what defines the sign/phase of the PLSC
+     * correlation. Since we can't know the sign in advance, we test for both by
+     * checking which sign leads to the largest sum.
      */
     const float abs_sum = abs(sof_corr + plsc_corr);
     const float abs_diff = abs(sof_corr - plsc_corr);
-    timing_metric = (abs_sum > abs_diff) ? abs_sum : abs_diff;
+    d_timing_metric = (abs_sum > abs_diff) ? abs_sum : abs_diff;
+    /* NOTE: the complex version of the timing metric could be used to obtain a
+     * rough frequency offset estimate. When the frequency offset is constant
+     * over the PLHEADER, all differentials have a factor of exp(-j*2*pi*f0),
+     * where f0 is the frequency offset. If we define:
+     *
+     * complex_timing_metric = (abs_sum > abs_diff) ? (sof_corr + plsc_corr) :
+     *                                                (sof_corr - plsc_corr);
+     * Then, the frequency offset estimate becomes:
+     *
+     * freq_offset_estimate = -std::arg(complex_timing_metric) / (2 * M_PI));
+     *
+     * However, this estimate is poor under strong noise. A more robust approach
+     * is to accumulate the energy of multiple PLHEADERs, as done in the
+     * `freq_sync` class.
+     */
 
     /* Is this a peak? */
     const bool is_peak =
-        locked_or_almost ? (timing_metric > threshold_l) : (timing_metric > threshold_u);
+        locked ? (d_timing_metric > threshold_l) : (d_timing_metric > threshold_u);
     /* TODO: check the average symbol magnitude and normalize */
 
-    /* Is a peak expected? */
-    const bool peak_expected = locked_or_almost;
+    /* Is a peak expected? When locked, the program can only hit this point when
+     * processing the last PLHEADER symbol, which is when the timing metric peak
+     * is expected. Before locking, there are no peak expectations. */
+    const bool peak_expected = locked;
 
     /* Useful log separator */
     if (debug_level > 1 && (is_peak || peak_expected)) {
@@ -147,34 +172,34 @@ bool frame_sync::step(const gr_complex& in)
 
     /* State machine */
     if (is_peak) {
-        if (state == frame_sync_state_t::searching) {
-            state = frame_sync_state_t::found;
+        if (d_state == frame_sync_state_t::searching) {
+            d_state = frame_sync_state_t::found;
             if (debug_level > 0) {
                 printf("Frame sync: PLFRAME found\n");
             }
-        } else if (state == frame_sync_state_t::found) {
-            state = frame_sync_state_t::locked;
+        } else if (d_state == frame_sync_state_t::found && d_sym_cnt == d_frame_len) {
+            d_state = frame_sync_state_t::locked;
             if (debug_level > 0) {
                 printf("Frame sync: PLFRAME lock acquired\n");
             }
         }
+        d_sof_interval = d_sym_cnt;
+        d_sym_cnt = 0;
 
         if (debug_level > 1) {
             printf("Frame sync: {Peak after: %u, "
                    "Timing Metric: %f, "
                    "Locked: %u}\r\n",
-                   sym_cnt,
-                   timing_metric,
-                   (state == frame_sync_state_t::locked));
+                   d_sof_interval,
+                   d_timing_metric,
+                   (d_state == frame_sync_state_t::locked));
         }
-
-        sym_cnt = 0;
     } else if (peak_expected) {
-        state = frame_sync_state_t::searching;
+        d_state = frame_sync_state_t::searching;
         if (debug_level > 0) {
             printf("Frame sync: PLFRAME lock lost\n");
             if (debug_level > 1) {
-                printf("Frame sync: Insufficient Timing Metric: %f\n", timing_metric);
+                printf("Frame sync: Insufficient Timing Metric: %f\n", d_timing_metric);
             }
         }
     }
@@ -184,7 +209,7 @@ bool frame_sync::step(const gr_complex& in)
         if (debug_level > 2) {
             printf("Frame sync: {Sym: %u, SOF: %+.1f %+.1fj, PLSC: %+.1f "
                    "%+.1fj}\r\n",
-                   sym_cnt,
+                   d_sym_cnt,
                    sof_corr.real(),
                    sof_corr.imag(),
                    plsc_corr.real(),
@@ -198,6 +223,13 @@ bool frame_sync::step(const gr_complex& in)
     }
 
     return is_peak;
+}
+
+void frame_sync::set_frame_len(unsigned int len)
+{
+    if (len > MAX_PLFRAME_LEN)
+        throw std::runtime_error("Invalid PLFRAME length");
+    d_frame_len = len;
 }
 
 } // namespace dvbs2rx

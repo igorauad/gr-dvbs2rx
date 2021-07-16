@@ -95,6 +95,12 @@ void pls_info_t::parse(uint8_t dec_plsc)
     xfecframe_len = S * 90;
 }
 
+void pls_info_t::parse(uint8_t _modcod, bool _short_fecframe, bool _has_pilots)
+{
+    uint8_t _plsc = ((_modcod & 0x1F) << 2) | (_short_fecframe << 1) | _has_pilots;
+    parse(_plsc);
+}
+
 void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
 {
     if (soft && coherent) {
