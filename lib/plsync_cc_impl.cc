@@ -38,15 +38,14 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
       d_debug_level(debug_level),
       d_sps(sps),
       d_locked(false),
-      d_da_phase(0.0)
+      d_da_phase(0.0),
+      d_payload_state(payload_state_t::searching),
+      d_sof_cnt(0)
 {
     d_frame_sync = new frame_sync(debug_level);
     d_plsc_decoder = new plsc_decoder(debug_level);
     d_freq_sync = new freq_sync(freq_est_period, debug_level);
     d_pl_descrambler = new pl_descrambler(gold_code);
-
-    /* Buffer to store received pilots (PLHEADER and pilot blocks) */
-    d_rx_pilots.resize(PLHEADER_LEN + (MAX_PILOT_BLKS * PILOT_BLK_LEN));
 
     /* Message port */
     message_port_register_out(d_port_id);
@@ -72,26 +71,21 @@ void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_req
     ninput_items_required[0] = noutput_items;
 }
 
-void plsync_cc_impl::calibrate_tag_delay(int sof_detection_idx,
-                                         int noutput_items,
-                                         int tolerance)
+void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
 {
-    // Search for tags that occurred since the last search up to the current
-    // range of indexes being processed by the work function.
+    // Always keep track of the state at the previous SOF
+    d_rot_ctrl.past = d_rot_ctrl.current;
+
+    // Search for tags that occurred since the last search up to the current SOF
+    // plus some tag delay tolerance.
     static const pmt::pmt_t tag_key = pmt::intern("rot_phase_inc");
-    const uint64_t n_read = nitems_read(0);
-    const uint64_t tag_search_end = n_read + (uint64_t)(noutput_items);
+    const uint64_t tag_search_end = abs_sof_idx + tolerance;
     std::vector<tag_t> tags;
     get_tags_in_range(tags, 0, d_rot_ctrl.tag_search_start, tag_search_end, tag_key);
 
     // Prepare for the next tag search
     // NOTE: get_tags_in_range searches within the interval [start,end).
     d_rot_ctrl.tag_search_start = tag_search_end;
-
-    // Convert the relative SOF detection index to an absolute index
-    // corresponding to the first SOF/PLHEADER symbol. Assume the SOF detection
-    // happens at the last PLHEADER symbol.
-    const uint64_t abs_sof_idx = n_read + sof_detection_idx - 89;
 
     // Process the tags
     for (unsigned j = 0; j < tags.size(); j++) {
@@ -108,6 +102,11 @@ void plsync_cc_impl::calibrate_tag_delay(int sof_detection_idx,
         // the former is assigned here, whereas the latter is assigned in
         // control_rotator_freq.
 
+        // The tag confirms the frequency currently configured in the rotator
+        const double current_phase_inc = pmt::to_double(tags[j].value);
+        d_rot_ctrl.current.freq = -d_sps * current_phase_inc / (2.0 * GR_M_PI);
+        d_rot_ctrl.current.idx = tags[j].offset;
+
         // Error between the observed and expected tag offsets. Since we correct
         // this error on every PLFRAME, the observed error is the residual after
         // correction, not the raw delay. The raw error (interpreted as the
@@ -115,11 +114,6 @@ void plsync_cc_impl::calibrate_tag_delay(int sof_detection_idx,
         // residuals should converge to zero and oscillate around that.
         const int error = abs_sof_idx - tags[j].offset;
         d_rot_ctrl.tag_delay += error;
-
-        // The tag confirms the frequency currently configured in the rotator
-        const double current_phase_inc = pmt::to_double(tags[j].value);
-        d_rot_ctrl.current.freq = -d_sps * current_phase_inc / (2.0 * GR_M_PI);
-        d_rot_ctrl.current.idx = tags[j].offset;
 
         if (abs(d_rot_ctrl.tag_delay) > tolerance) // sanity check
             printf("Warning: rot_phase_inc tag delay %d seems too high\n",
@@ -141,61 +135,58 @@ void plsync_cc_impl::calibrate_tag_delay(int sof_detection_idx,
     }
 }
 
-void plsync_cc_impl::control_rotator_freq(int sof_detection_idx,
-                                          bool coarse_corrected,
-                                          bool new_coarse_est,
-                                          bool new_fine_est)
+void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
+                                          uint16_t plframe_len,
+                                          double rot_freq_adj,
+                                          bool ref_is_past_frame)
 {
-    // Send control messages only when locked. Before that, the frequency offset
-    // estimates can be very poor and are only supposed to be used internally.
-    if (!d_locked)
-        return;
-
-    double rot_freq_adj = 0; // frequency adjustment
-    if (coarse_corrected && new_fine_est)
-        rot_freq_adj = d_freq_sync->get_fine_foffset();
-    else if (!coarse_corrected && new_coarse_est)
-        rot_freq_adj = d_freq_sync->get_coarse_foffset();
-    else
-        return;
-
-    // Convert the relative SOF detection index to the absolute index of the
-    // first symbol in the current PLHEADER/SOF:
-    const uint64_t n_read = nitems_read(0);
-    const uint64_t abs_sof_idx = n_read + sof_detection_idx - 89;
-
     // Schedule the phase increment to take place at the start of the next frame
-    const uint64_t abs_next_sof_idx = abs_sof_idx + d_plsc_decoder->plframe_len;
+    const uint64_t abs_next_sof_idx = abs_sof_idx + plframe_len;
 
     // Assume the upstream rotator lies before a matched filter and, hence,
     // operates on the sample stream (i.e. on samples, not symbols). Use the
     // known oversampling ratio and the calibrated tag delay to schedule the
     // phase increment update. */
-    d_rot_ctrl.next.idx = d_sps * (abs_next_sof_idx + d_rot_ctrl.tag_delay);
+    uint64_t target_idx = d_sps * (abs_next_sof_idx + d_rot_ctrl.tag_delay);
+
+    // Prevent two frequency corrections at the same sample offset. The scenario
+    // where this becomes possible is as follows:
+    //
+    // - The frequency synchronizer has achieved the coarse-corrected state and
+    //   the PLFRAMEs have pilots.
+    //
+    // - A new SOF comes and the coarse estimate at this SOF exceeds the fine
+    //   estimation range. Hence, at this point the frequency synchronizer will
+    //   toggle its coarse corrected state back to false and the PLHEADER
+    //   handler will send the new coarse estimate to the rotator.
+    //
+    // - Next, the payload handler processes the PLFRAME preceding the SOF that
+    //   triggered the coarse correction. The PLFRAME has pilots, and it came
+    //   while the synchronizer was still coarse corrected (before the new
+    //   PLHEADER). Hence, the handler calls for a new fine offset estimate,
+    //   which is also sent to the rotator.
+    //
+    // In this case, both updates would be applicable to the same offset. By
+    // preventing this scenario here, only the first update would be applied,
+    // which, in this example, is the update due to the new coarse estimate.
+    if (target_idx == d_rot_ctrl.next.idx)
+        return;
+    d_rot_ctrl.next.idx = target_idx;
 
     // Rotator frequency that should start taking effect on the next frame:
     //
     // NOTE: Extra caution is required when adding the frequency offset estimate
-    // to the rotator's frequency. Assuming we are now processing the i-th
-    // frame, note the fine estimate is based on frame i-1 and is only
-    // effectively corrected by the upstream rotator on the start of frame
-    // i+1. Hence, the fine estimate that was just obtained must be accumulated
-    // to the frequency that still existed in the rotator during frame i-1.
-    //
-    // In other words, there is a two-frame delay in the correction process. To
-    // overcome this, we track 3 stages of the rotator's frequency: at the
-    // previous frame, the current and the next frame. The next frequency is the
-    // correction scheduled via control message in the sequel.
-    d_rot_ctrl.next.freq = d_rot_ctrl.past.freq + rot_freq_adj;
+    // to the rotator's frequency, depending on which frame was used to generate
+    // the new frequency offset estimate. Refer to the comments on this
+    // function's declaration (on plsync_cc_impl.h).
+    d_rot_ctrl.next.freq = (ref_is_past_frame) ? (d_rot_ctrl.past.freq + rot_freq_adj)
+                                               : (d_rot_ctrl.current.freq + rot_freq_adj);
 
     // Sanity check
-    if (d_rot_ctrl.current.idx < d_rot_ctrl.past.idx ||
-        d_rot_ctrl.next.idx < d_rot_ctrl.current.idx) {
-        printf("Warning: rotator frequency state has unexpected index(es)\n");
-        return;
-    }
+    assert(d_rot_ctrl.current.idx > d_rot_ctrl.past.idx &&
+           d_rot_ctrl.next.idx > d_rot_ctrl.current.idx);
 
-    // Send the corresponding phase increment
+    // Send the corresponding phase increment to the rotator block
     static const pmt::pmt_t inc_key = pmt::intern("inc");
     static const pmt::pmt_t offset_key = pmt::intern("offset");
     const double phase_inc = -d_rot_ctrl.next.freq * 2.0 * GR_M_PI / d_sps;
@@ -204,11 +195,9 @@ void plsync_cc_impl::control_rotator_freq(int sof_detection_idx,
     msg = pmt::dict_add(msg, offset_key, pmt::from_uint64(d_rot_ctrl.next.idx));
     message_port_pub(d_port_id, msg);
 
-    if (d_debug_level > 1)
-        printf("- Cumulative frequency offset: %g "
-               "(coarse corrected? %u)\n",
-               d_rot_ctrl.next.freq,
-               coarse_corrected);
+    if (d_debug_level > 1) {
+        printf("- Cumulative frequency offset: %g \n", d_rot_ctrl.next.freq);
+    }
 
     if (d_debug_level > 2) {
         printf("[Rotator ctrl] "
@@ -219,15 +208,6 @@ void plsync_cc_impl::control_rotator_freq(int sof_detection_idx,
                abs_next_sof_idx,
                d_rot_ctrl.next.idx);
     }
-
-    // Prepare the state for the next frame
-    d_rot_ctrl.past = d_rot_ctrl.current;
-    /* NOTE: don't shift the "next" frequency correction into the "current". The
-     * next value (at d_rot_ctrl.next.freq) is just an expectation for what the
-     * next rotator frequency should be. We must receive the confirmation from
-     * the rotator that the new increment was applied (see
-     * calibrate_tag_delay). If there is no rotator upstream,
-     * d_rot_ctrl.past.freq will be 0 forever. */
 }
 
 void plframe_idx_t::step(uint16_t plframe_len, bool has_pilots)
@@ -257,19 +237,160 @@ void plframe_idx_t::step(uint16_t plframe_len, bool has_pilots)
 
 void plframe_idx_t::reset()
 {
-    i_in_frame = -1;
+    i_in_frame = 0;
     i_in_slot = 0;
     i_in_pilot_blk = 0;
     i_slot = 0;
     i_pilot_blk = 0;
     is_pilot_sym = false;
-    is_data_sym = false;
+    is_data_sym = true;
 }
 
-bool plframe_idx_t::is_valid_pilot_idx()
+void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
+                                     const gr_complex* p_plheader,
+                                     plframe_info_t& frame_info)
 {
-    return is_pilot_sym && (i_pilot_blk < MAX_PILOT_BLKS) &&
-           (i_in_pilot_blk < PILOT_BLK_LEN);
+    // Cache the SOF index
+    frame_info.abs_sof_idx = abs_sof_idx;
+
+    /* Coarse frequency offset estimation
+     *
+     * The frequency synchronizer offers two coarse estimation options: based on
+     * the SOF only or based on the entire PLHEADER. However, we would need
+     * decode the PLSC first in order to use the full PLHEADER. Here, we opt for
+     * estimating the coarse frequency offset before decoding the PLSC, mostly
+     * to avoid estimation errors due to wrong PLSC decoding.
+     *
+     * TODO: Review this strategy once the PLSC decoding becomes more robust
+     * based on a priori knowledge of the set of possible MODCODS. */
+    bool new_coarse_est = d_freq_sync->estimate_coarse(p_plheader, false /* SOF only */);
+    frame_info.coarse_corrected = d_freq_sync->is_coarse_corrected();
+
+    /* Try to de-rotate the PLHEADER's pi/2 BPSK symbols and fetch the
+     * post-processed (de-rotated) PLHEADER pi/2 BPSK symbols*/
+    d_freq_sync->derotate_plheader(p_plheader);
+    const gr_complex* p_pp_plheader = d_freq_sync->get_plheader();
+
+    /* Decode the pi/2 BPSK-mapped and scrambled PLSC symbols
+     *
+     * The PLSC decoder offers coherent and non-coherent decoding alternatives,
+     * both with hard or soft demapping. Use the default coherent soft decoder. */
+    d_plsc_decoder->decode(p_pp_plheader + SOF_LEN - 1);
+    d_plsc_decoder->get_info(&frame_info.pls);
+
+    /* Tell the frame synchronizer what the frame length is, so that it
+     * knows when to expect the next SOF */
+    d_frame_sync->set_frame_len(frame_info.pls.plframe_len);
+
+    /* Calibrate the delay between the upstream rotator and this block. */
+    calibrate_tag_delay(abs_sof_idx);
+
+    /* Control the frequency correction applied by the external rotator.
+     *
+     * Do so only when locked to maximize the chances of the actual phase
+     * increment update landing at the start of the upcoming PLFRAME. Also, once
+     * the coarse-corrected state is achieved, let only the fine frequency
+     * offset estimations be used to regulate the external rotator. */
+    if (d_locked && !frame_info.coarse_corrected && new_coarse_est) {
+        control_rotator_freq(abs_sof_idx,
+                             frame_info.pls.plframe_len,
+                             d_freq_sync->get_coarse_foffset(),
+                             false /* reference is the current frame */);
+    }
+
+    /* Copy the full PLHEADER to the frame information structure. The PLHEADER
+     * can be used later, e.g., for fine frequency offset estimation. */
+    memcpy(frame_info.plheader.data(), p_plheader, PLHEADER_LEN * sizeof(gr_complex));
+}
+
+int plsync_cc_impl::handle_payload(int noutput_items,
+                                   gr_complex* out,
+                                   const gr_complex* p_payload,
+                                   const plframe_info_t& frame_info,
+                                   const plframe_info_t& next_frame_info)
+{
+    const gr_complex* p_descrambled_payload = d_pl_descrambler->get_payload();
+
+    // Start with the processing steps that don't depend on the output buffer
+    if (d_payload_state != payload_state_t::partial) {
+        // Descramble the payload
+        d_pl_descrambler->descramble(p_payload, frame_info.pls.payload_len);
+
+        /* Estimate the phase of the PLHEADER preceding the payload. This phase
+         * is used both for phase correction of the output data symbols and fine
+         * frequency offset estimation. */
+        const gr_complex* p_plheader = frame_info.plheader.data();
+        d_da_phase =
+            d_freq_sync->estimate_plheader_phase(p_plheader, frame_info.pls.plsc);
+
+        // If the PLFRAME has pilot symbols, estimate the phase of each pilot
+        // block and, then, estimate the fine frequency offset.
+        //
+        // Note the fine estimate only makes sense after the coarse frequency
+        // offset correction. The residual offset must fall within the fine
+        // estimation range of up to ~3.3e-4 in normalized frequency.
+        if (frame_info.pls.has_pilots && frame_info.coarse_corrected) {
+            // Average phase of each descrambled pilot block
+            for (int i = 0; i < frame_info.pls.n_pilots; i++) {
+                const gr_complex* p_pilots =
+                    p_descrambled_payload + ((i + 1) * PILOT_BLK_PERIOD) - PILOT_BLK_LEN;
+                d_freq_sync->estimate_pilot_phase(p_pilots, i);
+            }
+
+            // Fine freq. offset based on the phase jump between pilot blocks
+            d_freq_sync->estimate_fine_pilot_mode(frame_info.pls.n_pilots);
+
+            // Schedule the rotator update
+            //
+            // NOTE: Since we always process the payload in between two SOFs,
+            // we've already processed SOF n+1 at this point while we are
+            // processing the n-th payload. Hence, we must schedule the
+            // frequency update for SOF n+2. For that, we use the
+            // next_frame_info, which holds the absolute index where SOF n+1
+            // start and the length of PLFRAME n+1.
+            control_rotator_freq(next_frame_info.abs_sof_idx,
+                                 next_frame_info.pls.plframe_len,
+                                 d_freq_sync->get_fine_foffset(),
+                                 true /* reference is the previous frame */);
+        }
+
+        // We are done with the processing that does not depend on the output
+        // buffer. Next time handle_payload is called for this payload, go
+        // straight to the next step, which requires space in the output buffer.
+        d_payload_state = payload_state_t::partial;
+    }
+
+    // Output the phase-corrected and descrambled data symbols.
+    int n_produced = 0;
+
+    for (int i = 0; i < noutput_items && d_idx.i_in_frame < frame_info.pls.payload_len;
+         i++) {
+        // If this PLFRAME has pilot blocks, update the phase estimate after
+        // every pilot block. Do so only if coarse-corrected, as otherwise the
+        // pilot phase estimates would be uninitialized.
+        if (d_idx.is_pilot_sym && frame_info.coarse_corrected &&
+            d_idx.i_in_pilot_blk == (PILOT_BLK_LEN - 1)) {
+            d_da_phase = d_freq_sync->get_pilot_phase(d_idx.i_pilot_blk);
+        }
+
+        // Output
+        if (d_idx.is_data_sym) {
+            out[n_produced] =
+                gr_expj(-d_da_phase) * p_descrambled_payload[d_idx.i_in_frame];
+            n_produced++;
+        }
+
+        /* Update the frame indexes */
+        d_idx.step(frame_info.pls.plframe_len, frame_info.pls.has_pilots);
+    }
+
+    // Finalize
+    if (d_idx.i_in_frame == frame_info.pls.payload_len) {
+        d_idx.reset();
+        d_payload_state = payload_state_t::searching;
+    }
+
+    return n_produced;
 }
 
 int plsync_cc_impl::general_work(int noutput_items,
@@ -279,191 +400,114 @@ int plsync_cc_impl::general_work(int noutput_items,
 {
     const gr_complex* in = (const gr_complex*)input_items[0];
     gr_complex* out = (gr_complex*)output_items[0];
-    int n_produced = 0;
+    int n_produced = 0, n_consumed = 0;
 
-    bool new_coarse_est; // a new coarse freq. offset was estimated
-    bool new_fine_est;   // a new fine freq. offset was estimated
-    gr_complex descrambled_sym;
+    // If there is no payload waiting to be processed, consume the input stream
+    // until the next SOF/PLHEADER is found.
+    if (d_payload_state == payload_state_t::searching) {
+        for (int i = 0; i < noutput_items; i++) {
+            bool is_sof = d_frame_sync->step(in[i]);
+            n_consumed++;
+            if (is_sof) {
+                d_sof_cnt++;
 
-    /* Symbol by symbol processing */
-    for (int i = 0; i < noutput_items; i++) {
-        /* Update indexes */
-        if (d_frame_sync->is_locked_or_almost())
-            d_idx.step(d_plsc_decoder->plframe_len, d_plsc_decoder->has_pilots);
+                // If this SOF came where the previous PLSC told it would be, we
+                // are still locked.
+                d_locked = d_frame_sync->is_locked();
 
-        /* PL Descrambling */
-        d_pl_descrambler->step(in[i], descrambled_sym, d_idx.i_in_frame);
+                // Convert the relative SOF detection index to an absolute index
+                // corresponding to the first SOF/PLHEADER symbol. Consider that
+                // the SOF detection happens at the last PLHEADER symbol.
+                const uint64_t abs_sof_idx = nitems_read(0) + i - 89;
 
-        /* Store symbols from pilot blocks (if any) for post-processing such as
-         * fine frequency offset estimation
-         *
-         * NOTE: the descrambled symbols must be stored */
-        if (d_idx.is_valid_pilot_idx()) {
-            const uint16_t z =
-                (d_idx.i_pilot_blk * PILOT_BLK_LEN) + d_idx.i_in_pilot_blk; // 0 to 791
-            d_rx_pilots[PLHEADER_LEN + z] = descrambled_sym;
+                if (d_debug_level > 1)
+                    printf("SOF count: %lu; Index: %lu\n", d_sof_cnt, abs_sof_idx);
 
-            /* Once all symbols of the current pilot block have been
-             * acquired, estimate the average phase of the block */
-            if (d_idx.i_in_pilot_blk == (PILOT_BLK_LEN - 1)) {
-                d_da_phase = d_freq_sync->estimate_pilot_phase(d_rx_pilots.data(),
-                                                               d_idx.i_pilot_blk);
+                // Cache some information from the last PLFRAME before handling
+                // the new PLHEADER. As soon as the PLHEADER is handled, the
+                // PLSC decoder will update its PL signaling info, and other
+                // state variables will change. However, because we always
+                // process the payload between two SOFs, the payload of interest
+                // is the one corresponding to the preceding PLHEADER, not the
+                // succeeding PLHEADER that is about to be handled.
+                //
+                // In addition to the PL signaling information, the following
+                // variables also need to be cached:
+                //
+                // - The coarse corrected state. We want to know if the
+                //   frequency synchronizer was already coarse-corrected at the
+                //   time of the PLFRAME being processed, not at the time of the
+                //   next PLHEADER that is about to be processed.
+                //
+                // - The PLHEADER sequence itself. We need that in order to
+                //   estimate the PLHEADER phase when processing the payload.
+                //
+                // This metadata is contained within the plframe_info_t
+                // structure. Once `handle_plheader()` is called, it updates
+                // `d_next_frame_info`. Hence, cache the `d_next_frame_info`
+                // from the previous SOF, which is the current frame to be
+                // processed by the `handle_payload()` function.
+                d_curr_frame_info = d_next_frame_info;
+
+                // The PLHEADER can always be processed right away because it
+                // doesn't produce any output (no need to worry about
+                // noutput_items). Also, at this point, and only at this point,
+                // the PLHEADER is available inside the frame synchronizer.
+                handle_plheader(
+                    abs_sof_idx, d_frame_sync->get_plheader(), d_next_frame_info);
+
+                // If this is the first SOF ever, keep going until the next. We
+                // take the PLFRAME payload as the sequence of symbols between
+                // two SOFs. Hence, we need at least two SOF detections.
+                static bool first_sof = true;
+                if (first_sof) {
+                    first_sof = false;
+                    continue;
+                }
+                // Before locking, it's hard to tell with some confidence that a
+                // valid PLFRAME lies between the preceding and the current SOF.
+                // Keep going until frame lock is achieved.
+                if (!d_locked)
+                    continue;
+
+                // If the PLFRAME between the present and the past SOFs is a
+                // dummy frame, it doesn't produce any output anyway, so skip it
+                // and keep going until the next payload.
+                if (d_curr_frame_info.pls.dummy_frame)
+                    continue;
+
+                // The payload can only be processed if the expected XFECFRAME
+                // output fits in the output buffer. Hence, unlike the PLHEADER,
+                // it cannot be processed right away. Mark the processing as
+                // pending for now and don't consume any more input samples
+                // until this payload is handled.
+                //
+                // Besides, tag the beginning of the XFECFRAME to follow in the
+                // output. Include the MODCOD and the FECFRAME length so that
+                // downstream blocks can de-map and decode it in ACM/VCM mode.
+                d_payload_state = payload_state_t::pending;
+                add_item_tag(
+                    0,
+                    nitems_written(0), // note n_produced = 0 at this point
+                    pmt::string_to_symbol("XFECFRAME"),
+                    pmt::cons(pmt::from_long(d_curr_frame_info.pls.modcod),
+                              pmt::from_bool(d_curr_frame_info.pls.short_fecframe)));
+                break;
             }
-        }
-
-        /* Frame timing recovery */
-        bool is_sof = d_frame_sync->step(in[i]);
-
-        if (is_sof) {
-            /* If this SOF came where the previous PLSC told it would
-             * be, we are still locked */
-            d_locked = d_frame_sync->is_locked();
-
-
-            /* Coarse frequency offset estimation
-             *
-             * When locked, we feed the past PLHEADER on every call to
-             * estimate_coarse(). With that, the estimation is based on the
-             * **past** PLHEADER as well as (freq_est_period - 1) PLHEADERs
-             * before it. The motivation for using the past PLHEADER is that it
-             * is a safer bet. The fact that frame sync is still locked suggests
-             * that the previous PLSC was correctly decoded, whereas, the
-             * current PLHEADER could be wrongly decoded, and that will only be
-             * checked by the next PLFRAME.
-             *
-             * In contrast, while the frame timing recovery loop is unlocked, it
-             * is still somewhat beneficial to compute a coarse frequency offset
-             * estimate. We won't use this estimate to control the external
-             * rotator, as it could be a very poor estimate (e.g., based on a
-             * false positive SOF detection). Nevertheless, we can use it
-             * locally to derotate the PLHEADER in attempt to facilitate the
-             * PLSC decoding. Hence, while unlocked, we feed the current
-             * PLHEADER to "estimate_coarse()". As a result, the coarse
-             * frequency offset estimate will be based on the **current**
-             * PLHEADER and (freq_est_period - 1) PLHEADERs before it.
-             *
-             * Aside from the difference in terms of whether the current or past
-             * PLHEADER is fed to the estimator, there is also a difference in
-             * the symbols that are processed. When unlocked, only the SOF
-             * symbols are processed, such that there is no need to decode the
-             * PLSC correctly before the frequency offset estimation. The
-             * rationale is that we want to estimate the frequency offset to
-             * support the PLSC decoding, not the reverse. In contrast, when
-             * locked, the full PLHEADER is processed.
-             *
-             * Lastly, note the past PLHEADER is saved on the vector d_rx_pilots
-             * when locked. Hence, we read it from there. Meanwhile, the current
-             * PLHEADER is available within the frame sync buffer. */
-            assert(d_plsc_decoder->dec_plsc < n_plsc_codewords);
-            const gr_complex* p_current_plheader = d_frame_sync->get_plheader();
-            const gr_complex* p_past_plheader = d_rx_pilots.data();
-            new_coarse_est = d_freq_sync->estimate_coarse(d_locked ? p_past_plheader
-                                                                   : p_current_plheader,
-                                                          d_plsc_decoder->dec_plsc,
-                                                          d_locked);
-
-            /* Fine frequency offset based on the previous frame
-             *
-             * Pre-requisites for valid estimation:
-             *
-             * 1) Frame timing is still locked, meaning it is very likely that
-             * the previous PLSC was correctly decoded and, as a result, also
-             * likely that the pilots were correctly acquired throughout the
-             * frame.
-             *
-             * 2) The previous frame contained pilots. Note the PLSC decoder has
-             * not processed the new PLHEADER yet, so it still has the info of
-             * the previous frame. In other words, this must be called before
-             * decoding the new PLSC.
-             *
-             * Pre-requisite for accurate estimation:
-             *
-             * - Coarse frequency offset must already have been corrected,
-             * meaning the residual offset is small enough and falls within the
-             * fine estimation range (up to 3.3e-4 in normalized frequency).
-             */
-            new_fine_est = d_locked && d_plsc_decoder->has_pilots;
-            if (new_fine_est) {
-                d_freq_sync->estimate_fine(d_rx_pilots.data(), d_plsc_decoder->n_pilots);
-            }
-
-            /* Try to de-rotate the PLHEADER's pi/2 BPSK symbols */
-            d_freq_sync->derotate_plheader(p_current_plheader);
-
-            /* Post-processed (de-rotated) PLHEADER pi/2 BPSK symbols */
-            const gr_complex* p_pp_plheader = d_freq_sync->get_plheader();
-
-            /* Decode the pi/2 BPSK-mapped and scrambled PLSC symbols */
-            bool coarse_corrected = d_freq_sync->is_coarse_corrected();
-            bool coherent_demap = d_locked && coarse_corrected;
-            d_plsc_decoder->decode(p_pp_plheader + SOF_LEN - 1, coherent_demap);
-
-            /* Tag the beginning of a XFECFRAME and include both the MODCOD and
-             * whether FECFRAME is short, so that the downstream blocks can
-             * de-map and decode it */
-            if (d_plsc_decoder->modcod > 0)
-                add_item_tag(0,
-                             nitems_written(0) + n_produced,
-                             pmt::string_to_symbol("XFECFRAME"),
-                             pmt::cons(pmt::from_long(d_plsc_decoder->modcod),
-                                       pmt::from_bool(d_plsc_decoder->short_fecframe)));
-
-            /* Tell the frame synchronizer what the frame length is, so that it
-             * knows when to expect a new SOF */
-            d_frame_sync->set_frame_len(d_plsc_decoder->plframe_len);
-
-            /* Calibrate the delay between the upstream rotator and this
-             * block. Then, schedule a frequency update on the rotator. */
-            calibrate_tag_delay(i, noutput_items);
-            control_rotator_freq(i, coarse_corrected, new_coarse_est, new_fine_est);
-
-            /* Save the symbols of the new PLHEADER into the pilot buffer, which
-             * will be processed by the end of this frame for fine freq. offset
-             * estimation.
-             *
-             * NOTE: this has to be executed only after calling the fine
-             * frequency offset estimation, otherwise the new PLHEADER would
-             * overwrite the previous PLHEADER that is needed for fine
-             * estimation based on the previous frame.
-             */
-            memcpy(d_rx_pilots.data(),
-                   p_current_plheader,
-                   PLHEADER_LEN * sizeof(gr_complex));
-
-            /* Estimate the phase of this PLHEADER - this phase estimate
-             * can be used for fine frequency offset estimation in the
-             * next frame in case it has pilots. */
-            d_da_phase = d_freq_sync->estimate_plheader_phase(p_current_plheader,
-                                                              d_plsc_decoder->dec_plsc);
-
-            /* Reset the symbol indexes
-             *
-             * NOTE: the start of frame (SOF) is only detected when the
-             * last (90th) symbol of the PLHEADER is processed by the
-             * frame synchronizer block. */
-            d_idx.reset();
-        }
-
-        /* Output symbols with data-aided phase correction based on last pilot
-         * blocks' phase estimate
-         *
-         * TODO: add phase tracking for when pilots are absent
-         *
-         * TODO: correct phase based on an "interpolated" version of the last
-         * data-aided phase estimate. That is, try to predict how the phase
-         * evolves over time in between pilot blocks and use such time-varying
-         * prediction for correction.
-         **/
-        if (d_locked && d_idx.is_data_sym && !d_plsc_decoder->dummy_frame) {
-            out[n_produced] = gr_expj(-d_da_phase) * descrambled_sym;
-            n_produced++;
         }
     }
+    if (d_payload_state != payload_state_t::searching) {
+        n_produced += handle_payload(noutput_items,
+                                     out,
+                                     d_frame_sync->get_payload(),
+                                     d_curr_frame_info,
+                                     d_next_frame_info);
+    }
 
-    consume_each(noutput_items);
-
-    // Tell runtime system how many output items we produced.
+    // Tell runtime system how many input/output items were consumed/produced.
+    consume_each(n_consumed);
     return n_produced;
 }
+
 } /* namespace dvbs2rx */
 } /* namespace gr */
