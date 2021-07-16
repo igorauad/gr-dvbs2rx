@@ -13,44 +13,6 @@
 namespace gr {
 namespace dvbs2rx {
 
-void plsc_encoder::encode(gr_complex* bpsk_out, const uint8_t plsc)
-{
-    uint64_t codeword = d_reed_muller_encoder.encode(plsc);
-    map_bpsk(codeword ^ plsc_scrambler, bpsk_out, PLSC_LEN);
-}
-
-void plsc_encoder::encode(gr_complex* bpsk_out,
-                          const uint8_t modcod,
-                          bool short_fecframe,
-                          bool has_pilots)
-{
-    uint8_t plsc = ((modcod & 0x1F) << 2) | (short_fecframe << 1) | has_pilots;
-    encode(bpsk_out, plsc);
-}
-
-/**
- * @brief Custom Euclidean-space image mapper for the RM encoder/decoder
- *
- * The Reed-Muller encoder's constructor accepts a function to customize the
- * mapping from the 64-bit binary codewords to their corresponding real-valued
- * Euclidean-space images. It is convenient to consider that the Euclidean-space
- * image used by the PLSC decoder is the real-valued BPSK sequence (of +-1
- * symbols) corresponding to the scrambled codeword, instead of the original
- * (unscrambled) codeword. That saves an extra descrambling step.
- *
- */
-void map_plsc_codeword_to_bpsk(float* dest_ptr, uint64_t codeword)
-{
-    reed_muller::default_euclidean_map(dest_ptr, codeword ^ plsc_scrambler);
-};
-
-plsc_decoder::plsc_decoder(int debug_level)
-    : d_debug_level(debug_level),
-      d_reed_muller_decoder(&map_plsc_codeword_to_bpsk),
-      d_soft_dec_buf(PLSC_LEN)
-{
-}
-
 void pls_info_t::parse(uint8_t dec_plsc)
 {
     plsc = dec_plsc;
@@ -99,6 +61,44 @@ void pls_info_t::parse(uint8_t _modcod, bool _short_fecframe, bool _has_pilots)
 {
     uint8_t _plsc = ((_modcod & 0x1F) << 2) | (_short_fecframe << 1) | _has_pilots;
     parse(_plsc);
+}
+
+void plsc_encoder::encode(gr_complex* bpsk_out, const uint8_t plsc)
+{
+    uint64_t codeword = d_reed_muller_encoder.encode(plsc);
+    map_bpsk(codeword ^ plsc_scrambler, bpsk_out, PLSC_LEN);
+}
+
+void plsc_encoder::encode(gr_complex* bpsk_out,
+                          const uint8_t modcod,
+                          bool short_fecframe,
+                          bool has_pilots)
+{
+    uint8_t plsc = ((modcod & 0x1F) << 2) | (short_fecframe << 1) | has_pilots;
+    encode(bpsk_out, plsc);
+}
+
+/**
+ * @brief Custom Euclidean-space image mapper for the RM encoder/decoder
+ *
+ * The Reed-Muller encoder's constructor accepts a function to customize the
+ * mapping from the 64-bit binary codewords to their corresponding real-valued
+ * Euclidean-space images. It is convenient to consider that the Euclidean-space
+ * image used by the PLSC decoder is the real-valued BPSK sequence (of +-1
+ * symbols) corresponding to the scrambled codeword, instead of the original
+ * (unscrambled) codeword. That saves an extra descrambling step.
+ *
+ */
+void map_plsc_codeword_to_bpsk(float* dest_ptr, uint64_t codeword)
+{
+    reed_muller::default_euclidean_map(dest_ptr, codeword ^ plsc_scrambler);
+};
+
+plsc_decoder::plsc_decoder(int debug_level)
+    : d_debug_level(debug_level),
+      d_reed_muller_decoder(&map_plsc_codeword_to_bpsk),
+      d_soft_dec_buf(PLSC_LEN)
+{
 }
 
 void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
