@@ -32,10 +32,10 @@ typedef struct{
     int npd;
     int ro;
     int isi;
-    int upl;
-    int dfl;
+    unsigned int upl;
+    unsigned int dfl;
     int sync;
-    int syncd;
+    unsigned int syncd;
 }BBHeader;
 
 typedef struct{

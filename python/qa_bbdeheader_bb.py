@@ -267,6 +267,91 @@ class qa_bbdeheader_bb(gr_unittest.TestCase):
         # The first BBFRAME (with the CRC error) should be discarded
         self._assert_up_stream(up_stream, n_discarded_bbframes=1)
 
+    def test_undetected_dfl_corruption(self):
+        """Test undetectable errors on the DFL field of the BBHEADER
+        """
+        # Parameters
+        kbch = 16008  # QPSK 1/4 with normal fecframe
+        n_bbframes = 2  # Number of BBFRAMEs to generate
+        self._set_stream_len_params(kbch, n_bbframes)
+
+        # Generate the stream of UPs and the corresponding stream of BBFRAMEs
+        up_stream = gen_up_stream(self.n_ups)
+        bbframe_stream = gen_bbframe_stream(kbch, n_bbframes, up_stream)
+
+        # Corrupt the DFL field of the first BBHEADER with an error that is a
+        # multiple of the CRC generator polynomial (i.e., undetectable), and
+        # which results in a DFL exceeding "kbch - 80"
+        gen_poly = int(DVBS2_GEN_POLY, 2)
+        error = gen_poly.to_bytes(2, byteorder='big')
+        dfl_field_offset = 4  # in bytes from the start of the BBHEADER
+        corrupt_stream = bytearray(bbframe_stream)
+        for j in range(len(error)):
+            corrupt_stream[dfl_field_offset + j] ^= error[j]
+        resulting_dfl = int.from_bytes(
+            corrupt_stream[dfl_field_offset:dfl_field_offset + 2],
+            byteorder='big')
+        assert (resulting_dfl > kbch - 80)
+
+        # Run the flowgraph
+        self._set_up_flowgraph(corrupt_stream)
+        self.tb.run()
+
+        # The first BBFRAME (with the corrupt DFL) should be discarded
+        self._assert_up_stream(up_stream, n_discarded_bbframes=1)
+
+        # Now, corrupt the DFL field of the first BBHEADER with an undetectable
+        # error yielding a DFL that is not a multiple of 8
+        error = (gen_poly << 2).to_bytes(2, byteorder='big')
+        dfl_field_offset = 4  # in bytes from the start of the BBHEADER
+        corrupt_stream = bytearray(bbframe_stream)
+        for j in range(len(error)):
+            corrupt_stream[dfl_field_offset + j] ^= error[j]
+        resulting_dfl = int.from_bytes(
+            corrupt_stream[dfl_field_offset:dfl_field_offset + 2],
+            byteorder='big')
+        assert (resulting_dfl % 8 != 0)
+
+        # Run the flowgraph
+        self._set_up_flowgraph(corrupt_stream)
+        self.tb.run()
+
+        # Again, the first BBFRAME (with the corrupt DFL) should be discarded
+        self._assert_up_stream(up_stream, n_discarded_bbframes=1)
+
+    def test_undetected_syncd_corruption(self):
+        """Test undetectable error on the SYNCD field of the BBHEADER
+        """
+        # Parameters
+        kbch = 16008  # QPSK 1/4 with normal fecframe
+        n_bbframes = 2  # Number of BBFRAMEs to generate
+        self._set_stream_len_params(kbch, n_bbframes)
+
+        # Generate the stream of UPs and the corresponding stream of BBFRAMEs
+        up_stream = gen_up_stream(self.n_ups)
+        bbframe_stream = gen_bbframe_stream(kbch, n_bbframes, up_stream)
+
+        # Corrupt the SYNCD field of the first BBHEADER with an error that is a
+        # multiple of the CRC generator polynomial (i.e., undetectable), and
+        # which sets the SYNCD to an invalid value exceeding the DFL.
+        gen_poly = int(DVBS2_GEN_POLY, 2)
+        error = (gen_poly << 7).to_bytes(2, byteorder='big')
+        syncd_field_offset = 7  # in bytes from the start of the BBHEADER
+        corrupt_stream = bytearray(bbframe_stream)
+        for j in range(len(error)):
+            corrupt_stream[syncd_field_offset + j] ^= error[j]
+        resulting_syncd = int.from_bytes(
+            corrupt_stream[syncd_field_offset:syncd_field_offset + 2],
+            byteorder='big')
+        assert (resulting_syncd > (kbch - 80))
+
+        # Run the flowgraph
+        self._set_up_flowgraph(corrupt_stream)
+        self.tb.run()
+
+        # The first BBFRAME (with the corrupt SYNCD) should be discarded
+        self._assert_up_stream(up_stream, n_discarded_bbframes=1)
+
 
 if __name__ == '__main__':
     gr_unittest.run(qa_bbdeheader_bb)
