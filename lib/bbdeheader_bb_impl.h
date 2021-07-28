@@ -49,6 +49,7 @@ namespace gr {
     {
      private:
       unsigned int kbch;
+      unsigned int max_dfl;
       unsigned int dvb_standard;
       unsigned int count;
       unsigned int synched;

@@ -248,13 +248,14 @@ namespace gr {
             break;
         }
       }
+      max_dfl = kbch - BB_HEADER_LENGTH_BITS;
       build_crc8_table();
       dvb_standard = standard;
       count = 0;
       index = 0;
       synched = FALSE;
       spanning = FALSE;
-      set_output_multiple((kbch / 8) * 2);
+      set_output_multiple((max_dfl / 8) * 2);
     }
 
     /*
@@ -314,7 +315,8 @@ namespace gr {
     void
     bbdeheader_bb_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
     {
-      ninput_items_required[0] = noutput_items * 8;
+      unsigned int n_bbframes = noutput_items / (max_dfl / 8);
+      ninput_items_required[0] = n_bbframes * kbch;
     }
 
     int
@@ -332,8 +334,9 @@ namespace gr {
       unsigned char tmp;
       BBHeader *h = &m_format[0].bb_header;
 
-      for (int i = 0; i < noutput_items; i += (kbch / 8)) {
-        check = check_crc8_bits(in, BB_HEADER_LENGTH_BITS + 8);
+      const unsigned int n_bbframes = noutput_items / (max_dfl / 8);
+      for (unsigned int i = 0; i < n_bbframes; i++) {
+        check = check_crc8_bits(in, BB_HEADER_LENGTH_BITS);
         if (dvb_standard == STANDARD_DVBS2) {
           mode = INPUTMODE_NORMAL;
           if (check == 0) {
@@ -359,7 +362,7 @@ namespace gr {
         if (check != TRUE) {
           synched = FALSE;
           printf("Baseband header crc failed.\n");
-          i += (kbch / 8);
+          in += kbch;
         }
         else {
           h->ts_gs = *in++ << 1;
@@ -548,7 +551,7 @@ namespace gr {
 
       // Tell runtime system how many input items we consumed on
       // each input stream.
-      consume_each (noutput_items * 8);
+      consume_each(n_bbframes * kbch);
 
       // Tell runtime system how many output items we produced.
       return produced;
