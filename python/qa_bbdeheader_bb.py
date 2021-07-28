@@ -352,6 +352,58 @@ class qa_bbdeheader_bb(gr_unittest.TestCase):
         # The first BBFRAME (with the corrupt SYNCD) should be discarded
         self._assert_up_stream(up_stream, n_discarded_bbframes=1)
 
+    def test_padded_dfl(self):
+        """Test processing of a zero-padded DATAFIELD
+        """
+        # Parameters
+        kbch = 16008  # QPSK 1/4 with normal fecframe
+        n_bbframes = 4  # Number of BBFRAMEs to generate
+        self._set_stream_len_params(kbch, n_bbframes)
+
+        # Configure the DATAFIELD length to hold an integer number of UPs and
+        # no partial UP. In this case, the DATAFIELD length is not equal to
+        # "kbch - 80", and the DATAFIELD is zero-padded in the end.
+        max_dfl_bytes = int((kbch - 80) / 8)
+        n_ups_per_df = int(floor(max_dfl_bytes / UPL_BYTES))
+        dfl_bytes = n_ups_per_df * UPL_BYTES
+        pad_bytes = max_dfl_bytes - dfl_bytes
+        assert (pad_bytes > 0)
+        assert ((dfl_bytes + pad_bytes) * 8 == kbch - 80)
+
+        # Generate the stream of UPs
+        n_ups = n_bbframes * n_ups_per_df
+        up_stream = gen_up_stream(n_ups)
+
+        # Generate the CRC-8 encoded UP stream
+        modified_up_stream = replace_sync_with_crc(up_stream)
+
+        # Generate the BBFRAME stream with zero-padded datafields.
+        #
+        # NOTE: since the DATAFIELD is constrained to contain an integer number
+        # of UPs, each DATAFIELD starts aligned with a UP. Hence, the SYNCD is
+        # always zero in this case.
+        bbframe_stream = bytearray()
+        syncd = 0
+        offset = 0
+        for i in range(n_bbframes):
+            # Fill the BBHEADER
+            bbframe_stream += gen_bbheader(kbch, syncd, dfl=dfl_bytes * 8)
+            # Fill the payload with UPs
+            bbframe_stream += modified_up_stream[offset:(offset + dfl_bytes)]
+            # Zero pad so that BBFRAME+DATAFIELD+PADDING has a length of kbch
+            bbframe_stream += bytes(pad_bytes)
+            # Go to the next DATAFIELD
+            offset += dfl_bytes
+
+        # Run the flowgraph
+        self._set_up_flowgraph(bbframe_stream)
+        self.tb.run()
+
+        # The entire UP stream should be processed despite the zero-padding
+        expected_out = list(up_stream)
+        observed_out = self.sink.data()
+        self.assertListEqual(expected_out, observed_out)
+
 
 if __name__ == '__main__':
     gr_unittest.run(qa_bbdeheader_bb)

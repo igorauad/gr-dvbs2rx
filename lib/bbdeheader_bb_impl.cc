@@ -394,6 +394,7 @@ namespace gr {
         for (int n = 15; n >= 0; n--) {
           h->dfl |= *in++ << n;
         }
+        df_remaining = h->dfl;
         h->sync = 0;
         for (int n = 7; n >= 0; n--) {
           h->sync |= *in++ << n;
@@ -431,11 +432,11 @@ namespace gr {
           printf("Baseband header resynchronizing.\n");
           if (mode == INPUTMODE_NORMAL) {
             in += h->syncd + 8;
-            h->dfl -= h->syncd + 8;
+            df_remaining -= h->syncd + 8;
           }
           else {
             in += h->syncd;
-            h->dfl -= h->syncd;
+            df_remaining -= h->syncd;
           }
           count = 0;
           synched = TRUE;
@@ -446,7 +447,7 @@ namespace gr {
 
         // Process the DATAFIELD
         if (mode == INPUTMODE_NORMAL) {
-          while (h->dfl) {
+          while (df_remaining) {
             if (count == 0) {
               crc = 0;
               if (index == TRANSPORT_PACKET_LENGTH) {
@@ -457,7 +458,7 @@ namespace gr {
                 index = 0;
                 spanning = FALSE;
               }
-              if (h->dfl < TRANSPORT_PACKET_LENGTH * 8) {
+              if (df_remaining < (TRANSPORT_PACKET_LENGTH - 1) * 8) {
                 index = 0;
                 packet[index++] = 0x47;
                 spanning = TRUE;
@@ -490,12 +491,12 @@ namespace gr {
                 }
               }
               count = 0;
-              h->dfl -= 8;
-              if (h->dfl == 0) {
+              df_remaining -= 8;
+              if (df_remaining == 0) {
                 distance = (TRANSPORT_PACKET_LENGTH - 1) * 8;
               }
             }
-            if (h->dfl >= 8 && count > 0) {
+            if (df_remaining >= 8 && count > 0) {
               tmp = 0;
               for (int n = 7; n >= 0; n--) {
                 tmp |= *in++ << n;
@@ -510,15 +511,16 @@ namespace gr {
                 produced++;
               }
               count++;
-              h->dfl -= 8;
-              if (h->dfl == 0) {
+              df_remaining -= 8;
+              if (df_remaining == 0) {
                 distance = 0;
               }
             }
           }
+          in += max_dfl - h->dfl; // Skip the DATAFIELD padding, if any
         }
         else {
-          while (h->dfl) {
+          while (df_remaining) {
             if (count == 0) {
               if (index == TRANSPORT_PACKET_LENGTH) {
                 for (int j = 0; j < TRANSPORT_PACKET_LENGTH; j++) {
@@ -528,7 +530,7 @@ namespace gr {
                 index = 0;
                 spanning = FALSE;
               }
-              if (h->dfl < (TRANSPORT_PACKET_LENGTH - 1) * 8) {
+              if (df_remaining < (TRANSPORT_PACKET_LENGTH - 1) * 8) {
                 index = 0;
                 packet[index++] = 0x47;
                 spanning = TRUE;
@@ -547,11 +549,11 @@ namespace gr {
             }
             else if (count == TRANSPORT_PACKET_LENGTH) {
               count = 0;
-              if (h->dfl == 0) {
+              if (df_remaining == 0) {
                 distance = 0;
               }
             }
-            if (h->dfl >= 8 && count > 0) {
+            if (df_remaining >= 8 && count > 0) {
               tmp = 0;
               for (int n = 7; n >= 0; n--) {
                 tmp |= *in++ << n;
@@ -565,12 +567,13 @@ namespace gr {
                 produced++;
               }
               count++;
-              h->dfl -= 8;
-              if (h->dfl == 0) {
+              df_remaining -= 8;
+              if (df_remaining == 0) {
                 distance = 0;
               }
             }
           }
+          in += max_dfl - h->dfl; // Skip the DATAFIELD padding, if any
         }
       }
 
