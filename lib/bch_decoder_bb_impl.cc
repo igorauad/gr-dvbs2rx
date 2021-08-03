@@ -1,17 +1,17 @@
 /* -*- c++ -*- */
-/* 
+/*
  * Copyright 2018 Ahmet Inan, Ron Economos.
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -22,13 +22,13 @@
 #include "config.h"
 #endif
 
-#include <gnuradio/io_signature.h>
 #include "bch_decoder_bb_impl.h"
+#include <gnuradio/io_signature.h>
 #include <stdio.h>
 #include <functional>
 
 // BCH Code
-#define BCH_CODE_N8  0
+#define BCH_CODE_N8 0
 #define BCH_CODE_N10 1
 #define BCH_CODE_N12 2
 #define BCH_CODE_S12 3
@@ -38,19 +38,25 @@ namespace gr {
   namespace dvbs2rx {
 
     bch_decoder_bb::sptr
-    bch_decoder_bb::make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_outputmode_t outputmode)
+    bch_decoder_bb::make(dvb_standard_t standard,
+                         dvb_framesize_t framesize,
+                         dvb_code_rate_t rate,
+                         dvb_outputmode_t outputmode)
     {
-      return gnuradio::get_initial_sptr
-        (new bch_decoder_bb_impl(standard, framesize, rate, outputmode));
+      return gnuradio::get_initial_sptr(
+          new bch_decoder_bb_impl(standard, framesize, rate, outputmode));
     }
 
     /*
      * The private constructor
      */
-    bch_decoder_bb_impl::bch_decoder_bb_impl(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_outputmode_t outputmode)
-      : gr::block("bch_decoder_bb",
-              gr::io_signature::make(1, 1, sizeof(unsigned char)),
-              gr::io_signature::make(1, 1, sizeof(unsigned char)))
+    bch_decoder_bb_impl::bch_decoder_bb_impl(dvb_standard_t standard,
+                                             dvb_framesize_t framesize,
+                                             dvb_code_rate_t rate,
+                                             dvb_outputmode_t outputmode)
+        : gr::block("bch_decoder_bb",
+                    gr::io_signature::make(1, 1, sizeof(unsigned char)),
+                    gr::io_signature::make(1, 1, sizeof(unsigned char)))
     {
       if (framesize == FECFRAME_NORMAL) {
         switch (rate) {
@@ -423,7 +429,7 @@ namespace gr {
     }
 
     void
-    bch_decoder_bb_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
+    bch_decoder_bb_impl::forecast(int noutput_items, gr_vector_int &ninput_items_required)
     {
       if (output_mode == OM_MESSAGE) {
         ninput_items_required[0] = (noutput_items / kbch) * nbch;
@@ -434,10 +440,10 @@ namespace gr {
     }
 
     int
-    bch_decoder_bb_impl::general_work (int noutput_items,
-                       gr_vector_int &ninput_items,
-                       gr_vector_const_void_star &input_items,
-                       gr_vector_void_star &output_items)
+    bch_decoder_bb_impl::general_work(int noutput_items,
+                                      gr_vector_int &ninput_items,
+                                      gr_vector_const_void_star &input_items,
+                                      gr_vector_void_star &output_items)
     {
       const unsigned char *in = (const unsigned char *) input_items[0];
       unsigned char *out = (unsigned char *) output_items[0];
@@ -471,7 +477,9 @@ namespace gr {
         }
         if (corrections > 0 || corrections == -1) {
           if (corrections != -1) {
-            printf("frame = %d, BCH decoder number of corrections = %d\n", frame, corrections);
+            printf("frame = %d, BCH decoder number of corrections = %d\n",
+                   frame,
+                   corrections);
           }
           else {
             printf("frame = %d, BCH decoder too many bit errors.\n", frame);
@@ -490,7 +498,7 @@ namespace gr {
       }
 
       // each input stream.
-      consume_each (consumed);
+      consume_each(consumed);
 
       // Tell runtime system how many output items we produced.
       return noutput_items;
@@ -498,4 +506,3 @@ namespace gr {
 
   } /* namespace dvbs2rx */
 } /* namespace gr */
-

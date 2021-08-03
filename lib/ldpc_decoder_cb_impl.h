@@ -1,17 +1,17 @@
 /* -*- c++ -*- */
-/* 
+/*
  * Copyright 2018,2019 Ahmet Inan, Ron Economos.
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -21,15 +21,15 @@
 #ifndef INCLUDED_DVBS2RX_LDPC_DECODER_CB_IMPL_H
 #define INCLUDED_DVBS2RX_LDPC_DECODER_CB_IMPL_H
 
-#include <dvbs2rx/ldpc_decoder_cb.h>
+#include "algorithms.hh"
 #include "dvb_defines.h"
-#include "psk.hh"
-#include "qam.hh"
-#include "ldpc.hh"
 #include "dvb_s2_tables.hh"
 #include "dvb_s2x_tables.hh"
 #include "dvb_t2_tables.hh"
-#include "algorithms.hh"
+#include "ldpc.hh"
+#include "psk.hh"
+#include "qam.hh"
+#include <dvbs2rx/ldpc_decoder_cb.h>
 
 #define FACTOR 2
 
@@ -60,7 +60,7 @@ namespace gr {
 
     class ldpc_decoder_cb_impl : public ldpc_decoder_cb
     {
-     private:
+  private:
       unsigned int frame_size;
       unsigned int signal_constellation;
       unsigned int code_rate;
@@ -95,11 +95,18 @@ namespace gr {
       int interleave_lookup_table[FRAME_SIZE_NORMAL];
       int deinterleave_lookup_table[FRAME_SIZE_NORMAL];
 
-      void generate_interleave_lookup();
-      void generate_deinterleave_lookup();
-      inline void interleave_parity_bits(int *tempu, const int *&in);
-      inline void twist_interleave_columns(int* tempv, int* tempu, int rows, int mod, const int *twist);
-      inline void twist_deinterleave_columns(int* tempv, int* tempu, int rows, int mod, const int *twist);
+      void
+      generate_interleave_lookup();
+      void
+      generate_deinterleave_lookup();
+      inline void
+      interleave_parity_bits(int *tempu, const int *&in);
+      inline void
+      twist_interleave_columns(
+          int *tempv, int *tempu, int rows, int mod, const int *twist);
+      inline void
+      twist_deinterleave_columns(
+          int *tempv, int *tempu, int rows, int mod, const int *twist);
 
       const static int twist16n[8];
       const static int twist64n[12];
@@ -126,20 +133,26 @@ namespace gr {
       const static int mux256s_13[8];
       const static int mux256s_25[8];
 
-     public:
-      ldpc_decoder_cb_impl(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_constellation_t constellation, dvb_outputmode_t outputmode, dvb_infomode_t infomode);
+  public:
+      ldpc_decoder_cb_impl(dvb_standard_t standard,
+                           dvb_framesize_t framesize,
+                           dvb_code_rate_t rate,
+                           dvb_constellation_t constellation,
+                           dvb_outputmode_t outputmode,
+                           dvb_infomode_t infomode);
       ~ldpc_decoder_cb_impl();
 
-      void forecast (int noutput_items, gr_vector_int &ninput_items_required);
+      void
+      forecast(int noutput_items, gr_vector_int &ninput_items_required);
 
-      int general_work(int noutput_items,
-           gr_vector_int &ninput_items,
-           gr_vector_const_void_star &input_items,
-           gr_vector_void_star &output_items);
+      int
+      general_work(int noutput_items,
+                   gr_vector_int &ninput_items,
+                   gr_vector_const_void_star &input_items,
+                   gr_vector_void_star &output_items);
     };
 
   } // namespace dvbs2rx
 } // namespace gr
 
 #endif /* INCLUDED_DVBS2RX_LDPC_DECODER_CB_IMPL_H */
-

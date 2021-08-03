@@ -1,17 +1,17 @@
 /* -*- c++ -*- */
-/* 
+/*
  * Copyright 2018 Ron Economos.
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -22,26 +22,30 @@
 #include "config.h"
 #endif
 
-#include <gnuradio/io_signature.h>
 #include "bbdescrambler_bb_impl.h"
+#include <gnuradio/io_signature.h>
 
 namespace gr {
   namespace dvbs2rx {
 
     bbdescrambler_bb::sptr
-    bbdescrambler_bb::make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate)
+    bbdescrambler_bb::make(dvb_standard_t standard,
+                           dvb_framesize_t framesize,
+                           dvb_code_rate_t rate)
     {
-      return gnuradio::get_initial_sptr
-        (new bbdescrambler_bb_impl(standard, framesize, rate));
+      return gnuradio::get_initial_sptr(
+          new bbdescrambler_bb_impl(standard, framesize, rate));
     }
 
     /*
      * The private constructor
      */
-    bbdescrambler_bb_impl::bbdescrambler_bb_impl(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate)
-      : gr::sync_block("bbdescrambler_bb",
-              gr::io_signature::make(1, 1, sizeof(unsigned char)),
-              gr::io_signature::make(1, 1, sizeof(unsigned char)))
+    bbdescrambler_bb_impl::bbdescrambler_bb_impl(dvb_standard_t standard,
+                                                 dvb_framesize_t framesize,
+                                                 dvb_code_rate_t rate)
+        : gr::sync_block("bbdescrambler_bb",
+                         gr::io_signature::make(1, 1, sizeof(unsigned char)),
+                         gr::io_signature::make(1, 1, sizeof(unsigned char)))
     {
       if (framesize == FECFRAME_NORMAL) {
         switch (rate) {
@@ -264,7 +268,7 @@ namespace gr {
         int b = ((sr) ^ (sr >> 1)) & 1;
         bb_derandomise[i] = b;
         sr >>= 1;
-        if(b) {
+        if (b) {
           sr |= 0x4000;
         }
       }
@@ -272,14 +276,14 @@ namespace gr {
 
     int
     bbdescrambler_bb_impl::work(int noutput_items,
-        gr_vector_const_void_star &input_items,
-        gr_vector_void_star &output_items)
+                                gr_vector_const_void_star &input_items,
+                                gr_vector_void_star &output_items)
     {
       const unsigned char *in = (const unsigned char *) input_items[0];
       unsigned char *out = (unsigned char *) output_items[0];
 
       for (int i = 0; i < noutput_items; i += kbch) {
-        for (int j = 0; j < (int)kbch; ++j) {
+        for (int j = 0; j < (int) kbch; ++j) {
           out[i + j] = in[i + j] ^ bb_derandomise[j];
         }
       }
@@ -290,4 +294,3 @@ namespace gr {
 
   } /* namespace dvbs2rx */
 } /* namespace gr */
-
