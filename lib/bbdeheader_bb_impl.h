@@ -32,10 +32,10 @@ typedef struct{
     int npd;
     int ro;
     int isi;
-    int upl;
-    int dfl;
+    unsigned int upl;
+    unsigned int dfl;
     int sync;
-    int syncd;
+    unsigned int syncd;
 }BBHeader;
 
 typedef struct{
@@ -49,7 +49,9 @@ namespace gr {
     {
      private:
       unsigned int kbch;
+      unsigned int max_dfl;
       unsigned int dvb_standard;
+      unsigned int df_remaining;
       unsigned int count;
       unsigned int synched;
       unsigned char crc;

@@ -248,13 +248,14 @@ namespace gr {
             break;
         }
       }
+      max_dfl = kbch - BB_HEADER_LENGTH_BITS;
       build_crc8_table();
       dvb_standard = standard;
       count = 0;
       index = 0;
       synched = FALSE;
       spanning = FALSE;
-      set_output_multiple((kbch / 8) * 2);
+      set_output_multiple((max_dfl / 8) * 2);
     }
 
     /*
@@ -314,7 +315,8 @@ namespace gr {
     void
     bbdeheader_bb_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
     {
-      ninput_items_required[0] = noutput_items * 8;
+      unsigned int n_bbframes = noutput_items / (max_dfl / 8);
+      ninput_items_required[0] = n_bbframes * kbch;
     }
 
     int
@@ -332,8 +334,10 @@ namespace gr {
       unsigned char tmp;
       BBHeader *h = &m_format[0].bb_header;
 
-      for (int i = 0; i < noutput_items; i += (kbch / 8)) {
-        check = check_crc8_bits(in, BB_HEADER_LENGTH_BITS + 8);
+      const unsigned int n_bbframes = noutput_items / (max_dfl / 8);
+      for (unsigned int i = 0; i < n_bbframes; i++) {
+        // Check the BBHEADER integrity
+        check = check_crc8_bits(in, BB_HEADER_LENGTH_BITS);
         if (dvb_standard == STANDARD_DVBS2) {
           mode = INPUTMODE_NORMAL;
           if (check == 0) {
@@ -356,189 +360,220 @@ namespace gr {
             check = FALSE;
           }
         }
+
         if (check != TRUE) {
           synched = FALSE;
           printf("Baseband header crc failed.\n");
-          i += (kbch / 8);
+          in += kbch;
+          continue;
+        }
+
+        // Parse the BBHEADER
+        h->ts_gs = *in++ << 1;
+        h->ts_gs |= *in++;
+        h->sis_mis = *in++;
+        h->ccm_acm = *in++;
+        h->issyi = *in++;
+        h->npd = *in++;
+        h->ro = *in++ << 1;
+        h->ro |= *in++;
+        h->isi = 0;
+        if (h->sis_mis == 0) {
+          for (int n = 7; n >= 0; n--) {
+            h->isi |= *in++ << n;
+          }
         }
         else {
-          h->ts_gs = *in++ << 1;
-          h->ts_gs |= *in++;
-          h->sis_mis = *in++;
-          h->ccm_acm = *in++;
-          h->issyi = *in++;
-          h->npd = *in++;
-          h->ro = *in++ << 1;
-          h->ro |= *in++;
-          h->isi = 0;
-          if (h->sis_mis == 0) {
-            for (int n = 7; n >= 0; n--) {
-              h->isi |= *in++ << n;
-            }
-          }
-          else {
-            in += 8;
-          }
-          h->upl = 0;
-          for (int n = 15; n >= 0; n--) {
-            h->upl |= *in++ << n;
-          }
-          h->dfl = 0;
-          for (int n = 15; n >= 0; n--) {
-            h->dfl |= *in++ << n;
-          }
-          h->sync = 0;
-          for (int n = 7; n >= 0; n--) {
-            h->sync |= *in++ << n;
-          }
-          h->syncd = 0;
-          for (int n = 15; n >= 0; n--) {
-            h->syncd |= *in++ << n;
-          }
           in += 8;
-          if (synched == FALSE) {
-            printf("Baseband header resynchronizing.\n");
-            if (mode == INPUTMODE_NORMAL) {
-              in += h->syncd + 8;
-              h->dfl -= h->syncd + 8;
-            }
-            else {
-              in += h->syncd;
-              h->dfl -= h->syncd;
-            }
-            count = 0;
-            synched = TRUE;
-            index = 0;
-            spanning = FALSE;
-            distance = h->syncd;
-          }
+        }
+        h->upl = 0;
+        for (int n = 15; n >= 0; n--) {
+          h->upl |= *in++ << n;
+        }
+        h->dfl = 0;
+        for (int n = 15; n >= 0; n--) {
+          h->dfl |= *in++ << n;
+        }
+        df_remaining = h->dfl;
+        h->sync = 0;
+        for (int n = 7; n >= 0; n--) {
+          h->sync |= *in++ << n;
+        }
+        h->syncd = 0;
+        for (int n = 15; n >= 0; n--) {
+          h->syncd |= *in++ << n;
+        }
+        in += 8; // Skip the last byte (CRC-8), processed in the beginning.
+
+        // Validate the DFL and the SYNCD fields of the BBHEADER
+        if (h->dfl > max_dfl) {
+          synched = FALSE;
+          printf("Baseband header invalid (dfl > kbch - 80).\n");
+          in += max_dfl;
+          continue;
+        }
+
+        if (h->dfl % 8 != 0) {
+          synched = FALSE;
+          printf("Baseband header invalid (dfl not a multiple of 8).\n");
+          in += max_dfl;
+          continue;
+        }
+
+        if (h->syncd > h->dfl) {
+          synched = FALSE;
+          printf("Baseband header invalid (syncd > dfl).\n");
+          in += max_dfl;
+          continue;
+        }
+
+        // Skip the initial SYNCD bits of the DATAFIELD if re-synchronizing
+        if (synched == FALSE) {
+          printf("Baseband header resynchronizing.\n");
           if (mode == INPUTMODE_NORMAL) {
-            while (h->dfl) {
-              if (count == 0) {
-                crc = 0;
-                if (index == TRANSPORT_PACKET_LENGTH) {
-                  for (int j = 0; j < TRANSPORT_PACKET_LENGTH; j++) {
-                    *out++ = packet[j];
-                    produced++;
-                  }
-                  index = 0;
-                  spanning = FALSE;
-                }
-                if (h->dfl < TRANSPORT_PACKET_LENGTH * 8) {
-                  index = 0;
-                  packet[index++] = 0x47;
-                  spanning = TRUE;
-                }
-                else {
-                  *out++ = 0x47;
-                  produced++;
-                  tei = out;
-                }
-                count++;
-                if (check == TRUE) {
-                  if (distance != (unsigned int)h->syncd) {
-                    synched = FALSE;
-                  }
-                  check = FALSE;
-                }
-              }
-              else if (count == TRANSPORT_PACKET_LENGTH) {
-                tmp = 0;
-                for (int n = 7; n >= 0; n--) {
-                  tmp |= *in++ << n;
-                }
-                if (tmp != crc) {
-                  errors++;
-                  if (spanning) {
-                    packet[1] |= TRANSPORT_ERROR_INDICATOR;
-                  }
-                  else {
-                    *tei |= TRANSPORT_ERROR_INDICATOR;
-                  }
-                }
-                count = 0;
-                h->dfl -= 8;
-                if (h->dfl == 0) {
-                  distance = (TRANSPORT_PACKET_LENGTH - 1) * 8;
-                }
-              }
-              if (h->dfl >= 8 && count > 0) {
-                tmp = 0;
-                for (int n = 7; n >= 0; n--) {
-                  tmp |= *in++ << n;
-                  distance++;
-                }
-                crc = crc_tab[tmp ^ crc];
-                if (spanning == TRUE) {
-                  packet[index++] = tmp;
-                }
-                else {
-                  *out++ = tmp;
-                  produced++;
-                }
-                count++;
-                h->dfl -= 8;
-                if (h->dfl == 0) {
-                  distance = 0;
-                }
-              }
-            }
+            in += h->syncd + 8;
+            df_remaining -= h->syncd + 8;
           }
           else {
-            while (h->dfl) {
-              if (count == 0) {
-                if (index == TRANSPORT_PACKET_LENGTH) {
-                  for (int j = 0; j < TRANSPORT_PACKET_LENGTH; j++) {
-                    *out++ = packet[j];
-                    produced++;
-                  }
-                  index = 0;
-                  spanning = FALSE;
-                }
-                if (h->dfl < (TRANSPORT_PACKET_LENGTH - 1) * 8) {
-                  index = 0;
-                  packet[index++] = 0x47;
-                  spanning = TRUE;
-                }
-                else {
-                  *out++ = 0x47;
+            in += h->syncd;
+            df_remaining -= h->syncd;
+          }
+          count = 0;
+          synched = TRUE;
+          index = 0;
+          spanning = FALSE;
+          distance = h->syncd;
+        }
+
+        // Process the DATAFIELD
+        if (mode == INPUTMODE_NORMAL) {
+          while (df_remaining) {
+            if (count == 0) {
+              crc = 0;
+              if (index == TRANSPORT_PACKET_LENGTH) {
+                for (int j = 0; j < TRANSPORT_PACKET_LENGTH; j++) {
+                  *out++ = packet[j];
                   produced++;
                 }
-                count++;
-                if (check == TRUE) {
-                  if (distance != (unsigned int)h->syncd) {
-                    synched = FALSE;
-                  }
-                  check = FALSE;
-                }
+                index = 0;
+                spanning = FALSE;
               }
-              else if (count == TRANSPORT_PACKET_LENGTH) {
-                count = 0;
-                if (h->dfl == 0) {
-                  distance = 0;
-                }
+              if (df_remaining < (TRANSPORT_PACKET_LENGTH - 1) * 8) {
+                index = 0;
+                packet[index++] = 0x47;
+                spanning = TRUE;
               }
-              if (h->dfl >= 8 && count > 0) {
-                tmp = 0;
-                for (int n = 7; n >= 0; n--) {
-                  tmp |= *in++ << n;
-                  distance++;
+              else {
+                *out++ = 0x47;
+                produced++;
+                tei = out;
+              }
+              count++;
+              if (check == TRUE) {
+                if (distance != (unsigned int)h->syncd) {
+                  synched = FALSE;
                 }
-                if (spanning == TRUE) {
-                  packet[index++] = tmp;
+                check = FALSE;
+              }
+            }
+            else if (count == TRANSPORT_PACKET_LENGTH) {
+              tmp = 0;
+              for (int n = 7; n >= 0; n--) {
+                tmp |= *in++ << n;
+              }
+              if (tmp != crc) {
+                errors++;
+                if (spanning) {
+                  packet[1] |= TRANSPORT_ERROR_INDICATOR;
                 }
                 else {
-                  *out++ = tmp;
-                  produced++;
+                  *tei |= TRANSPORT_ERROR_INDICATOR;
                 }
-                count++;
-                h->dfl -= 8;
-                if (h->dfl == 0) {
-                  distance = 0;
-                }
+              }
+              count = 0;
+              df_remaining -= 8;
+              if (df_remaining == 0) {
+                distance = (TRANSPORT_PACKET_LENGTH - 1) * 8;
+              }
+            }
+            if (df_remaining >= 8 && count > 0) {
+              tmp = 0;
+              for (int n = 7; n >= 0; n--) {
+                tmp |= *in++ << n;
+                distance++;
+              }
+              crc = crc_tab[tmp ^ crc];
+              if (spanning == TRUE) {
+                packet[index++] = tmp;
+              }
+              else {
+                *out++ = tmp;
+                produced++;
+              }
+              count++;
+              df_remaining -= 8;
+              if (df_remaining == 0) {
+                distance = 0;
               }
             }
           }
+          in += max_dfl - h->dfl; // Skip the DATAFIELD padding, if any
+        }
+        else {
+          while (df_remaining) {
+            if (count == 0) {
+              if (index == TRANSPORT_PACKET_LENGTH) {
+                for (int j = 0; j < TRANSPORT_PACKET_LENGTH; j++) {
+                  *out++ = packet[j];
+                  produced++;
+                }
+                index = 0;
+                spanning = FALSE;
+              }
+              if (df_remaining < (TRANSPORT_PACKET_LENGTH - 1) * 8) {
+                index = 0;
+                packet[index++] = 0x47;
+                spanning = TRUE;
+              }
+              else {
+                *out++ = 0x47;
+                produced++;
+              }
+              count++;
+              if (check == TRUE) {
+                if (distance != (unsigned int)h->syncd) {
+                  synched = FALSE;
+                }
+                check = FALSE;
+              }
+            }
+            else if (count == TRANSPORT_PACKET_LENGTH) {
+              count = 0;
+              if (df_remaining == 0) {
+                distance = 0;
+              }
+            }
+            if (df_remaining >= 8 && count > 0) {
+              tmp = 0;
+              for (int n = 7; n >= 0; n--) {
+                tmp |= *in++ << n;
+                distance++;
+              }
+              if (spanning == TRUE) {
+                packet[index++] = tmp;
+              }
+              else {
+                *out++ = tmp;
+                produced++;
+              }
+              count++;
+              df_remaining -= 8;
+              if (df_remaining == 0) {
+                distance = 0;
+              }
+            }
+          }
+          in += max_dfl - h->dfl; // Skip the DATAFIELD padding, if any
         }
       }
 
@@ -548,7 +583,7 @@ namespace gr {
 
       // Tell runtime system how many input items we consumed on
       // each input stream.
-      consume_each (noutput_items * 8);
+      consume_each(n_bbframes * kbch);
 
       // Tell runtime system how many output items we produced.
       return produced;
