@@ -27,7 +27,6 @@
 #include <stdio.h>
 #include <cmath>
 #include <iostream>
-#include <algorithm>
 
 constexpr int DVB_S2_TABLE_B1::DEG[];
 constexpr int DVB_S2_TABLE_B1::LEN[];

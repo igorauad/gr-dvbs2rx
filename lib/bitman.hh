@@ -21,6 +21,8 @@
 #ifndef BITMAN_HH
 #define BITMAN_HH
 
+#include <cstdint>
+
 namespace CODE {
 
   void

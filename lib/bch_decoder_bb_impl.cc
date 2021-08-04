@@ -25,7 +25,6 @@
 #include <gnuradio/io_signature.h>
 #include "bch_decoder_bb_impl.h"
 #include <stdio.h>
-#include <iostream>
 #include <functional>
 
 // BCH Code

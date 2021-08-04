@@ -21,6 +21,9 @@
 #ifndef REED_SOLOMON_ERROR_CORRECTION_HH
 #define REED_SOLOMON_ERROR_CORRECTION_HH
 
+#include <cassert>
+#include <iostream>
+
 namespace CODE {
   namespace RS {
 

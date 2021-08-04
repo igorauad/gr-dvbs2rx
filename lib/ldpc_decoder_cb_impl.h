@@ -29,7 +29,6 @@
 #include "dvb_s2_tables.hh"
 #include "dvb_s2x_tables.hh"
 #include "dvb_t2_tables.hh"
-#include "simd.hh"
 #include "algorithms.hh"
 
 #define FACTOR 2

@@ -22,6 +22,10 @@
 #define PSK_HH
 
 #include "modulation.hh"
+#include <algorithm>
+#include <cmath>
+#include <type_traits>
+#include <gnuradio/gr_complex.h>
 
 template <int NUM, typename TYPE, typename CODE>
 struct PhaseShiftKeying;

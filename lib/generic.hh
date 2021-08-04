@@ -22,6 +22,9 @@
 #define GENERIC_HH
 
 #include "exclusive_reduce.hh"
+#include <algorithm>
+#include <cmath>
+#include <complex>
 
 template <typename TYPE>
 struct NormalUpdate

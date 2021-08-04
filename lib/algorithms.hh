@@ -23,6 +23,7 @@
 
 #include "generic.hh"
 #include "exclusive_reduce.hh"
+#include "simd.hh"
 
 template <typename VALUE, int WIDTH>
 struct SelfCorrectedUpdate<SIMD<VALUE, WIDTH>>
