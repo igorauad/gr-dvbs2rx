@@ -18,7 +18,10 @@ except ImportError:
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
-    from dvbs2rx import bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL, C1_4
+    try:
+        from dvbs2rx import bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL, C1_4
+    except ImportError:
+        from dvbs2rx_python import bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL, C1_4
 
 DVBS2_GEN_POLY = '111010101'  # x^8 + x^7 + x^6 + x^4 + x^2 +1
 BBHEADER_NO_CRC_FMT = "!BBHHBH"  # BBHEADER format excluding the CRC field

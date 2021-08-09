@@ -1,17 +1,17 @@
 /* -*- c++ -*- */
-/* 
+/*
  * Copyright 2018 Ahmet Inan, Ron Economos.
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -21,40 +21,45 @@
 #ifndef ALGORITHMS_HH
 #define ALGORITHMS_HH
 
-#include "generic.hh"
 #include "exclusive_reduce.hh"
+#include "generic.hh"
+#include "simd.hh"
 
 template <typename VALUE, int WIDTH>
-struct SelfCorrectedUpdate<SIMD<VALUE, WIDTH>>
-{
+struct SelfCorrectedUpdate<SIMD<VALUE, WIDTH>> {
   typedef SIMD<VALUE, WIDTH> TYPE;
-  static void update(TYPE *a, TYPE b)
+  static void
+  update(TYPE *a, TYPE b)
   {
     *a = vreinterpret<TYPE>(vand(vmask(b), vorr(vceqz(*a), veor(vcgtz(*a), vcltz(b)))));
   }
 };
 
 template <typename VALUE, int WIDTH, typename UPDATE>
-struct MinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE>
-{
+struct MinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE> {
   typedef SIMD<VALUE, WIDTH> TYPE;
-  static TYPE zero()
+  static TYPE
+  zero()
   {
     return vzero<TYPE>();
   }
-  static TYPE one()
+  static TYPE
+  one()
   {
     return vdup<TYPE>(1);
   }
-  static TYPE min(TYPE a, TYPE b)
+  static TYPE
+  min(TYPE a, TYPE b)
   {
     return vmin(a, b);
   }
-  static TYPE sign(TYPE a, TYPE b)
+  static TYPE
+  sign(TYPE a, TYPE b)
   {
     return vsign(a, b);
   }
-  static void finalp(TYPE *links, int cnt)
+  static void
+  finalp(TYPE *links, int cnt)
   {
     TYPE mags[cnt], mins[cnt];
     for (int i = 0; i < cnt; ++i)
@@ -67,15 +72,18 @@ struct MinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE>
     for (int i = 0; i < cnt; ++i)
       links[i] = sign(mins[i], signs[i]);
   }
-  static TYPE add(TYPE a, TYPE b)
+  static TYPE
+  add(TYPE a, TYPE b)
   {
     return vadd(a, b);
   }
-  static TYPE sub(TYPE a, TYPE b)
+  static TYPE
+  sub(TYPE a, TYPE b)
   {
     return vsub(a, b);
   }
-  static bool bad(TYPE v, int blocks)
+  static bool
+  bad(TYPE v, int blocks)
   {
     auto tmp = vcgtz(v);
     for (int i = 0; i < blocks; ++i)
@@ -83,42 +91,49 @@ struct MinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE>
         return true;
     return false;
   }
-  static void update(TYPE *a, TYPE b)
+  static void
+  update(TYPE *a, TYPE b)
   {
     UPDATE::update(a, b);
   }
 };
 
 template <int WIDTH, typename UPDATE>
-struct MinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE>
-{
+struct MinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE> {
   typedef int8_t VALUE;
   typedef SIMD<VALUE, WIDTH> TYPE;
-  static TYPE zero()
+  static TYPE
+  zero()
   {
     return vzero<TYPE>();
   }
-  static TYPE one()
+  static TYPE
+  one()
   {
     return vdup<TYPE>(1);
   }
-  static TYPE sign(TYPE a, TYPE b)
+  static TYPE
+  sign(TYPE a, TYPE b)
   {
     return vsign(a, b);
   }
-  static TYPE eor(TYPE a, TYPE b)
+  static TYPE
+  eor(TYPE a, TYPE b)
   {
     return vreinterpret<TYPE>(veor(vmask(a), vmask(b)));
   }
-  static TYPE orr(TYPE a, TYPE b)
+  static TYPE
+  orr(TYPE a, TYPE b)
   {
     return vreinterpret<TYPE>(vorr(vmask(a), vmask(b)));
   }
-  static TYPE other(TYPE a, TYPE b, TYPE c)
+  static TYPE
+  other(TYPE a, TYPE b, TYPE c)
   {
     return vreinterpret<TYPE>(vbsl(vceq(a, b), vmask(c), vmask(b)));
   }
-  static void finalp(TYPE *links, int cnt)
+  static void
+  finalp(TYPE *links, int cnt)
   {
     TYPE mags[cnt];
     for (int i = 0; i < cnt; ++i)
@@ -137,17 +152,21 @@ struct MinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE>
       signs = eor(signs, links[i]);
 
     for (int i = 0; i < cnt; ++i)
-      links[i] = sign(other(mags[i], mins[0], mins[1]), orr(eor(signs, links[i]), vdup<TYPE>(127)));
+      links[i] = sign(other(mags[i], mins[0], mins[1]),
+                      orr(eor(signs, links[i]), vdup<TYPE>(127)));
   }
-  static TYPE add(TYPE a, TYPE b)
+  static TYPE
+  add(TYPE a, TYPE b)
   {
     return vqadd(a, b);
   }
-  static TYPE sub(TYPE a, TYPE b)
+  static TYPE
+  sub(TYPE a, TYPE b)
   {
     return vqsub(a, b);
   }
-  static bool bad(TYPE v, int blocks)
+  static bool
+  bad(TYPE v, int blocks)
   {
     auto tmp = vcgtz(v);
     for (int i = 0; i < blocks; ++i)
@@ -155,33 +174,38 @@ struct MinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE>
         return true;
     return false;
   }
-  static void update(TYPE *a, TYPE b)
+  static void
+  update(TYPE *a, TYPE b)
   {
     UPDATE::update(a, vmin(vmax(b, vdup<TYPE>(-32)), vdup<TYPE>(31)));
   }
 };
 
 template <typename VALUE, int WIDTH, typename UPDATE, int FACTOR>
-struct OffsetMinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR>
-{
+struct OffsetMinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR> {
   typedef SIMD<VALUE, WIDTH> TYPE;
-  static TYPE zero()
+  static TYPE
+  zero()
   {
     return vzero<TYPE>();
   }
-  static TYPE one()
+  static TYPE
+  one()
   {
     return vdup<TYPE>(1);
   }
-  static TYPE min(TYPE a, TYPE b)
+  static TYPE
+  min(TYPE a, TYPE b)
   {
     return vmin(a, b);
   }
-  static TYPE sign(TYPE a, TYPE b)
+  static TYPE
+  sign(TYPE a, TYPE b)
   {
     return vsign(a, b);
   }
-  static void finalp(TYPE *links, int cnt)
+  static void
+  finalp(TYPE *links, int cnt)
   {
     TYPE beta = vdup<TYPE>(0.5 * FACTOR);
     TYPE mags[cnt], mins[cnt];
@@ -195,15 +219,18 @@ struct OffsetMinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR>
     for (int i = 0; i < cnt; ++i)
       links[i] = sign(mins[i], signs[i]);
   }
-  static TYPE add(TYPE a, TYPE b)
+  static TYPE
+  add(TYPE a, TYPE b)
   {
     return vadd(a, b);
   }
-  static TYPE sub(TYPE a, TYPE b)
+  static TYPE
+  sub(TYPE a, TYPE b)
   {
     return vsub(a, b);
   }
-  static bool bad(TYPE v, int blocks)
+  static bool
+  bad(TYPE v, int blocks)
   {
     auto tmp = vcgtz(v);
     for (int i = 0; i < blocks; ++i)
@@ -211,42 +238,49 @@ struct OffsetMinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR>
         return true;
     return false;
   }
-  static void update(TYPE *a, TYPE b)
+  static void
+  update(TYPE *a, TYPE b)
   {
     UPDATE::update(a, b);
   }
 };
 
 template <int WIDTH, typename UPDATE, int FACTOR>
-struct OffsetMinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR>
-{
+struct OffsetMinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR> {
   typedef int8_t VALUE;
   typedef SIMD<VALUE, WIDTH> TYPE;
-  static TYPE zero()
+  static TYPE
+  zero()
   {
     return vzero<TYPE>();
   }
-  static TYPE one()
+  static TYPE
+  one()
   {
     return vdup<TYPE>(1);
   }
-  static TYPE sign(TYPE a, TYPE b)
+  static TYPE
+  sign(TYPE a, TYPE b)
   {
     return vsign(a, b);
   }
-  static TYPE eor(TYPE a, TYPE b)
+  static TYPE
+  eor(TYPE a, TYPE b)
   {
     return vreinterpret<TYPE>(veor(vmask(a), vmask(b)));
   }
-  static TYPE orr(TYPE a, TYPE b)
+  static TYPE
+  orr(TYPE a, TYPE b)
   {
     return vreinterpret<TYPE>(vorr(vmask(a), vmask(b)));
   }
-  static TYPE other(TYPE a, TYPE b, TYPE c)
+  static TYPE
+  other(TYPE a, TYPE b, TYPE c)
   {
     return vreinterpret<TYPE>(vbsl(vceq(a, b), vmask(c), vmask(b)));
   }
-  static void finalp(TYPE *links, int cnt)
+  static void
+  finalp(TYPE *links, int cnt)
   {
     auto beta = vunsigned(vdup<TYPE>(std::nearbyint(0.5 * FACTOR)));
     TYPE mags[cnt];
@@ -266,17 +300,21 @@ struct OffsetMinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR>
       signs = eor(signs, links[i]);
 
     for (int i = 0; i < cnt; ++i)
-      links[i] = sign(other(mags[i], mins[0], mins[1]), orr(eor(signs, links[i]), vdup<TYPE>(127)));
+      links[i] = sign(other(mags[i], mins[0], mins[1]),
+                      orr(eor(signs, links[i]), vdup<TYPE>(127)));
   }
-  static TYPE add(TYPE a, TYPE b)
+  static TYPE
+  add(TYPE a, TYPE b)
   {
     return vqadd(a, b);
   }
-  static TYPE sub(TYPE a, TYPE b)
+  static TYPE
+  sub(TYPE a, TYPE b)
   {
     return vqsub(a, b);
   }
-  static bool bad(TYPE v, int blocks)
+  static bool
+  bad(TYPE v, int blocks)
   {
     auto tmp = vcgtz(v);
     for (int i = 0; i < blocks; ++i)
@@ -284,7 +322,8 @@ struct OffsetMinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR>
         return true;
     return false;
   }
-  static void update(TYPE *a, TYPE b)
+  static void
+  update(TYPE *a, TYPE b)
   {
     UPDATE::update(a, vmin(vmax(b, vdup<TYPE>(-32)), vdup<TYPE>(31)));
   }
@@ -292,22 +331,25 @@ struct OffsetMinSumAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR>
 
 
 template <typename VALUE, int WIDTH, typename UPDATE, int FACTOR>
-struct MinSumCAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR>
-{
+struct MinSumCAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR> {
   typedef SIMD<VALUE, WIDTH> TYPE;
-  static TYPE zero()
+  static TYPE
+  zero()
   {
     return vzero<TYPE>();
   }
-  static TYPE one()
+  static TYPE
+  one()
   {
     return vdup<TYPE>(1);
   }
-  static TYPE sign(TYPE a, TYPE b)
+  static TYPE
+  sign(TYPE a, TYPE b)
   {
     return vsign(a, b);
   }
-  static TYPE correction_factor(TYPE a, TYPE b)
+  static TYPE
+  correction_factor(TYPE a, TYPE b)
   {
     TYPE apb = vabs(vadd(a, b));
     TYPE apb2 = vadd(apb, apb);
@@ -320,29 +362,34 @@ struct MinSumCAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR>
     nc = vand(nc, vand(vcgt(factor2, amb), vcgt(apb, amb2)));
     return vreinterpret<TYPE>(vorr(pc, nc));
   }
-  static TYPE minc(TYPE a, TYPE b)
+  static TYPE
+  minc(TYPE a, TYPE b)
   {
     TYPE m = vmin(vabs(a), vabs(b));
     TYPE x = vsign(vsign(m, a), b);
     x = vadd(x, correction_factor(a, b));
     return x;
   }
-  static void finalp(TYPE *links, int cnt)
+  static void
+  finalp(TYPE *links, int cnt)
   {
     TYPE tmp[cnt];
     CODE::exclusive_reduce(links, tmp, cnt, minc);
     for (int i = 0; i < cnt; ++i)
       links[i] = tmp[i];
   }
-  static TYPE add(TYPE a, TYPE b)
+  static TYPE
+  add(TYPE a, TYPE b)
   {
     return vadd(a, b);
   }
-  static TYPE sub(TYPE a, TYPE b)
+  static TYPE
+  sub(TYPE a, TYPE b)
   {
     return vsub(a, b);
   }
-  static bool bad(TYPE v, int blocks)
+  static bool
+  bad(TYPE v, int blocks)
   {
     auto tmp = vcgtz(v);
     for (int i = 0; i < blocks; ++i)
@@ -350,30 +397,34 @@ struct MinSumCAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR>
         return true;
     return false;
   }
-  static void update(TYPE *a, TYPE b)
+  static void
+  update(TYPE *a, TYPE b)
   {
     UPDATE::update(a, b);
   }
 };
 
 template <int WIDTH, typename UPDATE, int FACTOR>
-struct MinSumCAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR>
-{
+struct MinSumCAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR> {
   typedef int8_t VALUE;
   typedef SIMD<VALUE, WIDTH> TYPE;
-  static TYPE zero()
+  static TYPE
+  zero()
   {
     return vzero<TYPE>();
   }
-  static TYPE one()
+  static TYPE
+  one()
   {
     return vdup<TYPE>(1);
   }
-  static TYPE sign(TYPE a, TYPE b)
+  static TYPE
+  sign(TYPE a, TYPE b)
   {
     return vsign(a, b);
   }
-  static TYPE correction_factor(TYPE a, TYPE b)
+  static TYPE
+  correction_factor(TYPE a, TYPE b)
   {
     TYPE apb = vqabs(vqadd(a, b));
     TYPE apb2 = vqadd(apb, apb);
@@ -386,29 +437,34 @@ struct MinSumCAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR>
     nc = vand(nc, vand(vcgt(factor2, amb), vcgt(apb, amb2)));
     return vreinterpret<TYPE>(vorr(pc, nc));
   }
-  static TYPE minc(TYPE a, TYPE b)
+  static TYPE
+  minc(TYPE a, TYPE b)
   {
     TYPE m = vmin(vqabs(a), vqabs(b));
     TYPE x = vsign(vsign(m, a), b);
     x = vqadd(x, correction_factor(a, b));
     return x;
   }
-  static void finalp(TYPE *links, int cnt)
+  static void
+  finalp(TYPE *links, int cnt)
   {
     TYPE tmp[cnt];
     CODE::exclusive_reduce(links, tmp, cnt, minc);
     for (int i = 0; i < cnt; ++i)
       links[i] = tmp[i];
   }
-  static TYPE add(TYPE a, TYPE b)
+  static TYPE
+  add(TYPE a, TYPE b)
   {
     return vqadd(a, b);
   }
-  static TYPE sub(TYPE a, TYPE b)
+  static TYPE
+  sub(TYPE a, TYPE b)
   {
     return vqsub(a, b);
   }
-  static bool bad(TYPE v, int blocks)
+  static bool
+  bad(TYPE v, int blocks)
   {
     auto tmp = vcgtz(v);
     for (int i = 0; i < blocks; ++i)
@@ -416,7 +472,8 @@ struct MinSumCAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR>
         return true;
     return false;
   }
-  static void update(TYPE *a, TYPE b)
+  static void
+  update(TYPE *a, TYPE b)
   {
     UPDATE::update(a, vmin(vmax(b, vdup<TYPE>(-32)), vdup<TYPE>(31)));
   }

@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(bbdescrambler_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(f6edef50e4f27630942ebe9e284d0186)                     */
+/* BINDTOOL_HEADER_FILE_HASH(7ba9ac3742bd15cfe26cf82948708d13)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -27,35 +27,26 @@ namespace py = pybind11;
 // pydoc.h is automatically generated in the build directory
 #include <bbdescrambler_bb_pydoc.h>
 
-void bind_bbdescrambler_bb(py::module& m)
+void
+bind_bbdescrambler_bb(py::module &m)
 {
 
-    using bbdescrambler_bb    = ::gr::dvbs2rx::bbdescrambler_bb;
+  using bbdescrambler_bb = ::gr::dvbs2rx::bbdescrambler_bb;
 
 
-    py::class_<bbdescrambler_bb, gr::sync_block, gr::block, gr::basic_block,
-        std::shared_ptr<bbdescrambler_bb>>(m, "bbdescrambler_bb", D(bbdescrambler_bb))
+  py::class_<bbdescrambler_bb,
+             gr::sync_block,
+             gr::block,
+             gr::basic_block,
+             std::shared_ptr<bbdescrambler_bb>>(
+      m, "bbdescrambler_bb", D(bbdescrambler_bb))
 
-        .def(py::init(&bbdescrambler_bb::make),
+      .def(py::init(&bbdescrambler_bb::make),
            py::arg("standard"),
            py::arg("framesize"),
            py::arg("rate"),
-           D(bbdescrambler_bb,make)
-        )
-        
+           D(bbdescrambler_bb, make))
 
 
-
-        ;
-
-
-
-
+      ;
 }
-
-
-
-
-
-
-

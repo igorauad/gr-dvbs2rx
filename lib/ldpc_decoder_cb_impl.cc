@@ -1,17 +1,17 @@
 /* -*- c++ -*- */
-/* 
+/*
  * Copyright 2018,2019 Ahmet Inan, Ron Economos.
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -22,12 +22,11 @@
 #include "config.h"
 #endif
 
-#include <gnuradio/io_signature.h>
 #include "ldpc_decoder_cb_impl.h"
+#include <gnuradio/io_signature.h>
 #include <stdio.h>
 #include <cmath>
 #include <iostream>
-#include <algorithm>
 
 constexpr int DVB_S2_TABLE_B1::DEG[];
 constexpr int DVB_S2_TABLE_B1::LEN[];
@@ -261,19 +260,29 @@ namespace gr {
   namespace dvbs2rx {
 
     ldpc_decoder_cb::sptr
-    ldpc_decoder_cb::make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_constellation_t constellation, dvb_outputmode_t outputmode, dvb_infomode_t infomode)
+    ldpc_decoder_cb::make(dvb_standard_t standard,
+                          dvb_framesize_t framesize,
+                          dvb_code_rate_t rate,
+                          dvb_constellation_t constellation,
+                          dvb_outputmode_t outputmode,
+                          dvb_infomode_t infomode)
     {
-      return gnuradio::get_initial_sptr
-        (new ldpc_decoder_cb_impl(standard, framesize, rate, constellation, outputmode, infomode));
+      return gnuradio::get_initial_sptr(new ldpc_decoder_cb_impl(
+          standard, framesize, rate, constellation, outputmode, infomode));
     }
 
     /*
      * The private constructor
      */
-    ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate, dvb_constellation_t constellation, dvb_outputmode_t outputmode, dvb_infomode_t infomode)
-      : gr::block("ldpc_decoder_cb",
-              gr::io_signature::make(1, 1, sizeof(gr_complex)),
-              gr::io_signature::make(1, 1, sizeof(unsigned char)))
+    ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
+                                               dvb_framesize_t framesize,
+                                               dvb_code_rate_t rate,
+                                               dvb_constellation_t constellation,
+                                               dvb_outputmode_t outputmode,
+                                               dvb_infomode_t infomode)
+        : gr::block("ldpc_decoder_cb",
+                    gr::io_signature::make(1, 1, sizeof(gr_complex)),
+                    gr::io_signature::make(1, 1, sizeof(unsigned char)))
     {
       unsigned int rows;
       if (framesize == FECFRAME_NORMAL) {
@@ -577,7 +586,8 @@ namespace gr {
             rowaddr2 = 0;
           }
           /* 102 */
-          else if (rate == C25_36 || rate == C13_18 || rate == C7_15 || rate == C8_15 || rate == C26_45) {
+          else if (rate == C25_36 || rate == C13_18 || rate == C7_15 || rate == C8_15 ||
+                   rate == C26_45) {
             rowaddr0 = rows;
             rowaddr1 = 0;
             rowaddr2 = rows * 2;
@@ -614,7 +624,8 @@ namespace gr {
       dint = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
       tempu = new int8_t[ldpc->code_len()];
       tempv = new int8_t[ldpc->code_len()];
-      aligned_buffer = aligned_alloc(sizeof(simd_type), sizeof(simd_type) * ldpc->code_len());
+      aligned_buffer =
+          aligned_alloc(sizeof(simd_type), sizeof(simd_type) * ldpc->code_len());
       decode.init(ldpc);
       generate_interleave_lookup();
       generate_deinterleave_lookup();
@@ -641,7 +652,8 @@ namespace gr {
     }
 
     inline void
-    ldpc_decoder_cb_impl::twist_interleave_columns(int* tempv, int* tempu, int rows, int mod, const int *twist)
+    ldpc_decoder_cb_impl::twist_interleave_columns(
+        int *tempv, int *tempu, int rows, int mod, const int *twist)
     {
       int index = 0, offset;
 
@@ -658,7 +670,8 @@ namespace gr {
     }
 
     inline void
-    ldpc_decoder_cb_impl::twist_deinterleave_columns(int* tempv, int* tempu, int rows, int mod, const int *twist)
+    ldpc_decoder_cb_impl::twist_deinterleave_columns(
+        int *tempv, int *tempu, int rows, int mod, const int *twist)
     {
       int index = 0, offset;
 
@@ -686,7 +699,7 @@ namespace gr {
       const int *in = &interleave_lookup_table[0];
       const int MOD_BITS = mod->bits();
 
-      for(int i = 0; i < FRAME_SIZE_NORMAL; i++) {
+      for (int i = 0; i < FRAME_SIZE_NORMAL; i++) {
         interleave_lookup_table[i] = i;
       }
       switch (signal_constellation) {
@@ -838,7 +851,7 @@ namespace gr {
       const int *in = &deinterleave_lookup_table[0];
       const int MOD_BITS = mod->bits();
 
-      for(int i = 0; i < FRAME_SIZE_NORMAL; i++) {
+      for (int i = 0; i < FRAME_SIZE_NORMAL; i++) {
         deinterleave_lookup_table[i] = i;
       }
       switch (signal_constellation) {
@@ -989,7 +1002,8 @@ namespace gr {
     }
 
     void
-    ldpc_decoder_cb_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
+    ldpc_decoder_cb_impl::forecast(int noutput_items,
+                                   gr_vector_int &ninput_items_required)
     {
       if (output_mode == OM_MESSAGE) {
         ninput_items_required[0] = (noutput_items / nbch) * (frame_size / mod->bits());
@@ -1000,10 +1014,10 @@ namespace gr {
     }
 
     int
-    ldpc_decoder_cb_impl::general_work (int noutput_items,
-                       gr_vector_int &ninput_items,
-                       gr_vector_const_void_star &input_items,
-                       gr_vector_void_star &output_items)
+    ldpc_decoder_cb_impl::general_work(int noutput_items,
+                                       gr_vector_int &ninput_items,
+                                       gr_vector_const_void_star &input_items,
+                                       gr_vector_void_star &output_items)
     {
       const gr_complex *in = (const gr_complex *) input_items[0];
       const gr_complex *insnr = (const gr_complex *) input_items[0];
@@ -1052,7 +1066,8 @@ namespace gr {
                 if (code_rate == C1_3 || code_rate == C2_5) {
                   for (unsigned int t = 0; t < q_val; t++) {
                     for (int s = 0; s < 360; s++) {
-                      dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = soft[(nbch + (360 * t) + s) + (blk * CODE_LEN)];
+                      dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
+                          soft[(nbch + (360 * t) + s) + (blk * CODE_LEN)];
                     }
                   }
                   for (unsigned int k = 0; k < nbch; k++) {
@@ -1110,7 +1125,8 @@ namespace gr {
               }
               for (unsigned int t = 0; t < q_val; t++) {
                 for (int s = 0; s < 360; s++) {
-                  dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempv[(nbch + (360 * t) + s)];
+                  dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
+                      tempv[(nbch + (360 * t) + s)];
                 }
               }
               for (unsigned int k = 0; k < nbch; k++) {
@@ -1147,7 +1163,8 @@ namespace gr {
               }
               for (unsigned int t = 0; t < q_val; t++) {
                 for (int s = 0; s < 360; s++) {
-                  dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempv[(nbch + (360 * t) + s)];
+                  dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
+                      tempv[(nbch + (360 * t) + s)];
                 }
               }
               for (unsigned int k = 0; k < nbch; k++) {
@@ -1182,7 +1199,8 @@ namespace gr {
                 }
                 for (unsigned int t = 0; t < q_val; t++) {
                   for (int s = 0; s < 360; s++) {
-                    dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempv[(nbch + (360 * t) + s)];
+                    dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
+                        tempv[(nbch + (360 * t) + s)];
                   }
                 }
                 for (unsigned int k = 0; k < nbch; k++) {
@@ -1216,7 +1234,8 @@ namespace gr {
                 }
                 for (unsigned int t = 0; t < q_val; t++) {
                   for (int s = 0; s < 360; s++) {
-                    dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] = tempv[(nbch + (360 * t) + s)];
+                    dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
+                        tempv[(nbch + (360 * t) + s)];
                   }
                 }
                 for (unsigned int k = 0; k < nbch; k++) {
@@ -1245,11 +1264,17 @@ namespace gr {
         }
         if (count < 0) {
           total_trials += trials;
-          printf("frame = %d, snr = %.2f, LDPC decoder failed at converging to a code word.\n", chunk * SIZEOF_SIMD, snr);
+          printf("frame = %d, snr = %.2f, LDPC decoder failed at converging to a code "
+                 "word.\n",
+                 chunk * SIZEOF_SIMD,
+                 snr);
         }
         else {
           total_trials += (trials - count);
-          printf("frame = %d, snr = %.2f, max trials = %d\n", chunk * SIZEOF_SIMD, snr, trials - count);
+          printf("frame = %d, snr = %.2f, max trials = %d\n",
+                 chunk * SIZEOF_SIMD,
+                 snr,
+                 trials - count);
         }
         chunk++;
         precision_sum = 0;
@@ -1394,7 +1419,12 @@ namespace gr {
           precision_sum += FACTOR / (sigma * sigma);
           total_snr += snr;
           if (info_mode) {
-            printf("frame = %d, snr = %.2f, average max trials = %d, average snr = %.2f\n", frame, snr, total_trials / chunk, total_snr / (frame + 1));
+            printf(
+                "frame = %d, snr = %.2f, average max trials = %d, average snr = %.2f\n",
+                frame,
+                snr,
+                total_trials / chunk,
+                total_snr / (frame + 1));
           }
           insnr += frame_size / MOD_BITS;
           frame++;
@@ -1414,112 +1444,55 @@ namespace gr {
 
       // Tell runtime system how many input items we consumed on
       // each input stream.
-      consume_each (consumed);
+      consume_each(consumed);
 
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }
 
-    const int ldpc_decoder_cb_impl::twist16n[8] =
-    {
-      0, 0, 2, 4, 4, 5, 7, 7
-    };
+    const int ldpc_decoder_cb_impl::twist16n[8] = {0, 0, 2, 4, 4, 5, 7, 7};
 
-    const int ldpc_decoder_cb_impl::twist64n[12] =
-    {
-      0, 0, 2, 2, 3, 4, 4, 5, 5, 7, 8, 9
-    };
+    const int ldpc_decoder_cb_impl::twist64n[12] = {0, 0, 2, 2, 3, 4, 4, 5, 5, 7, 8, 9};
 
-    const int ldpc_decoder_cb_impl::twist256n[16] =
-    {
-      0, 2, 2, 2, 2, 3, 7, 15, 16, 20, 22, 22, 27, 27, 28, 32
-    };
+    const int ldpc_decoder_cb_impl::twist256n[16] = {
+        0, 2, 2, 2, 2, 3, 7, 15, 16, 20, 22, 22, 27, 27, 28, 32};
 
-    const int ldpc_decoder_cb_impl::twist16s[8] =
-    {
-      0, 0, 0, 1, 7, 20, 20, 21
-    };
+    const int ldpc_decoder_cb_impl::twist16s[8] = {0, 0, 0, 1, 7, 20, 20, 21};
 
-    const int ldpc_decoder_cb_impl::twist64s[12] =
-    {
-      0, 0, 0, 2, 2, 2, 3, 3, 3, 6, 7, 7
-    };
+    const int ldpc_decoder_cb_impl::twist64s[12] = {0, 0, 0, 2, 2, 2, 3, 3, 3, 6, 7, 7};
 
-    const int ldpc_decoder_cb_impl::twist256s[8] =
-    {
-      0, 0, 0, 1, 7, 20, 20, 21
-    };
+    const int ldpc_decoder_cb_impl::twist256s[8] = {0, 0, 0, 1, 7, 20, 20, 21};
 
-    const int ldpc_decoder_cb_impl::mux16[8] =
-    {
-      7, 1, 4, 2, 5, 3, 6, 0
-    };
+    const int ldpc_decoder_cb_impl::mux16[8] = {7, 1, 4, 2, 5, 3, 6, 0};
 
-    const int ldpc_decoder_cb_impl::mux64[12] =
-    {
-      11, 7, 3, 10, 6, 2, 9, 5, 1, 8, 4, 0
-    };
+    const int ldpc_decoder_cb_impl::mux64[12] = {11, 7, 3, 10, 6, 2, 9, 5, 1, 8, 4, 0};
 
-    const int ldpc_decoder_cb_impl::mux256[16] =
-    {
-      15, 1, 13, 3, 8, 11, 9, 5, 10, 6, 4, 7, 12, 2, 14, 0
-    };
+    const int ldpc_decoder_cb_impl::mux256[16] = {
+        15, 1, 13, 3, 8, 11, 9, 5, 10, 6, 4, 7, 12, 2, 14, 0};
 
-    const int ldpc_decoder_cb_impl::mux16_35[8] =
-    {
-      0, 5, 1, 2, 4, 7, 3, 6
-    };
+    const int ldpc_decoder_cb_impl::mux16_35[8] = {0, 5, 1, 2, 4, 7, 3, 6};
 
-    const int ldpc_decoder_cb_impl::mux16_13[8] =
-    {
-      6, 0, 3, 4, 5, 2, 1, 7
-    };
+    const int ldpc_decoder_cb_impl::mux16_13[8] = {6, 0, 3, 4, 5, 2, 1, 7};
 
-    const int ldpc_decoder_cb_impl::mux16_25[8] =
-    {
-      7, 5, 4, 0, 3, 1, 2, 6
-    };
+    const int ldpc_decoder_cb_impl::mux16_25[8] = {7, 5, 4, 0, 3, 1, 2, 6};
 
-    const int ldpc_decoder_cb_impl::mux64_35[12] =
-    {
-      2, 7, 6, 9, 0, 3, 1, 8, 4, 11, 5, 10
-    };
+    const int ldpc_decoder_cb_impl::mux64_35[12] = {2, 7, 6, 9, 0, 3, 1, 8, 4, 11, 5, 10};
 
-    const int ldpc_decoder_cb_impl::mux64_13[12] =
-    {
-      4, 2, 0, 5, 6, 1, 3, 7, 8, 9, 10, 11
-    };
+    const int ldpc_decoder_cb_impl::mux64_13[12] = {4, 2, 0, 5, 6, 1, 3, 7, 8, 9, 10, 11};
 
-    const int ldpc_decoder_cb_impl::mux64_25[12] =
-    {
-      4, 0, 1, 6, 2, 3, 5, 8, 7, 10, 9, 11
-    };
+    const int ldpc_decoder_cb_impl::mux64_25[12] = {4, 0, 1, 6, 2, 3, 5, 8, 7, 10, 9, 11};
 
-    const int ldpc_decoder_cb_impl::mux256_35[16] =
-    {
-      2, 11, 3, 4, 0, 9, 1, 8, 10, 13, 7, 14, 6, 15, 5, 12
-    };
+    const int ldpc_decoder_cb_impl::mux256_35[16] = {
+        2, 11, 3, 4, 0, 9, 1, 8, 10, 13, 7, 14, 6, 15, 5, 12};
 
-    const int ldpc_decoder_cb_impl::mux256_23[16] =
-    {
-      7, 2, 9, 0, 4, 6, 13, 3, 14, 10, 15, 5, 8, 12, 11, 1
-    };
+    const int ldpc_decoder_cb_impl::mux256_23[16] = {
+        7, 2, 9, 0, 4, 6, 13, 3, 14, 10, 15, 5, 8, 12, 11, 1};
 
-    const int ldpc_decoder_cb_impl::mux256s[8] =
-    {
-      7, 3, 1, 5, 2, 6, 4, 0
-    };
+    const int ldpc_decoder_cb_impl::mux256s[8] = {7, 3, 1, 5, 2, 6, 4, 0};
 
-    const int ldpc_decoder_cb_impl::mux256s_13[8] =
-    {
-      4, 0, 1, 2, 5, 3, 6, 7
-    };
+    const int ldpc_decoder_cb_impl::mux256s_13[8] = {4, 0, 1, 2, 5, 3, 6, 7};
 
-    const int ldpc_decoder_cb_impl::mux256s_25[8] =
-    {
-      4, 0, 5, 1, 2, 3, 6, 7
-    };
+    const int ldpc_decoder_cb_impl::mux256s_25[8] = {4, 0, 5, 1, 2, 3, 6, 7};
 
   } /* namespace dvbs2rx */
 } /* namespace gr */
-

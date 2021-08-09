@@ -1,17 +1,17 @@
 /* -*- c++ -*- */
-/* 
+/*
  * Copyright 2018,2019 Ahmet Inan, Ron Economos.
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -21,8 +21,8 @@
 #ifndef LAYERED_DECODER_HH
 #define LAYERED_DECODER_HH
 
-#include <stdlib.h>
 #include "ldpc.hh"
+#include <stdlib.h>
 
 template <typename TYPE, typename ALG>
 class LDPCDecoder
@@ -34,62 +34,67 @@ class LDPCDecoder
   int M, N, K, R, q, CNL, LT;
   bool initialized;
 
-  void reset()
+  void
+  reset()
   {
     for (int i = 0; i < LT; ++i)
       bnl[i] = alg.zero();
   }
-  bool bad(TYPE *data, TYPE *parity, int blocks)
+  bool
+  bad(TYPE *data, TYPE *parity, int blocks)
   {
     for (int i = 0; i < q; ++i) {
       int cnt = cnc[i];
       for (int j = 0; j < M; ++j) {
-        TYPE cnv = alg.sign(alg.one(), parity[M*i+j]);
+        TYPE cnv = alg.sign(alg.one(), parity[M * i + j]);
         if (i)
-          cnv = alg.sign(cnv, parity[M*(i-1)+j]);
+          cnv = alg.sign(cnv, parity[M * (i - 1) + j]);
         else if (j)
-          cnv = alg.sign(cnv, parity[j+(q-1)*M-1]);
+          cnv = alg.sign(cnv, parity[j + (q - 1) * M - 1]);
         for (int c = 0; c < cnt; ++c)
-          cnv = alg.sign(cnv, data[pos[CNL*(M*i+j)+c]]);
+          cnv = alg.sign(cnv, data[pos[CNL * (M * i + j) + c]]);
         if (alg.bad(cnv, blocks))
           return true;
       }
     }
     return false;
   }
-  void update(TYPE *data, TYPE *parity)
+  void
+  update(TYPE *data, TYPE *parity)
   {
     TYPE *bl = bnl;
     for (int i = 0; i < q; ++i) {
       int cnt = cnc[i];
       for (int j = 0; j < M; ++j) {
-        int deg = cnt + 2 - !(i|j);
+        int deg = cnt + 2 - !(i | j);
         TYPE inp[deg], out[deg];
         for (int c = 0; c < cnt; ++c)
-          inp[c] = out[c] = alg.sub(data[pos[CNL*(M*i+j)+c]], bl[c]);
-        inp[cnt] = out[cnt] = alg.sub(parity[M*i+j], bl[cnt]);
+          inp[c] = out[c] = alg.sub(data[pos[CNL * (M * i + j) + c]], bl[c]);
+        inp[cnt] = out[cnt] = alg.sub(parity[M * i + j], bl[cnt]);
         if (i)
-          inp[cnt+1] = out[cnt+1] = alg.sub(parity[M*(i-1)+j], bl[cnt+1]);
+          inp[cnt + 1] = out[cnt + 1] = alg.sub(parity[M * (i - 1) + j], bl[cnt + 1]);
         else if (j)
-          inp[cnt+1] = out[cnt+1] = alg.sub(parity[j+(q-1)*M-1], bl[cnt+1]);
+          inp[cnt + 1] = out[cnt + 1] = alg.sub(parity[j + (q - 1) * M - 1], bl[cnt + 1]);
         alg.finalp(out, deg);
         for (int c = 0; c < cnt; ++c)
-          data[pos[CNL*(M*i+j)+c]] = alg.add(inp[c], out[c]);
-        parity[M*i+j] = alg.add(inp[cnt], out[cnt]);
+          data[pos[CNL * (M * i + j) + c]] = alg.add(inp[c], out[c]);
+        parity[M * i + j] = alg.add(inp[cnt], out[cnt]);
         if (i)
-          parity[M*(i-1)+j] = alg.add(inp[cnt+1], out[cnt+1]);
+          parity[M * (i - 1) + j] = alg.add(inp[cnt + 1], out[cnt + 1]);
         else if (j)
-          parity[j+(q-1)*M-1] = alg.add(inp[cnt+1], out[cnt+1]);
+          parity[j + (q - 1) * M - 1] = alg.add(inp[cnt + 1], out[cnt + 1]);
         for (int d = 0; d < deg; ++d)
           alg.update(bl++, out[d]);
       }
     }
   }
-public:
+
+  public:
   LDPCDecoder() : initialized(false)
   {
   }
-  void init(LDPCInterface *it)
+  void
+  init(LDPCInterface *it)
   {
     if (initialized) {
       free(bnl);
@@ -115,7 +120,7 @@ public:
       int bit_deg = ldpc->bit_deg();
       for (int n = 0; n < bit_deg; ++n) {
         int i = acc_pos[n];
-        pos[CNL*i+cnc[i]++] = j;
+        pos[CNL * i + cnc[i]++] = j;
       }
       ldpc->next_bit();
     }
@@ -127,21 +132,22 @@ public:
     for (int i = 0; i < q; ++i)
       for (int j = 0; j < M; ++j)
         for (int c = 0; c < CNL; ++c)
-          tmp[CNL*(M*i+j)+c] = pos[CNL*(q*j+i)+c];
+          tmp[CNL * (M * i + j) + c] = pos[CNL * (q * j + i) + c];
     delete[] pos;
     pos = tmp;
   }
-  int operator()(TYPE *data, TYPE *parity, int trials = 25, int blocks = 1)
+  int
+  operator()(TYPE *data, TYPE *parity, int trials = 25, int blocks = 1)
   {
     reset();
     for (int i = 0; i < q; ++i)
       for (int j = 0; j < M; ++j)
-        pty[M*i+j] = parity[q*j+i];
+        pty[M * i + j] = parity[q * j + i];
     while (bad(data, pty, blocks) && --trials >= 0)
       update(data, pty);
     for (int i = 0; i < q; ++i)
       for (int j = 0; j < M; ++j)
-        parity[q*j+i] = pty[M*i+j];
+        parity[q * j + i] = pty[M * i + j];
     return trials;
   }
   ~LDPCDecoder()

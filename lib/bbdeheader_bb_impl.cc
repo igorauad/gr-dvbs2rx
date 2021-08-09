@@ -1,17 +1,17 @@
 /* -*- c++ -*- */
-/* 
+/*
  * Copyright 2018 Ron Economos.
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -22,8 +22,8 @@
 #include "config.h"
 #endif
 
-#include <gnuradio/io_signature.h>
 #include "bbdeheader_bb_impl.h"
+#include <gnuradio/io_signature.h>
 #include <stdio.h>
 
 #define TRANSPORT_PACKET_LENGTH 188
@@ -33,19 +33,23 @@ namespace gr {
   namespace dvbs2rx {
 
     bbdeheader_bb::sptr
-    bbdeheader_bb::make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate)
+    bbdeheader_bb::make(dvb_standard_t standard,
+                        dvb_framesize_t framesize,
+                        dvb_code_rate_t rate)
     {
-      return gnuradio::get_initial_sptr
-        (new bbdeheader_bb_impl(standard, framesize, rate));
+      return gnuradio::get_initial_sptr(
+          new bbdeheader_bb_impl(standard, framesize, rate));
     }
 
     /*
      * The private constructor
      */
-    bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate)
-      : gr::block("bbdeheader_bb",
-              gr::io_signature::make(1, 1, sizeof(unsigned char)),
-              gr::io_signature::make(1, 1, sizeof(unsigned char)))
+    bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
+                                           dvb_framesize_t framesize,
+                                           dvb_code_rate_t rate)
+        : gr::block("bbdeheader_bb",
+                    gr::io_signature::make(1, 1, sizeof(unsigned char)),
+                    gr::io_signature::make(1, 1, sizeof(unsigned char)))
     {
       if (framesize == FECFRAME_NORMAL) {
         switch (rate) {
@@ -313,17 +317,17 @@ namespace gr {
     }
 
     void
-    bbdeheader_bb_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
+    bbdeheader_bb_impl::forecast(int noutput_items, gr_vector_int &ninput_items_required)
     {
       unsigned int n_bbframes = noutput_items / (max_dfl / 8);
       ninput_items_required[0] = n_bbframes * kbch;
     }
 
     int
-    bbdeheader_bb_impl::general_work (int noutput_items,
-                       gr_vector_int &ninput_items,
-                       gr_vector_const_void_star &input_items,
-                       gr_vector_void_star &output_items)
+    bbdeheader_bb_impl::general_work(int noutput_items,
+                                     gr_vector_int &ninput_items,
+                                     gr_vector_const_void_star &input_items,
+                                     gr_vector_void_star &output_items)
     {
       const unsigned char *in = (const unsigned char *) input_items[0];
       unsigned char *out = (unsigned char *) output_items[0];
@@ -470,7 +474,7 @@ namespace gr {
               }
               count++;
               if (check == TRUE) {
-                if (distance != (unsigned int)h->syncd) {
+                if (distance != (unsigned int) h->syncd) {
                   synched = FALSE;
                 }
                 check = FALSE;
@@ -541,7 +545,7 @@ namespace gr {
               }
               count++;
               if (check == TRUE) {
-                if (distance != (unsigned int)h->syncd) {
+                if (distance != (unsigned int) h->syncd) {
                   synched = FALSE;
                 }
                 check = FALSE;
@@ -591,4 +595,3 @@ namespace gr {
 
   } /* namespace dvbs2rx */
 } /* namespace gr */
-
