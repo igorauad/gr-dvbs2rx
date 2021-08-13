@@ -43,9 +43,8 @@ void bind_plsync_cc(py::module& m)
              py::arg("debug_level"),
              D(plsync_cc, make))
 
-        .def("get_freq_offset",
-             &plsync_cc::get_freq_offset,
-             D(plsync_cc, get_freq_offset))
+        .def(
+            "get_freq_offset", &plsync_cc::get_freq_offset, D(plsync_cc, get_freq_offset))
 
         ;
 }
