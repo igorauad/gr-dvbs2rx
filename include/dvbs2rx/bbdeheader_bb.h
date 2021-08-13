@@ -28,31 +28,31 @@
 #include <dvbs2rx/dvbt2_config.h>
 
 namespace gr {
-  namespace dvbs2rx {
+namespace dvbs2rx {
+
+/*!
+ * \brief <+description of block+>
+ * \ingroup dvbs2rx
+ *
+ */
+class DVBS2RX_API bbdeheader_bb : virtual public gr::block
+{
+public:
+    typedef std::shared_ptr<bbdeheader_bb> sptr;
 
     /*!
-     * \brief <+description of block+>
-     * \ingroup dvbs2rx
+     * \brief Return a shared_ptr to a new instance of dvbs2rx::bbdeheader_bb.
      *
+     * To avoid accidental use of raw pointers, dvbs2rx::bbdeheader_bb's
+     * constructor is in a private implementation
+     * class. dvbs2rx::bbdeheader_bb::make is the public interface for
+     * creating new instances.
      */
-    class DVBS2RX_API bbdeheader_bb : virtual public gr::block
-    {
-  public:
-      typedef std::shared_ptr<bbdeheader_bb> sptr;
+    static sptr
+    make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate);
+};
 
-      /*!
-       * \brief Return a shared_ptr to a new instance of dvbs2rx::bbdeheader_bb.
-       *
-       * To avoid accidental use of raw pointers, dvbs2rx::bbdeheader_bb's
-       * constructor is in a private implementation
-       * class. dvbs2rx::bbdeheader_bb::make is the public interface for
-       * creating new instances.
-       */
-      static sptr
-      make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate);
-    };
-
-  } // namespace dvbs2rx
+} // namespace dvbs2rx
 } // namespace gr
 
 #endif /* INCLUDED_DVBS2RX_BBDEHEADER_BB_H */

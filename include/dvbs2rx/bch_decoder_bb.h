@@ -27,34 +27,33 @@
 #include <dvbs2rx/dvb_config.h>
 
 namespace gr {
-  namespace dvbs2rx {
+namespace dvbs2rx {
+
+/*!
+ * \brief <+description of block+>
+ * \ingroup dvbs2rx
+ *
+ */
+class DVBS2RX_API bch_decoder_bb : virtual public gr::block
+{
+public:
+    typedef std::shared_ptr<bch_decoder_bb> sptr;
 
     /*!
-     * \brief <+description of block+>
-     * \ingroup dvbs2rx
+     * \brief Return a shared_ptr to a new instance of dvbs2rx::bch_decoder_bb.
      *
+     * To avoid accidental use of raw pointers, dvbs2rx::bch_decoder_bb's
+     * constructor is in a private implementation
+     * class. dvbs2rx::bch_decoder_bb::make is the public interface for
+     * creating new instances.
      */
-    class DVBS2RX_API bch_decoder_bb : virtual public gr::block
-    {
-  public:
-      typedef std::shared_ptr<bch_decoder_bb> sptr;
+    static sptr make(dvb_standard_t standard,
+                     dvb_framesize_t framesize,
+                     dvb_code_rate_t rate,
+                     dvb_outputmode_t outputmode);
+};
 
-      /*!
-       * \brief Return a shared_ptr to a new instance of dvbs2rx::bch_decoder_bb.
-       *
-       * To avoid accidental use of raw pointers, dvbs2rx::bch_decoder_bb's
-       * constructor is in a private implementation
-       * class. dvbs2rx::bch_decoder_bb::make is the public interface for
-       * creating new instances.
-       */
-      static sptr
-      make(dvb_standard_t standard,
-           dvb_framesize_t framesize,
-           dvb_code_rate_t rate,
-           dvb_outputmode_t outputmode);
-    };
-
-  } // namespace dvbs2rx
+} // namespace dvbs2rx
 } // namespace gr
 
 #endif /* INCLUDED_DVBS2RX_BCH_DECODER_BB_H */

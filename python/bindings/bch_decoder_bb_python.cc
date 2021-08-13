@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(bch_decoder_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(be94ac11d943a5d0f1466b8a28af555b)                     */
+/* BINDTOOL_HEADER_FILE_HASH(8eb0e6b8d53b4e01df6462c78386269e)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -27,23 +27,24 @@ namespace py = pybind11;
 // pydoc.h is automatically generated in the build directory
 #include <bch_decoder_bb_pydoc.h>
 
-void
-bind_bch_decoder_bb(py::module &m)
+void bind_bch_decoder_bb(py::module& m)
 {
 
-  using bch_decoder_bb = ::gr::dvbs2rx::bch_decoder_bb;
+    using bch_decoder_bb = ::gr::dvbs2rx::bch_decoder_bb;
 
 
-  py::class_<bch_decoder_bb, gr::block, gr::basic_block, std::shared_ptr<bch_decoder_bb>>(
-      m, "bch_decoder_bb", D(bch_decoder_bb))
+    py::class_<bch_decoder_bb,
+               gr::block,
+               gr::basic_block,
+               std::shared_ptr<bch_decoder_bb>>(m, "bch_decoder_bb", D(bch_decoder_bb))
 
-      .def(py::init(&bch_decoder_bb::make),
-           py::arg("standard"),
-           py::arg("framesize"),
-           py::arg("rate"),
-           py::arg("outputmode"),
-           D(bch_decoder_bb, make))
+        .def(py::init(&bch_decoder_bb::make),
+             py::arg("standard"),
+             py::arg("framesize"),
+             py::arg("rate"),
+             py::arg("outputmode"),
+             D(bch_decoder_bb, make))
 
 
-      ;
+        ;
 }

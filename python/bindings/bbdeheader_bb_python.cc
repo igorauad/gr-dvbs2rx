@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(bbdeheader_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(ca74b678a465842cd954ed15bdf88491)                     */
+/* BINDTOOL_HEADER_FILE_HASH(5f52a0db35bfb44b36c44f9554ed54fa)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -27,22 +27,21 @@ namespace py = pybind11;
 // pydoc.h is automatically generated in the build directory
 #include <bbdeheader_bb_pydoc.h>
 
-void
-bind_bbdeheader_bb(py::module &m)
+void bind_bbdeheader_bb(py::module& m)
 {
 
-  using bbdeheader_bb = ::gr::dvbs2rx::bbdeheader_bb;
+    using bbdeheader_bb = ::gr::dvbs2rx::bbdeheader_bb;
 
 
-  py::class_<bbdeheader_bb, gr::block, gr::basic_block, std::shared_ptr<bbdeheader_bb>>(
-      m, "bbdeheader_bb", D(bbdeheader_bb))
+    py::class_<bbdeheader_bb, gr::block, gr::basic_block, std::shared_ptr<bbdeheader_bb>>(
+        m, "bbdeheader_bb", D(bbdeheader_bb))
 
-      .def(py::init(&bbdeheader_bb::make),
-           py::arg("standard"),
-           py::arg("framesize"),
-           py::arg("rate"),
-           D(bbdeheader_bb, make))
+        .def(py::init(&bbdeheader_bb::make),
+             py::arg("standard"),
+             py::arg("framesize"),
+             py::arg("rate"),
+             D(bbdeheader_bb, make))
 
 
-      ;
+        ;
 }

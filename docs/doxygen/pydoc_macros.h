@@ -13,7 +13,7 @@
 #define __DOC5(n1, n2, n3, n4, n5) __doc_##n1##_##n2##_##n3##_##n4##_##n5
 #define __DOC6(n1, n2, n3, n4, n5, n6) __doc_##n1##_##n2##_##n3##_##n4##_##n5##_##n6
 #define __DOC7(n1, n2, n3, n4, n5, n6, n7) \
-  __doc_##n1##_##n2##_##n3##_##n4##_##n5##_##n6##_##n7
+    __doc_##n1##_##n2##_##n3##_##n4##_##n5##_##n6##_##n7
 #define DOC(...) __EXPAND(__EXPAND(__CAT2(__DOC, __VA_SIZE(__VA_ARGS__)))(__VA_ARGS__))
 
 #endif // PYDOC_MACROS_H

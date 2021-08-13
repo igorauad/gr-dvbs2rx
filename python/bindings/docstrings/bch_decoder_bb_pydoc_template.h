@@ -15,10 +15,10 @@
  */
 
 
-static const char *__doc_gr_dvbs2rx_bch_decoder_bb = R"doc()doc";
+static const char* __doc_gr_dvbs2rx_bch_decoder_bb = R"doc()doc";
 
 
-static const char *__doc_gr_dvbs2rx_bch_decoder_bb_bch_decoder_bb = R"doc()doc";
+static const char* __doc_gr_dvbs2rx_bch_decoder_bb_bch_decoder_bb = R"doc()doc";
 
 
-static const char *__doc_gr_dvbs2rx_bch_decoder_bb_make = R"doc()doc";
+static const char* __doc_gr_dvbs2rx_bch_decoder_bb_make = R"doc()doc";
