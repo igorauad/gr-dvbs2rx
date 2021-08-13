@@ -6,18 +6,37 @@
 #include <gnuradio/gr_complex.h>
 #include <aff3ct.hpp>
 #include <pl_signaling.h>
+#include <boost/program_options.hpp>
 using namespace aff3ct;
+namespace po = boost::program_options;
 
 struct params {
-    int K = 7;               // number of information bits
-    int N = 64;              // codeword size
-    int fe = 100;            // number of frame errors
-    int n_frames = 1e7;      // max number of frames to simulate per ebn0
-    int seed = 0;            // PRNG seed for the AWGN channel
-    float ebn0_min = 0;      // minimum SNR value
-    float ebn0_max = 10.01f; // maximum SNR value
-    float ebn0_step = 1.00f; // SNR step
-    float R;                 // code rate (R=K/N)
+    int K = 7;          // number of information bits
+    int N = 64;         // codeword size
+    int fe = 100;       // number of frame errors
+    int n_frames = 1e7; // max number of frames to simulate per ebn0
+    int seed = 0;       // PRNG seed for the AWGN channel
+    float ebn0_min;     // minimum SNR value
+    float ebn0_max;     // maximum SNR value
+    float ebn0_step;    // SNR step
+    float R;            // code rate (R=K/N)
+
+    params(float ebn0_min, float ebn0_max, float ebn0_step)
+        : ebn0_min(ebn0_min), ebn0_max(ebn0_max), ebn0_step(ebn0_step)
+    {
+        R = (float)K / (float)N;
+        std::cout << "# * Simulation parameters: " << std::endl;
+        std::cout << "#    ** Frame errors   = " << fe << std::endl;
+        std::cout << "#    ** Max frames     = " << n_frames << std::endl;
+        std::cout << "#    ** Noise seed     = " << seed << std::endl;
+        std::cout << "#    ** Info. bits (K) = " << K << std::endl;
+        std::cout << "#    ** Frame size (N) = " << N << std::endl;
+        std::cout << "#    ** Code rate  (R) = " << R << std::endl;
+        std::cout << "#    ** SNR min   (dB) = " << ebn0_min << std::endl;
+        std::cout << "#    ** SNR max   (dB) = " << ebn0_max << std::endl;
+        std::cout << "#    ** SNR step  (dB) = " << ebn0_step << std::endl;
+        std::cout << "#" << std::endl;
+    };
 };
 
 struct AwgnChannel {
@@ -76,22 +95,6 @@ struct utils {
         terminal; // manage the output text on the terminal
 };
 
-void init_params(params& p)
-{
-    p.R = (float)p.K / (float)p.N;
-    std::cout << "# * Simulation parameters: " << std::endl;
-    std::cout << "#    ** Frame errors   = " << p.fe << std::endl;
-    std::cout << "#    ** Max frames     = " << p.n_frames << std::endl;
-    std::cout << "#    ** Noise seed     = " << p.seed << std::endl;
-    std::cout << "#    ** Info. bits (K) = " << p.K << std::endl;
-    std::cout << "#    ** Frame size (N) = " << p.N << std::endl;
-    std::cout << "#    ** Code rate  (R) = " << p.R << std::endl;
-    std::cout << "#    ** SNR min   (dB) = " << p.ebn0_min << std::endl;
-    std::cout << "#    ** SNR max   (dB) = " << p.ebn0_max << std::endl;
-    std::cout << "#    ** SNR step  (dB) = " << p.ebn0_step << std::endl;
-    std::cout << "#" << std::endl;
-}
-
 void init_modules(const params& p, modules& m)
 {
     m.encoder = std::unique_ptr<gr::dvbs2rx::plsc_encoder>(new gr::dvbs2rx::plsc_encoder);
@@ -127,7 +130,16 @@ void init_utils(const modules& m, utils& u)
         std::unique_ptr<tools::Terminal_std>(new tools::Terminal_std(u.reporters));
 }
 
-void plsc_loopback(modules& m, buffers& b)
+void unpack_plsc_bits(uint8_t plsc, uint8_t dec_plsc, buffers& b)
+{
+    // From a packed uint8 to a vector of ints
+    for (size_t i = 0; i < 7; i++) {
+        b.ref_bits[i] = (plsc >> i) & 1;
+        b.dec_bits[i] = (dec_plsc >> i) & 1;
+    }
+}
+
+void plsc_loopback_coherent(modules& m, buffers& b)
 {
     // Pick a random PLSC
     uint8_t plsc = rand() % 128;
@@ -145,14 +157,66 @@ void plsc_loopback(modules& m, buffers& b)
     m.decoder->decode(b.bpsk_syms.data());
 
     // Unpack the PLSC bits
-    for (size_t i = 0; i < 7; i++) {
-        b.ref_bits[i] = (plsc >> i) & 1;
-        b.dec_bits[i] = (m.decoder->dec_plsc >> i) & 1;
+    unpack_plsc_bits(plsc, m.decoder->dec_plsc, b);
+}
+
+void plsc_loopback_differential(modules& m, buffers& b)
+{
+    // Pick a random PLSC
+    uint8_t plsc = rand() % 128;
+
+    // Encode and map to pi/2 BPSK symbols
+    b.bpsk_syms[0] = (-SQRT2_2 + SQRT2_2i);          // last SOF symbol
+    m.encoder->encode(b.bpsk_syms.data() + 1, plsc); // PLSC symbols
+
+    // Add noise over the 65 symbols (the last SOF symbol and the PLSC symbols)
+    for (size_t i = 0; i < PLSC_LEN + 1; i++) {
+        b.bpsk_syms[i] += m.channel->noise();
     }
+
+    // Decode the noisy pi/2 BPSK symbols differentially
+    m.decoder->decode(b.bpsk_syms.data(), false /* non-coherent */);
+
+    // Unpack the PLSC bits
+    unpack_plsc_bits(plsc, m.decoder->dec_plsc, b);
+}
+
+int parse_opts(int ac, char* av[], po::variables_map& vm)
+{
+    try {
+        po::options_description desc("Program options");
+        desc.add_options()("help,h", "produce help message")(
+            "ebn0-min", po::value<float>()->default_value(0), "Etarting Eb/N0 in dB")(
+            "ebn0-max", po::value<float>()->default_value(10), "Ending Eb/N0 in dB")(
+            "ebn0-step", po::value<float>()->default_value(1), "Eb/N0 step in dB")(
+            "differential",
+            po::bool_switch(),
+            "try differential detection instead of coherent");
+
+        po::store(po::parse_command_line(ac, av, desc), vm);
+        po::notify(vm);
+
+        if (vm.count("help")) {
+            std::cout << desc << "\n";
+            return 0;
+        }
+    } catch (exception& e) {
+        std::cerr << "error: " << e.what() << "\n";
+        return -1;
+    } catch (...) {
+        std::cerr << "Exception of unknown type!\n";
+    }
+
+    return 1;
 }
 
 int main(int argc, char** argv)
 {
+    po::variables_map args;
+    int opt_parser_res = parse_opts(argc, argv, args);
+    if (opt_parser_res < 1)
+        return opt_parser_res;
+
     std::cout << "#----------------------------------------------------------"
               << std::endl;
     std::cout << "# PLSC decoding BER vs. SNR benchmark" << std::endl;
@@ -160,8 +224,23 @@ int main(int argc, char** argv)
               << std::endl;
     std::cout << "#" << std::endl;
 
-    params p;
-    init_params(p); // create and initialize the parameters defined by the user
+    // create and initialize the parameters defined by the user
+    params p(args["ebn0-min"].as<float>(),
+             args["ebn0-max"].as<float>(),
+             args["ebn0-step"].as<float>());
+
+    // Decide which PLSC loopback encoder-decoder wrapper to use (with coherent
+    // or differential pi/2 BPSK de-mapping)
+    void (*plsc_loopback)(modules & m, buffers & b);
+    bool differential_demapping = args["differential"].as<bool>();
+    if (differential_demapping) {
+        std::cout << "# * pi/2 BPSK de-mapping: differential\n#" << std::endl;
+        plsc_loopback = &plsc_loopback_differential;
+    } else {
+        std::cout << "# * pi/2 BPSK de-mapping: coherent\n#" << std::endl;
+        plsc_loopback = &plsc_loopback_coherent;
+    }
+
     modules m;
     init_modules(p, m); // create and initialize the modules
     buffers b;
