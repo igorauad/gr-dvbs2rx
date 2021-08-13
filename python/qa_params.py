@@ -14,7 +14,10 @@ except ImportError:
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
-    from dvbs2rx import params, dvbs2rx_python
+    try:
+        from dvbs2rx import params, dvbs2rx_python
+    except ImportError:
+        from python import params, dvbs2rx_python
 
 
 class qa_params(gr_unittest.TestCase):

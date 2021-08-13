@@ -21,7 +21,10 @@ except ImportError:
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
-    from dvbs2rx import plsync_cc
+    try:
+        from dvbs2rx import plsync_cc
+    except ImportError:
+        from python import plsync_cc
 
 SQRT2_2 = sqrt(2) / 2
 JSQRT2_2 = SQRT2_2 * 1j

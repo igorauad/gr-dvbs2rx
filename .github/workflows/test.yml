@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: igorfreire/gnuradio-oot-dev:3.9.2-ubuntu-focal
-      env:
-          PYTHONPATH: ${{github.workspace}}/build/python/bindings
     steps:
     - uses: actions/checkout@v2
     - name: Configure CMake
