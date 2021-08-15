@@ -205,32 +205,9 @@ bool freq_sync::estimate_coarse(const gr_complex* in, bool full, uint8_t plsc)
 
 float freq_sync::estimate_sof_phase(const gr_complex* in)
 {
-    // If the frequency offset is below the coarse correction threshold, assume
-    // the SOF phase will change slowly. The threshold for the normalized
-    // frequency offset is 3.3875e-4. At this level, the phase change over 26
-    // symbols is upper limited to +-0.055 degrees Hence, there is no need to
-    // de-rotate the SOF symbols before estimating the phase. On the other hand,
-    // while not coarse corrected, the SOF phase may change
-    // significantly. Hence, it is helpful to derotate the SOF symbols before
-    // attempting to estimate their initial phase.
-    const gr_complex* mod_rm_in = in;
-    if (!coarse_corrected) {
-        const float phase_inc = 2.0 * GR_M_PI * coarse_foffset;
-
-        /* De-rotate and save into the post-processed SOF buffer */
-        gr_complex phasor = gr_expj(-phase_inc);
-        gr_complex phasor_0 = gr_expj(0);
-        volk_32fc_s32fc_x2_rotator_32fc(pp_sof.data(), in, phasor, &phasor_0, SOF_LEN);
-
-        // In this case, remove the modulation from the de-rotated SOF symbols
-        // instead of the raw input SOF symbols.
-        mod_rm_in = pp_sof.data();
-    }
-
     // Remove the modulation to obtain a noisy CW. At this point, the CW should
-    // be barely rotating.
-    volk_32fc_x2_multiply_32fc(
-        pilot_mod_rm.data(), mod_rm_in, plheader_conj.data(), SOF_LEN);
+    // be barely rotating if the residual frequency offset is low enough.
+    volk_32fc_x2_multiply_32fc(pilot_mod_rm.data(), in, plheader_conj.data(), SOF_LEN);
 
     // Return the average angle of the modulation-removed CW symbols
     gr_complex ck_sum = 0;
@@ -317,7 +294,7 @@ void freq_sync::estimate_fine_pilot_mode(uint8_t n_pilot_blks)
      * The phase difference between two pilot blocks accumulates over
      * PILOT_BLK_PERIOD, namely over 1476 symbols. The phase difference between
      * the PLHEADER and the first pilot block accumulates over (PLHEADER_LEN +
-     * PILOT_BLK_INTERVAL), namely over 1530 symbols. Each phase diference
+     * PILOT_BLK_INTERVAL), namely over 1530 symbols. Each phase difference
      * divided by (2*pi*interval) gives the corresponding frequency offset
      * estimate over that interval. In total, there are n_pilot_blks
      * estimates. The arithmetic average of them is computed by summing each
@@ -338,54 +315,91 @@ void freq_sync::estimate_fine_pilot_mode(uint8_t n_pilot_blks)
     fine_est_ready = true;
 }
 
-void freq_sync::derotate_plheader(const gr_complex* in)
+void freq_sync::derotate_plheader(const gr_complex* in, bool open_loop)
 {
-    /* Frequency:
-     *
-     * The de-rotation's frequency depends on whether the frequency offset has
-     * been coarsely corrected (is sufficiently low). In the positive case, it
-     * will be based on the most recent fine frequency offset estimate, if
-     * any. When not coarsely corrected, we can still try to de-rotate the
-     * PLHEADER symbols here based on the most recent coarse frequency offset
-     * estimate.
-     *
-     * NOTE: this does not conflict with the de-rotation that is applied by an
-     * upstream rotator, because the current estimates are only going to be
-     * applied to the upstream de-rotator in the next frame, due to how the
-     * message port control mechanism works.
-     *
-     * NOTE 2: if coarse_corrected is true, that does not imply a fine frequency
-     * offset estimate is available already. Check both.
-     *
-     * Caveat: when de-rotating with the fine offset, note it does not
-     * necessarily correspond to the estimation based on the previous frame. It
-     * depends on whether the previous frame had pilots.
-     **/
-    const float phase_inc = (coarse_corrected && fine_est_ready)
-                                ? (2.0 * GR_M_PI * fine_foffset)
-                                : (2.0 * GR_M_PI * coarse_foffset);
+    if (open_loop) {
+        /* Frequency correction (open-loop mode only)
+         *
+         * The frequency correction value depends on whether the frequency offset is
+         * within the fine estimation range, as indicated by the coarse frequency offset
+         * estimate (more specifically, by the `coarse_corrected` state). In the positive
+         * case, it will be based on the most recent fine frequency offset estimate, if
+         * any. Otherwise, the correction will be based on the most recent coarse
+         * frequency offset estimate.
+         *
+         * NOTE 1: if coarse_corrected is true, that does not imply a fine frequency
+         * offset estimate is available already. Check both.
+         *
+         * NOTE 2: when de-rotating with the fine offset, note it does not necessarily
+         * correspond to the estimation based on the previous frame. It depends on whether
+         * the previous frame had pilots.
+         *
+         * NOTE 3: this frequency correction step is only applied in open-loop mode. In
+         * closed-loop, when an external block already handles the frequency corrections,
+         * it would lead to undesirable behavior.
+         *
+         * In closed-loop, when the coarse frequency offset estimation period is
+         * non-unitary, the problem is that the derotation is not required in all frames.
+         * For example, when the estimation period is 2, one frame leads to a new
+         * estimate, while the other receives the correction due to the preceding
+         * estimate, according to the architecture adopted by the PL Sync block. For
+         * instance, suppose four consecutive frames, [F0, F1, F2, F3]. After F1, a new
+         * coarse frequency offset estimate is produced and scheduled for correction at
+         * the start of F2. Hence, assuming an ideal estimate and correction, frame F2 no
+         * longer experiences the frequency offset estimated on F1. However, when
+         * processing F2, the most recent coarse frequency offset estimate is still that
+         * of F1, so the derotation would be based on F1, which would be clearly wrong. To
+         * avoid this, the de-rotation should only be applied when a new coarse frequency
+         * offset estimate is produced. In the example, it would be applied at frames F1
+         * and F3 only, but not on F0 and F2.
+         *
+         * To complicate things further, the fine offset estimations and corrections apply
+         * on different frames (with a different delay). For example, assume the same
+         * sequence of four frames, that the synchronizer is already in coarse-corrected
+         * state, and that all frames contain pilot blocks. In this case, frame F0 leads
+         * to a new fine offset estimate, but which is only applied at the start of frame
+         * F2 (two frames later). When the PLHEADER of F2 is processed, the most recent
+         * fine offset estimate will be that due to F1, but F2 receives the frequency
+         * correction due to the F0 estimate, so the derotation due to the F1 estimate
+         * does not make sense. In this case, the appropriate correction value would be
+         * "f_F1 - f_F0", i.e., the difference between the estimate due to F1 and the
+         * estimate due to F0.
+         *
+         * In both cases, further logic would be required to decide whether or not to
+         * apply derotation here in closed-loop mode, or to decide which frequency
+         * correction to apply. To avoid the extra complexity, we assume the benefit from
+         * this derotation is negligible in closed-loop, assuming the frequency correction
+         * eventually converges to an accurate value.
+         **/
+        const float phase_inc = (coarse_corrected && fine_est_ready)
+                                    ? (2.0 * GR_M_PI * fine_foffset)
+                                    : (2.0 * GR_M_PI * coarse_foffset);
+        gr_complex phasor = gr_expj(-phase_inc);
+        gr_complex phasor_0 = gr_expj(0);
 
-    /* Phase:
+        // De-rotate and save into the post-processed PLHEADER buffer
+        volk_32fc_s32fc_x2_rotator_32fc(
+            pp_plheader.data(), in, phasor, &phasor_0, PLHEADER_LEN);
+    }
+
+    /* Phase correction:
      *
-     * The de-rotation's starting phase depends on the phase of the
-     * PLHEADER. Unfortunately, at this point, as we are trying to help with the
-     * PLSC decoding, the PLSC has not been decoded yet. So our best bet is to
-     * estimate the phase based only on SOF symbols. Note also that we cannot
-     * simply rely on the MODCOD info of the previous frame, since VCM could be
-     * used and, as a result, the current frame may have a distinct MODCOD.
+     * This function is designed to derotate a PLHEADER before the PLSC
+     * decoding, meaning that, at this point, the PLSC has not been decoded yet.
+     * Hence, our best bet is to estimate the phase based only on the SOF
+     * symbols, which are known a priori. Besides, note that we cannot simply
+     * rely on the MODCOD info of the previous frame, since VCM could be used
+     * and, as a result, the current frame may have a distinct MODCOD.
      */
-    const float plheader_phase = estimate_sof_phase(in);
+    const gr_complex* p_plheader = (open_loop) ? pp_plheader.data() : in;
+    const float plheader_phase = estimate_sof_phase(p_plheader);
 
     if (debug_level > 2)
         printf("PLHEADER phase: %g\n", plheader_phase);
 
-    /* Finally, prepare the rotator's phasors */
-    gr_complex phasor = gr_expj(-phase_inc);
-    gr_complex phasor_0 = gr_expj(-plheader_phase);
-
-    /* De-rotate and save into the post-processed PLHEADER buffer */
-    volk_32fc_s32fc_x2_rotator_32fc(
-        pp_plheader.data(), in, phasor, &phasor_0, PLHEADER_LEN);
+    gr_complex phase_correction = gr_expj(-plheader_phase);
+    volk_32fc_s32fc_multiply_32fc(
+        pp_plheader.data(), p_plheader, phase_correction, PLHEADER_LEN);
 }
 
 } // namespace dvbs2rx

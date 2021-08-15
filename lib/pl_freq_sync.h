@@ -34,6 +34,50 @@ const double fine_foffset_corr_range = 3.268e-4;
 namespace gr {
 namespace dvbs2rx {
 
+/**
+ * @brief Frequency Synchronizer
+ *
+ * Provides methods to estimate the coarse and fine frequency offsets disturbing DVB-S2
+ * frames, as well as methods to estimate the phases of various frame segments (SOF,
+ * PLHEADER, and pilot blocks). These methods are meant to be used in conjunction with an
+ * external frequency correction (or de-rotator/rotator) block. This class supplies the
+ * frequency offset estimates, while the external block applies the corrections, an
+ * operation denominated "closed-loop mode". In other words, this class is not responsible
+ * for frequency offset correction. Instead, it focuses on estimation only.
+ *
+ * Due to the closed-loop operation, when estimating the phases of the SOF, PLHEADER, and
+ * pilot blocks, this class assumes the symbols are not rotating. This assumption holds
+ * closely as soon as the external rotator block converges to an accurate frequency
+ * correction. Thus, the phase estimates are obtained by assuming the symbols are only
+ * disturbed by white Gaussian noise. The only exception is on the `derotate_plheader()`
+ * method, which offers an "open-loop" option, documented there.
+ *
+ * Once the frequency offset estimates are accurate enough, the external derotator block
+ * applies accurate corrections and the frequency offset observed by this block becomes
+ * sufficiently low. Moreover, once the normalized frequency offset magnitude falls below
+ * 3.268e-4, this class infers the system is already "coarse-corrected", and the
+ * corresponding state can be fetched through the `is_coarse_corrected()` method. At this
+ * point, it makes sense to start computing the fine frequency offset estimate. Before
+ * that, the fine frequency offset estimates are not reliable.
+ *
+ * Once a fine frequency offset becomes available, this class returns true on method
+ * `has_fine_foffset_est()`. As of this version, a fine offset can be computed whenever
+ * the processed DVB-S2 frames contain pilot blocks and the system is already
+ * coarse-corrected. The estimate is based on the independent phases of each pilot block
+ * composing the frame, each estimated through method `estimate_pilot_phase()`. After all
+ * pilot block phases have been estimated, the fine frequency offset estimate can be
+ * obtained by calling method `estimate_fine_pilot_mode()`.
+ *
+ * In contrast, the coarse frequency offset can be computed regardless of the presence of
+ * pilots. Also, unlike the fine frequency offset estimation, which is computed and
+ * refreshed on every frame, the coarse estimation is based on several consecutive frames.
+ * The number of frames considered in the computation is determined by the `period`
+ * parameter provided to the constructor.
+ *
+ * In any case, the most recent coarse and fine frequency offset estimates can be fetched
+ * independently through the `get_coarse_foffset()` and `get_fine_foffset()` methods.
+ *
+ */
 class DVBS2RX_API freq_sync
 {
 private:
@@ -163,13 +207,30 @@ public:
 
     /**
      * \brief De-rotate PLHEADER symbols.
+     *
      * \param in (const gr_complex *) Input rotated PLHEADER buffer.
+     * \param open_loop (bool) Whether to assume this block is running in open
+     * loop, without an external frequency correction block. In this case, it is
+     * assumed the most recent frequency offset estimate is still uncorrected
+     * and disturbing the input PLHEADER, so this method attempts to compensate
+     * for this frequency offset when derotating the PLHEADER.
+     *
      * \return Void.
      *
      * \note The de-rotated PLHEADER is saved internally and can be accessed
      * using the `get_plheader()` method.
+     *
+     * \note The open-loop option is useful when there is too much uncertainty about the
+     * the frequency offset estimate, for example while still searching for a DVB-S2
+     * signal. By running `derotate_plheader()` in open loop, only the PLHEADER will be
+     * derotated based on the internal frequency offset estimate, with no need to send the
+     * estimate to an external rotator block. At a minimum, if this derotation is
+     * successful, it can be determinant for a successful PLSC decoding, which then leads
+     * to frame locking. After that, the caller can be more certain about the frequency
+     * offset estimates being valid and switch to the usual closed-loop operation, while
+     * sending the frequency offset estimates to the external rotator block.
      */
-    void derotate_plheader(const gr_complex* in);
+    void derotate_plheader(const gr_complex* in, bool open_loop = false);
 
     /**
      * \brief Get the last PLHEADER phase estimate.

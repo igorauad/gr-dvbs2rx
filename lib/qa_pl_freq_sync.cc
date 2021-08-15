@@ -188,32 +188,6 @@ BOOST_DATA_TEST_CASE_F(
 
 BOOST_DATA_TEST_CASE_F(
     F,
-    test_sof_phase_est_with_freq_offset_corr,
-    bdata::make(
-        { (-M_PI / 2), (-3 * M_PI / 4), (M_PI / 2), (3 * M_PI / 4), (M_PI - 1e-5) }) *
-        bdata::make({ -0.23, -0.13, 0.03, 0.19, 0.25 }),
-    phase_0,
-    freq_offset)
-{
-    // Add frequency offset and a non-zero initial phase
-    volk::vector<gr_complex> rotated(PLHEADER_LEN);
-    rotate(rotated.data(), plheader.data(), freq_offset, phase_0, PLHEADER_LEN);
-
-    // Estimate the coarse frequency offset before estimating the SOF
-    // phase. When a frequency offset estimate is available internally, the
-    // phase estimation routine derotates the SOF symbols before attempting to
-    // estimate their initial phase.
-    bool use_full_plheader = false;
-    p_freq_sync->estimate_coarse(rotated.data(), use_full_plheader);
-
-    // Estimate the SOF phase
-    float phase_0_est = p_freq_sync->estimate_sof_phase(rotated.data());
-    BOOST_CHECK_CLOSE(phase_0_est, phase_0, 1e-3);
-}
-
-
-BOOST_DATA_TEST_CASE_F(
-    F,
     test_plheader_phase_est,
     bdata::make(
         { (-M_PI / 2), (-3 * M_PI / 4), (M_PI / 2), (3 * M_PI / 4), (M_PI - 1e-5) }),
@@ -352,7 +326,7 @@ BOOST_DATA_TEST_CASE_F(
 
 BOOST_DATA_TEST_CASE_F(
     F,
-    test_derotate_plheader,
+    test_derotate_plheader_open_loop,
     bdata::make(
         { (-M_PI / 2), (-3 * M_PI / 4), (M_PI / 2), (3 * M_PI / 4), (M_PI - 1e-5) }) *
         bdata::make({ -0.23, -0.13, 0.03, 0.19, 0.25 }),
@@ -369,7 +343,33 @@ BOOST_DATA_TEST_CASE_F(
     bool use_full_plheader = false;
     p_freq_sync->estimate_coarse(rotated.data(), use_full_plheader);
 
-    // Derotate the entire PLHEADER
+    // Derotate the PLHEADER
+    bool open_loop = true;
+    p_freq_sync->derotate_plheader(rotated.data(), open_loop);
+
+    // Check the derotated result
+    const gr_complex* derotated = p_freq_sync->get_plheader();
+    for (int i = 0; i < PLHEADER_LEN; i++) {
+        BOOST_CHECK_CLOSE(plheader[i].real(), derotated[i].real(), 1e-2);
+        BOOST_CHECK_CLOSE(plheader[i].imag(), derotated[i].imag(), 1e-2);
+    }
+}
+
+BOOST_DATA_TEST_CASE_F(
+    F,
+    test_derotate_plheader_closed_loop,
+    bdata::make(
+        { (-M_PI / 2), (-3 * M_PI / 4), (M_PI / 2), (3 * M_PI / 4), (M_PI - 1e-5) }),
+    phase_0)
+{
+    // In closed-loop, the external frequency correction block should eventually converge
+    // to an accurate correction, leaving a negligible residual frequency offset. Thus,
+    // add a non-zero initial phase and assume zero frequency offset.
+    float freq_offset = 0;
+    volk::vector<gr_complex> rotated(PLHEADER_LEN);
+    rotate(rotated.data(), plheader.data(), freq_offset, phase_0, PLHEADER_LEN);
+
+    // Derotate the PLHEADER
     p_freq_sync->derotate_plheader(rotated.data());
 
     // Check the derotated result
