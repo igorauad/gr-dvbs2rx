@@ -15,8 +15,8 @@ void dump_real_vec(const float* vec, unsigned int N, const char* label)
 {
     printf("- %10s: [", label);
     for (unsigned int i = 0; i < N - 1; i++)
-        printf("%.2f, ", vec[i]);
-    printf("%.2f]\n", vec[N - 1]);
+        printf("%g, ", vec[i]);
+    printf("%g]\n", vec[N - 1]);
 }
 
 void dump_real_vec(const volk::vector<float>& vec, unsigned int N, const char* label)
@@ -35,8 +35,8 @@ void dump_complex_vec(const gr_complex* vec, unsigned int N, const char* label)
 {
     printf("- %10s: [", label);
     for (unsigned int i = 0; i < N - 1; i++)
-        printf("(%+.2f %+.2fi), ", vec[i].real(), vec[i].imag());
-    printf("(%+.2f %+.2fi)]\n", vec[N - 1].real(), vec[N - 1].imag());
+        printf("(%+g %+gi), ", vec[i].real(), vec[i].imag());
+    printf("(%+g %+gi)]\n", vec[N - 1].real(), vec[N - 1].imag());
 }
 
 void dump_complex_vec(const volk::vector<gr_complex>& vec,
