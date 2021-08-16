@@ -13,14 +13,16 @@
 namespace gr {
 namespace dvbs2rx {
 
-frame_sync::frame_sync(int debug_level)
-    : debug_level(debug_level),
+frame_sync::frame_sync(int debug_level, uint8_t unlock_thresh)
+    : d_debug_level(debug_level),
+      d_unlock_thresh(unlock_thresh),
       d_sym_cnt(0),
       d_last_in(0),
       d_timing_metric(0.0),
       d_sof_interval(0),
       d_state(frame_sync_state_t::searching),
       d_frame_len(0),
+      d_unlock_cnt(0),
       d_plsc_delay_buf(PLSC_LEN + 1),
       d_sof_buf(SOF_CORR_LEN),
       d_plsc_e_buf(PLSC_CORR_LEN),
@@ -166,7 +168,7 @@ bool frame_sync::step(const gr_complex& in)
     const bool peak_expected = locked;
 
     /* Useful log separator */
-    if (debug_level > 1 && (is_peak || peak_expected)) {
+    if (d_debug_level > 1 && (is_peak || peak_expected)) {
         printf("--\n");
     }
 
@@ -174,19 +176,18 @@ bool frame_sync::step(const gr_complex& in)
     if (is_peak) {
         if (d_state == frame_sync_state_t::searching) {
             d_state = frame_sync_state_t::found;
-            if (debug_level > 0) {
+            if (d_debug_level > 0) {
                 printf("Frame sync: PLFRAME found\n");
             }
         } else if (d_state == frame_sync_state_t::found && d_sym_cnt == d_frame_len) {
             d_state = frame_sync_state_t::locked;
-            if (debug_level > 0) {
+            if (d_debug_level > 0) {
                 printf("Frame sync: PLFRAME lock acquired\n");
             }
         }
         d_sof_interval = d_sym_cnt;
-        d_sym_cnt = 0;
-
-        if (debug_level > 1) {
+        d_unlock_cnt = 0; // reset the unlock count just in case it was non-zero
+        if (d_debug_level > 1) {
             printf("Frame sync: {Peak after: %u, "
                    "Timing Metric: %f, "
                    "Locked: %u}\r\n",
@@ -195,18 +196,28 @@ bool frame_sync::step(const gr_complex& in)
                    (d_state == frame_sync_state_t::locked));
         }
     } else if (peak_expected) {
-        d_state = frame_sync_state_t::searching;
-        if (debug_level > 0) {
-            printf("Frame sync: PLFRAME lock lost\n");
-            if (debug_level > 1) {
-                printf("Frame sync: Insufficient Timing Metric: %f\n", d_timing_metric);
+        // Unlock only if the timing metric fails to exceed the threshold for
+        // `d_unlock_thresh` consecutive frames. It's important to avoid
+        // unlocking prematurely when running under high noise.
+        d_unlock_cnt++;
+        if (d_debug_level > 1) {
+            printf("Frame sync: Insufficient timing metric: %f (occurrence %u/%u)\n",
+                   d_timing_metric,
+                   d_unlock_cnt,
+                   d_unlock_thresh);
+        }
+        if (d_unlock_cnt == d_unlock_thresh) {
+            d_state = frame_sync_state_t::searching;
+            d_unlock_cnt = 0;
+            if (d_debug_level > 0) {
+                printf("Frame sync: PLFRAME lock lost\n");
             }
         }
     }
 
-    /* Further debugging logs */
+    /* Further debugging logs and symbol count reset */
     if (is_peak || peak_expected) {
-        if (debug_level > 2) {
+        if (d_debug_level > 2) {
             printf("Frame sync: {Sym: %u, SOF: %+.1f %+.1fj, PLSC: %+.1f "
                    "%+.1fj}\r\n",
                    d_sym_cnt,
@@ -215,17 +226,28 @@ bool frame_sync::step(const gr_complex& in)
                    plsc_corr.real(),
                    plsc_corr.imag());
         }
-        if (debug_level > 3) {
+        if (d_debug_level > 3) {
             dump_complex_vec(d_sof_buf, "Frame sync: SOF buffer");
             dump_complex_vec(d_plsc_e_buf, "Frame sync: PLSC even buffer");
             dump_complex_vec(d_plsc_o_buf, "Frame sync: PLSC odd buffer");
         }
+        d_sym_cnt = 0; // prepare to index the data symbols
     }
 
-    return is_peak;
+    // Return true for both the actual and inferred peaks. The goal is to
+    // indicate that this step is processing the last PLHEADER symbol, which is
+    // when the timing metric should peak. Hence, even if this particular
+    // PLHEADER does not lead to a sufficiently high timing metric, as long as
+    // we are still locked (i.e., the current state is either "found" or
+    // "locked"), this is the last PLHEADER symbol to the best of our knowledge.
+    // Note that the PL Sync block relies on this return value when deciding
+    // whether or not to process the PLHEADER. Hence, if we returned only
+    // "is_peak", the PLHEADER would be missed whenever the timing metric
+    // failed, even if still locked, which is clearly undesirable.
+    return (is_peak || peak_expected) && (d_state != frame_sync_state_t::searching);
 }
 
-void frame_sync::set_frame_len(unsigned int len)
+void frame_sync::set_frame_len(uint32_t len)
 {
     if (len > MAX_PLFRAME_LEN)
         throw std::runtime_error("Invalid PLFRAME length");

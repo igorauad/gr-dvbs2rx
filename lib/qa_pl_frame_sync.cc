@@ -26,7 +26,8 @@ struct F {
     {
         // Frame synchronizer object
         int debug_level = 0;
-        p_frame_sync = new frame_sync(debug_level);
+        uint8_t unlock_thresh = 1;
+        p_frame_sync = new frame_sync(debug_level, unlock_thresh);
 
         // Noiseless PLHEADER for testing
         plsc_encoder plsc_mapper;
@@ -187,8 +188,10 @@ BOOST_DATA_TEST_CASE_F(F,
 
 BOOST_FIXTURE_TEST_CASE(test_locking_unlocking, F)
 {
-    // Test a payload populated with a noisy rotating sequence on the unit
-    // circle with phase from 0 to 2*pi (exclusive).
+    // Test a payload populated with a rotating sequence on the unit circle with
+    // phase from 0 to 2*pi (exclusive). The actual rotation is unimportant. The
+    // only goal is to make all payload symbols unique such that the payload
+    // buffered by the frame synchronizer can be verified.
     volk::vector<gr_complex> payload_base(pls_info.payload_len, 1);
     volk::vector<gr_complex> payload(pls_info.payload_len);
     float esn0_db = 1e2; // ignored unless channel.add_noise is called
@@ -240,7 +243,8 @@ BOOST_FIXTURE_TEST_CASE(test_locking_unlocking, F)
     }
 
     // At this point, the frame synchronizer expects the third PLHEADER. If the
-    // PLHEADER doesn't come, it should unlock.
+    // PLHEADER doesn't come, and if the unlock_thresh parameter is set to 1,
+    // the frame synchronizer should unlock.
     volk::vector<gr_complex> non_plheader(PLHEADER_LEN, 1j);
     for (int i = 0; i < PLHEADER_LEN; i++)
         p_frame_sync->step(non_plheader[i]);
@@ -283,8 +287,129 @@ BOOST_FIXTURE_TEST_CASE(test_consecutive_sofs_after_wrong_frame_len, F)
         p_frame_sync->step(plheader[i]);
 
     // It shouldn't lock, as the PLHEADER comes at an unexpected index due to
-    // the wrong frame length information. It should still be in "found" state.
+    // the wrong frame length information. It should still be in "found" state,
+    // given that another PLHEADER was just found.
     BOOST_CHECK_EQUAL(p_frame_sync->is_locked_or_almost(), true);
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked(), false);
+}
+
+BOOST_FIXTURE_TEST_CASE(test_sof_after_wrong_frame_len_while_locked, F)
+{
+    // Test all-ones payloads
+    volk::vector<gr_complex> payload(pls_info.payload_len, 1);
+
+    // Get to locked state
+    for (int i = 0; i < PLHEADER_LEN; i++) // 1st PLHEADER
+        p_frame_sync->step(plheader[i]);
+    p_frame_sync->set_frame_len(pls_info.plframe_len);
+
+    for (int i = 0; i < pls_info.payload_len; i++) { // 1st Payload
+        bool is_peak = p_frame_sync->step(payload[i]);
+        BOOST_CHECK_EQUAL(is_peak, false);
+    }
+
+    for (int i = 0; i < PLHEADER_LEN; i++) // 2nd PLHEADER
+        p_frame_sync->step(plheader[i]);
+
+    // It should be locked at this point
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked_or_almost(), true);
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked(), true);
+
+    // Now, pretend the caller has failed to decode the second PLSC correctly
+    // and informed the wrong PLFRAME length for the second frame.
+    p_frame_sync->set_frame_len(100);
+
+    // Process the second payload
+    for (int i = 0; i < pls_info.payload_len; i++) {
+        bool is_peak = p_frame_sync->step(payload[i]);
+        BOOST_CHECK_EQUAL(is_peak, false);
+    }
+
+    // While processing the second payload, the frame synchronizer should find
+    // that the timing metric does not peak after the informed frame length. At
+    // this point, it should transition back to the "searching" state, given
+    // that the `unlock_thresh` parameter is set to 1.
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked_or_almost(), false);
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked(), false);
+}
+
+void add_noise_to_plheader(volk::vector<gr_complex>& noisy_plheader, float esn0_db)
+{
+    const float freq_offset = 0;
+    NoisyChannel channel(esn0_db, freq_offset);
+    channel.add_noise(noisy_plheader.data(), PLHEADER_LEN);
+
+    // Scale the noisy symbols for unit energy, just like an AGC would
+    gr_complex sq_norm;
+    volk_32fc_x2_conjugate_dot_prod_32fc(
+        &sq_norm, noisy_plheader.data(), noisy_plheader.data(), PLHEADER_LEN);
+    float rms = sqrt(abs(sq_norm) / PLHEADER_LEN);
+    for (gr_complex& x : noisy_plheader) {
+        x = x / rms;
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(test_non_unit_unlock_count_threshold, F)
+{
+    // Recreate the frame synchronizer object with a non-unitary unlock threshold
+    delete p_frame_sync;
+    int debug_level = 0;
+    uint8_t unlock_thresh = 2;
+    p_frame_sync = new frame_sync(debug_level, unlock_thresh);
+
+    // Test all-ones payloads
+    volk::vector<gr_complex> payload(pls_info.payload_len, 1);
+
+    // Get to locked state
+    for (int i = 0; i < PLHEADER_LEN; i++) // 1st PLHEADER
+        p_frame_sync->step(plheader[i]);
+    p_frame_sync->set_frame_len(pls_info.plframe_len);
+
+    for (int i = 0; i < pls_info.payload_len; i++) { // 1st Payload
+        bool is_peak = p_frame_sync->step(payload[i]);
+        BOOST_CHECK_EQUAL(is_peak, false);
+    }
+
+    for (int i = 0; i < PLHEADER_LEN; i++) // 2nd PLHEADER
+        p_frame_sync->step(plheader[i]);
+
+    // It should be locked at this point
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked_or_almost(), true);
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked(), true);
+
+    for (int i = 0; i < pls_info.payload_len; i++) { // 2nd Payload
+        bool is_peak = p_frame_sync->step(payload[i]);
+        BOOST_CHECK_EQUAL(is_peak, false);
+    }
+
+    // When processing the third PLHEADER, add a significant amount of noise
+    volk::vector<gr_complex> noisy_plheader1(plheader);
+    float esn0_db = -10;
+    add_noise_to_plheader(noisy_plheader1, esn0_db);
+
+    for (int i = 0; i < PLHEADER_LEN; i++) // 3rd PLHEADER
+        p_frame_sync->step(noisy_plheader1[i]);
+
+    // The timing metric should fail at this point, but the frame synchronizer
+    // should remain locked due to unlock_thresh=2.
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked_or_almost(), true);
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked(), true);
+
+    for (int i = 0; i < pls_info.payload_len; i++) { // 3rd Payload
+        bool is_peak = p_frame_sync->step(payload[i]);
+        BOOST_CHECK_EQUAL(is_peak, false);
+    }
+
+    // Process one more very noisy PLHEADER
+    volk::vector<gr_complex> noisy_plheader2(plheader);
+    add_noise_to_plheader(noisy_plheader2, esn0_db);
+
+    for (int i = 0; i < PLHEADER_LEN; i++) // 4th PLHEADER
+        p_frame_sync->step(noisy_plheader2[i]);
+
+    // Again, the timing metric should fail. However, since this is the second
+    // consecutive failure, and unlock_thresh=2, the synchronizer should unlock.
+    BOOST_CHECK_EQUAL(p_frame_sync->is_locked_or_almost(), false);
     BOOST_CHECK_EQUAL(p_frame_sync->is_locked(), false);
 }
 

@@ -78,45 +78,54 @@ enum class frame_sync_state_t {
  *
  * The two correlators (SOF and PLSC) are expected to peak when they observe the
  * SOF or PLSC in the input symbol sequence. The final timing metric is given by
- * the sum or difference of the these correlators, whichever has the largest
+ * the sum or difference of these correlators, whichever has the largest
  * magnitude. The sum (SOF + PLSC) peaks when the 7th PLSC bit is 0, and the
  * difference (SOF - PLSC) peaks when the 7th PLSC bit is 1. That is, the
  * difference metric essentially undoes the 180-degree shift on the PLSC
  * correlator peak that would arise when the 7th bit is 1.
  *
- * Furthermore, the implementation is robust to frequency offsets. The input
- * symbol sequence can have any frequency offset, as long as it doesn't change
- * significantly in the course of the PLHEADER, which is typically the case
- * given that the PLHEADER is short enough (for typical baud rates). If the
- * frequency offset is the same for symbols x[n] and x[n+1], the differential
- * metric includes a factor given by `exp(j*2*pi*f0*n) *
- * conj(exp(j*2*pi*f0*(n+1)))`, which is equal to `exp(-j*2*pi*f0)`. Moreover,
- * if the frequency offset remains the same over the entire PLHEADER, all
- * differentials include this factor. Ultimately, the cross-correlation peak is
- * still observed, just with a different phase (shifted by `-2*pi*f0`). In fact,
- * the phase of the complex timing metric (sum or difference between the
+ * Furthermore, as stated before, the implementation is robust to frequency
+ * offsets. The input symbol sequence can have any frequency offset, as long as
+ * it doesn't change significantly in the course of the PLHEADER, which is
+ * typically the case given that the PLHEADER is short enough (for typical
+ * DVB-S2 baud rates). If the frequency offset is the same for symbols x[n] and
+ * x[n+1], the differential metric includes a factor given by:
+ *
+ * ```
+ * exp(j*2*pi*f0*n) * conj(exp(j*2*pi*f0*(n+1))) = exp(-j*2*pi*f0).
+ * ```
+ *
+ * Moreover, if the frequency offset remains the same over the entire PLHEADER,
+ * all differentials include this factor. Ultimately, the cross-correlation peak
+ * is still observed, just with a different phase (shifted by `-2*pi*f0`). In
+ * fact, the phase of the complex timing metric (sum or difference between the
  * correlator peaks) could be used to estimate the coarse frequency offset
  * affecting the PLHEADER. However, a better method is implemented on the
  * dedicated `freq_sync` class.
  *
  * Lastly, aside from the correlators, the implementation comprises a state
- * machine with three states: "searching", "found", and "locked". As soon as a
+ * machine with three states: "searching", "found", and "locked". As soon as an
  * SOF is found, the state machine changes to the "found" state. At this point,
  * the caller should decode the corresponding PLSC and call method
  * `set_frame_len()` to inform the expected PLFRAME length following the
  * detected SOF. Then, if the next SOF comes exactly after the informed frame
  * length, the state machine changes into the "locked" state. From this point
- * on, the frame synchronizer will check the correlation peak (more precisely,
- * the so-called "timing metric") at the expected index on every frame. If at
- * any point the timing metric does not exceed a chosen threshold, it will
- * assume the frame lock has been lost and transition back to the "searching"
- * state.
+ * on, the frame synchronizer will check the correlation peak (i.e., the
+ * so-called "timing metric") at the expected index on every frame.
+ *
+ * Whenever the timing metric does not exceed a specific magnitude threshold,
+ * the implementation will increment an internal count for unlocking. After a
+ * chosen number of consecutive timing metric failures, this block will assume
+ * the frame lock has been lost and transition back to the "searching" state. At
+ * this point, it takes at least two more PLHEADERs to recover the lock, as the
+ * state machine needs to go over the "found" and "locked" states again.
  */
 class DVBS2RX_API frame_sync
 {
 private:
     /* Parameters */
-    int debug_level; /** debug level */
+    int d_debug_level;       /**< Debug level */
+    uint8_t d_unlock_thresh; /**< Number of frame detection failures before unlocking */
 
     /* State */
     uint32_t d_sym_cnt;         /**< Symbol count since the last SOF */
@@ -124,7 +133,8 @@ private:
     float d_timing_metric;      /**< Most recent timing metric */
     uint32_t d_sof_interval;    /**< Interval between the last two SOFs */
     frame_sync_state_t d_state; /**< Frame timing recovery state */
-    unsigned int d_frame_len;   /**< Current PLFRAME length */
+    uint32_t d_frame_len;       /**< Current PLFRAME length */
+    uint8_t d_unlock_cnt;       /**< Count of consecutive frame detection failures */
 
     delay_line<gr_complex> d_plsc_delay_buf; /**< Buffer used as delay line */
     delay_line<gr_complex> d_sof_buf;        /**< SOF correlator buffer */
@@ -162,15 +172,37 @@ private:
                    gr_complex* res);
 
 public:
-    frame_sync(int debug_level);
+    /**
+     * @brief Construct a new frame sync object
+     *
+     * @param debug_level (int) Target debugging log level (0 disables logs).
+     * @param unlock_thresh (uint8_t) Number of consecutive frame detection
+     * failures before unlocking. A failure occurs when the timing metric does
+     * not exceed the expected magnitude threshold. By default, 3 failures will
+     * lead to unlocking.
+     *
+     * @note The number of consecutive timing metric failures before unlocking
+     * must be tuned to avoid unlocking prematurely under high noise, when the
+     * timing metric deviates significantly from the nominal peak of 57 for
+     * unit-energy symbols (57 due to the 26+32=57 correlator taps). On the
+     * other hand, this threshold parameter should not be very high to avoid too
+     * much delay in unlocking. For example, if a PLSC decoding error occurs and
+     * a wrong PLFRAME length is informed to the frame synchronizer, the timing
+     * metric observed after the wrong frame length will most certainly fail to
+     * exceed the threshold. In this scenario, all subsequent `unlock_thresh`
+     * frames will likely fail, as the frame synchronizer will search for their
+     * PLHEADERs in wrong indexes. Hence, in this example, it is better to
+     * unlock reasonably fast than to wait further.
+     */
+    frame_sync(int debug_level, uint8_t unlock_thresh = 3);
 
     /**
      * \brief Process the next input symbol.
      * \param in (gr_complex &) Input symbol.
-     * \return (bool) Whether the input symbol leads to a timing metric peak.
-     * \note A timing metric peak is expected whenever the last PLHEADER symbol
-     * is processed. Hence, this function should return true for the last
-     * PLHEADER symbol only. For all other symbols, it should return false.
+     * \return (bool) Whether the input symbol consists of the last PLHEADER
+     * symbol, where the timing metric is expected to peak.
+     * \note This function should return true for the last PLHEADER symbol only.
+     * For all other symbols, it should return false.
      */
     bool step(const gr_complex& in);
 
@@ -181,10 +213,10 @@ public:
      * observed. If a timing metric peak is indeed observed at the next expected
      * SOF index, the synchronizer achieves frame lock.
      *
-     * \param len (unsigned int) Current PLFRAME length.
+     * \param len (uint32_t) Current PLFRAME length.
      * \return Void.
      */
-    void set_frame_len(unsigned int len);
+    void set_frame_len(uint32_t len);
 
     /**
      * \brief Check whether frame lock has been achieved
