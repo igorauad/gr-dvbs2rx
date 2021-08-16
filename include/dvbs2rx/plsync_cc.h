@@ -29,7 +29,8 @@ namespace dvbs2rx {
  * Internally, this block implements PL frame timing recovery, coarse and fine
  * frequency offset estimation, carrier phase tracking, PLSC decoding, and PL
  * descrambling. Furthermore, it manages frequency corrections to be carried out
- * by an external rotator block connected via message port.
+ * by an external rotator block connected via message port. This feature
+ * requires the rotator block from GR Version 3.9.2 or later.
  */
 class DVBS2RX_API plsync_cc : virtual public gr::block
 {
