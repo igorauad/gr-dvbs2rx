@@ -76,8 +76,11 @@ private:
      * can control the external rotator phase properly */
 
     /* State */
-    bool d_locked;                   /**< Whether the frame timing is locked */
-    float d_da_phase;                /**< Last data-aided phase estimate */
+    bool d_locked;      /**< Whether the frame timing is locked */
+    float d_da_phase;   /**< Last data-aided phase estimate */
+    bool d_closed_loop; /**< Whether any freq. correction has been applied to the
+                           external rotator. False while still waiting for the first
+                           correction (i.e., while effectively in open loop) */
     payload_state_t d_payload_state; /**< Payload processing state machine */
     rot_ctrl_t d_rot_ctrl;           /**< Upstream rotator control */
     plframe_idx_t d_idx;             /**< PLFRAME index state */
