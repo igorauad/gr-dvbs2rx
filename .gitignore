@@ -4,4 +4,5 @@ __pycache__/
 .DS_Store
 TAGS
 apps/*.py
+!apps/dvbs2_rx.py
 examples/*.py
