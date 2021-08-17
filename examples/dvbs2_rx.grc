@@ -229,7 +229,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    fd: '1'
+    fd: out_fd
     type: byte
     vlen: '1'
   states:
@@ -499,7 +499,7 @@ blocks:
     hide: none
     label: output file descriptor
     short_id: O
-    type: str
+    type: intx
     value: '1'
   states:
     bus_sink: false
