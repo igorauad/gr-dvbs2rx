@@ -99,8 +99,8 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
             tag_interval < 1000) // 1000 is arbitrary (< 3330)
             continue;
         // NOTE: use "d_rot_ctrl.current" instead of "d_rot_ctrl.past" because
-        // the former is assigned here, whereas the latter is assigned in
-        // control_rotator_freq.
+        // we are interested in filtering out replicated tags referring to the
+        // same frame (the current frame).
 
         // The tag confirms the frequency currently configured in the rotator
         const double current_phase_inc = pmt::to_double(tags[j].value);
@@ -108,10 +108,10 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
         d_rot_ctrl.current.idx = tags[j].offset;
 
         // Error between the observed and expected tag offsets. Since we correct
-        // this error on every PLFRAME, the observed error is the residual after
-        // correction, not the raw delay. The raw error (interpreted as the
-        // delay) is the cumulative sum of the residuals. Eventually, the
-        // residuals should converge to zero and oscillate around that.
+        // this error, the observed error is the residual after correction, not
+        // the raw tag delay. The raw error (interpreted as the delay) is the
+        // cumulative sum of the residuals. Eventually, the residuals should
+        // converge to zero and oscillate around that.
         const int error = abs_sof_idx - tags[j].offset;
         d_rot_ctrl.tag_delay += error;
 
@@ -145,8 +145,8 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
 
     // Assume the upstream rotator lies before a matched filter and, hence,
     // operates on the sample stream (i.e. on samples, not symbols). Use the
-    // known oversampling ratio and the calibrated tag delay to schedule the
-    // phase increment update. */
+    // known oversampling ratio and the calibrated symbol-spaced tag delay to
+    // schedule the phase increment update.
     uint64_t target_idx = d_sps * (abs_next_sof_idx + d_rot_ctrl.tag_delay);
 
     // Prevent two frequency corrections at the same sample offset. The scenario
@@ -163,8 +163,8 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     // - Next, the payload handler processes the PLFRAME preceding the SOF that
     //   triggered the coarse correction. The PLFRAME has pilots, and it came
     //   while the synchronizer was still coarse corrected (before the new
-    //   PLHEADER). Hence, the handler calls for a new fine offset estimate,
-    //   which is also sent to the rotator.
+    //   PLHEADER). Hence, the payload handler calls for a new fine offset
+    //   estimate, which is also sent to the rotator.
     //
     // In this case, both updates would be applicable to the same offset. By
     // preventing this scenario here, only the first update would be applied,
@@ -347,7 +347,7 @@ int plsync_cc_impl::handle_payload(int noutput_items,
             // processing the n-th payload. Hence, we must schedule the
             // frequency update for SOF n+2. For that, we use the
             // next_frame_info, which holds the absolute index where SOF n+1
-            // start and the length of PLFRAME n+1.
+            // starts and the length of PLFRAME n+1.
             control_rotator_freq(next_frame_info.abs_sof_idx,
                                  next_frame_info.pls.plframe_len,
                                  d_freq_sync->get_fine_foffset(),
@@ -439,7 +439,7 @@ int plsync_cc_impl::general_work(int noutput_items,
                 //   time of the PLFRAME being processed, not at the time of the
                 //   next PLHEADER that is about to be processed.
                 //
-                // - The PLHEADER sequence itself. We need that in order to
+                // - The PLHEADER sequence itself. We need it in order to
                 //   estimate the PLHEADER phase when processing the payload.
                 //
                 // This metadata is contained within the plframe_info_t
@@ -452,7 +452,8 @@ int plsync_cc_impl::general_work(int noutput_items,
                 // The PLHEADER can always be processed right away because it
                 // doesn't produce any output (no need to worry about
                 // noutput_items). Also, at this point, and only at this point,
-                // the PLHEADER is available inside the frame synchronizer.
+                // the PLHEADER is available inside the frame synchronizer and
+                // can be fetched via the `frame_sync.get_plheader()` method.
                 handle_plheader(
                     abs_sof_idx, d_frame_sync->get_plheader(), d_next_frame_info);
 
@@ -471,23 +472,24 @@ int plsync_cc_impl::general_work(int noutput_items,
                     continue;
 
                 // If the PLFRAME between the present and the past SOFs is a
-                // dummy frame, it doesn't produce any output anyway, so skip it
+                // dummy frame, it doesn't produce any output. Hence, skip it
                 // and keep going until the next payload.
                 if (d_curr_frame_info.pls.dummy_frame)
                     continue;
 
                 // The payload can only be processed if the expected XFECFRAME
                 // output fits in the output buffer. Hence, unlike the PLHEADER,
-                // it cannot be processed right away. Mark the processing as
+                // it may not be processed right away. Mark the processing as
                 // pending for now and don't consume any more input samples
                 // until this payload is handled.
                 //
-                // Besides, tag the beginning of the XFECFRAME to follow in the
+                // Also, tag the beginning of the XFECFRAME to follow in the
                 // output. Include the MODCOD and the FECFRAME length so that
-                // downstream blocks can de-map and decode it in ACM/VCM mode.
+                // downstream blocks can de-map and decode this frame even if
+                // running in ACM/VCM mode.
                 d_payload_state = payload_state_t::pending;
                 add_item_tag(
-                    0,
+                    0,                 // output 0 (the only output port)
                     nitems_written(0), // note n_produced = 0 at this point
                     pmt::string_to_symbol("XFECFRAME"),
                     pmt::cons(pmt::from_long(d_curr_frame_info.pls.modcod),
