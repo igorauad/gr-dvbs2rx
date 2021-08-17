@@ -183,8 +183,10 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
                                                : (d_rot_ctrl.current.freq + rot_freq_adj);
 
     // Sanity check
-    assert(d_rot_ctrl.current.idx > d_rot_ctrl.past.idx &&
+    assert(d_rot_ctrl.current.idx >= d_rot_ctrl.past.idx &&
            d_rot_ctrl.next.idx > d_rot_ctrl.current.idx);
+    // NOTE: the >= operator is required when comparing "current" to "past" because they
+    // will be equal on consecutive frames that don't experience any freqency correction.
 
     // Send the corresponding phase increment to the rotator block
     static const pmt::pmt_t inc_key = pmt::intern("inc");
