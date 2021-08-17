@@ -51,6 +51,35 @@ def generate_pilot_blk(scrambler_seq):
     return tuple(p)
 
 
+def calc_noise_std(snr_db):
+    """Compute the complex AWGN standard deviation for a target SNR
+
+    This standard deviation is equivalent to sqrt(N0), in the usual N0 notation
+    denoting the complex noise variance.
+
+    """
+    noise_var = 1.0 / (10**(float(snr_db) / 10))
+    noise_std = sqrt(noise_var)
+    return noise_std
+
+
+def rnd_const_mapper_input(n_symbols, bits_per_sym):
+    """Generate random symbols (int numbers) to a constellation mapper input
+
+    Args:
+        n_symbols    : Desired number of symbols in the output
+        bits_per_sym : Number of bits carried by each const symbol
+
+    Returns:
+        Random input symbols
+
+    """
+    rndm = random.Random()
+    n_bits = int(bits_per_sym * n_symbols)
+    in_vec = tuple([rndm.randint(0, 1) for i in range(0, n_bits)])
+    return in_vec
+
+
 class qa_plsync_cc(gr_unittest.TestCase):
     def setUp(self):
         self.tb = gr.top_block()
@@ -149,33 +178,6 @@ class qa_plsync_cc(gr_unittest.TestCase):
         self.modcod = modcod
         self.short_frame = short_frame
         self.plframe = plframe
-
-    def _noise_std(self, snr_db):
-        """Compute the complex AWGN standard deviation for a target SNR
-
-        This standard deviation is equivalent to sqrt(N0), in the usual N0
-        notation denoting the complex noise variance.
-
-        """
-        noise_var = 1.0 / (10**(float(snr_db) / 10))
-        noise_std = sqrt(noise_var)
-        return noise_std
-
-    def _rnd_const_mapper_input(self, n_symbols, bits_per_sym):
-        """Generate random symbols (int numbers) to a constellation mapper input
-
-        Args:
-            n_symbols    : Desired number of symbols in the output
-            bits_per_sym : Number of bits carried by each const symbol
-
-        Returns:
-            Random input symbols
-
-        """
-        rndm = random.Random()
-        n_bits = int(bits_per_sym * n_symbols)
-        in_vec = tuple([rndm.randint(0, 1) for i in range(0, n_bits)])
-        return in_vec
 
     def _gen_plframes(self, n):
         """Generate n blank PLFRAMEs
@@ -310,7 +312,7 @@ class qa_plsync_cc(gr_unittest.TestCase):
 
         # Constants
         phase_inc = 2 * pi * fe
-        noise_std = self._noise_std(snr_db)
+        noise_std = calc_noise_std(snr_db)
 
         # Random time offset: prepend zeros to the symbol sequence
         mod_syms = tuple(np.zeros(np.random.randint(1000)))
@@ -355,7 +357,7 @@ class qa_plsync_cc(gr_unittest.TestCase):
 
         # Constants
         phase_inc = 2 * pi * fe
-        noise_std = self._noise_std(snr_db)
+        noise_std = calc_noise_std(snr_db)
 
         # Overwrite the test PLHEADER - add pilot symbols to test the
         # pilot-based fine frequency offset estimation
@@ -409,11 +411,11 @@ class qa_plsync_cc(gr_unittest.TestCase):
 
         # Constants
         bits_per_sym = 2
-        noise_std = self._noise_std(snr_db)
+        noise_std = calc_noise_std(snr_db)
         qpsk_const = (EXPJ225, EXPJ315, EXPJ135, EXPJ45)
 
         # Random input symbols
-        in_vec = self._rnd_const_mapper_input(frame_len, bits_per_sym)
+        in_vec = rnd_const_mapper_input(frame_len, bits_per_sym)
 
         # Flowgraph
         src = blocks.vector_source_b(in_vec)
@@ -502,7 +504,7 @@ class qa_plsync_cc(gr_unittest.TestCase):
             phase_inc = 2 * pi * fe
 
             # Update the noise amplitude for the target SNR
-            noise_std = self._noise_std(snr_db)
+            noise_std = calc_noise_std(snr_db)
 
             # Re-generate the flowgraph every time to clear the state and the
             # tags held within the Tag Debug block
@@ -600,7 +602,7 @@ class qa_plsync_cc(gr_unittest.TestCase):
             phase_inc = 2 * pi * fe
 
             # Update the noise amplitude for the target SNR
-            noise_std = self._noise_std(snr_db)
+            noise_std = calc_noise_std(snr_db)
 
             # Re-generate the flowgraph every time to clear the state and the
             # tags held within the Tag Debug block
