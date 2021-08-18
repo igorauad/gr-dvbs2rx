@@ -54,6 +54,9 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
     /* This block only outputs data symbols, while pilot symbols are
      * retained. So until we find the need, tags are not propagated */
     set_tag_propagation_policy(TPP_DONT);
+
+    // Make sure the output buffer always fits at least a slot (90 symbols)
+    set_output_multiple(SLOT_LEN);
 }
 
 /*
@@ -69,7 +72,45 @@ plsync_cc_impl::~plsync_cc_impl()
 
 void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_required)
 {
-    ninput_items_required[0] = noutput_items;
+    if (d_locked) {
+        if (d_payload_state == payload_state_t::searching) {
+            // If the frame synchronizer is locked, and while still searching for the next
+            // payload, the work function will only produce output if it processes enough
+            // symbols to actually find a payload between two consecutive SOFs. Hence,
+            // require the symbols remaining until the end of the subsequent PLHEADER.
+            ninput_items_required[0] = d_next_frame_info.pls.payload_len -
+                                       d_frame_sync->get_sym_count() + PLHEADER_LEN;
+        } else {
+            // The block is still trying to output the buffered payload, so it won't
+            // process any further input symbols for this frame. However, note it may
+            // still process further symbols for a subsequent frame.
+            ninput_items_required[0] = 0;
+        }
+        // If the output buffer can fit more than the remaining samples of the current
+        // XFECFRAME (i.e., `n_remaining` below), the work function will be able to
+        // proceed to the next PLFRAME. In this case, increase the input size forecast
+        // assuming the subsequent frame(s) will have the same length as the current (in
+        // VCM/ACM mode, this will likely be a poor forecast).
+        int n_remaining = d_next_frame_info.pls.xfecframe_len - d_idx.i_in_frame;
+        int n_excess = noutput_items - n_remaining; // beyond the current XFECFRAME
+        if (n_excess > 0) {
+            int n_extra_frames =
+                1 + ((n_excess - 1) / d_next_frame_info.pls.xfecframe_len); // ceil
+            ninput_items_required[0] +=
+                d_next_frame_info.pls.plframe_len * n_extra_frames;
+        }
+    } else {
+        // While the frame synchronizer is still trying to lock, assume conservatively
+        // that we need an equal number of input items as output items. In reality,
+        // however, at this point, it's more likely we will only consume the input but
+        // won't produce any output until locked.
+        ninput_items_required[0] = noutput_items;
+    }
+
+    // Unfortunately, it seems the runtime executor won't let the forecast request more
+    // input items than output items (sort of, it's a little more complex than that). As a
+    // workaround, cap the required input items based on the available output items.
+    ninput_items_required[0] = std::min(ninput_items_required[0], noutput_items);
 }
 
 void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
@@ -461,13 +502,17 @@ int plsync_cc_impl::general_work(int noutput_items,
     gr_complex* out = (gr_complex*)output_items[0];
     int n_produced = 0, n_consumed = 0;
 
-    // If there is no payload waiting to be processed, consume the input stream
-    // until the next SOF/PLHEADER is found.
-    if (d_payload_state == payload_state_t::searching) {
-        for (int i = 0; i < noutput_items; i++) {
-            bool is_sof = d_frame_sync->step(in[i]);
-            n_consumed++;
-            if (is_sof) {
+    while ((n_consumed < ninput_items[0] || ninput_items[0] == 0) &&
+           n_produced < noutput_items) {
+        // If there is no payload waiting to be processed, consume the input stream until
+        // the next SOF/PLHEADER is found by the frame synchronizer.
+        if (d_payload_state == payload_state_t::searching) {
+            for (int i = n_consumed; i < ninput_items[0]; i++) {
+                bool is_sof = d_frame_sync->step(in[i]);
+                n_consumed++;
+                if (!is_sof)
+                    continue;
+
                 d_sof_cnt++;
 
                 // If this SOF came where the previous PLSC told it would be, we
@@ -482,87 +527,86 @@ int plsync_cc_impl::general_work(int noutput_items,
                 if (d_debug_level > 1)
                     printf("SOF count: %lu; Index: %lu\n", d_sof_cnt, abs_sof_idx);
 
-                // Cache some information from the last PLFRAME before handling
-                // the new PLHEADER. As soon as the PLHEADER is handled, the
-                // PLSC decoder will update its PL signaling info, and other
-                // state variables will change. However, because we always
-                // process the payload between two SOFs, the payload of interest
-                // is the one corresponding to the preceding PLHEADER, not the
-                // succeeding PLHEADER that is about to be handled.
+                // Cache some information from the last PLFRAME before handling the new
+                // PLHEADER. As soon as the PLHEADER is handled, the PLSC decoder will
+                // update its PL signaling info, and other state variables will change.
+                // However, because we always process the payload between two SOFs, the
+                // payload of interest is the one corresponding to the preceding PLHEADER,
+                // not the succeeding PLHEADER that is about to be handled.
                 //
-                // In addition to the PL signaling information, the following
-                // variables also need to be cached:
+                // In addition to the PL signaling information, the following variables
+                // also need to be cached:
                 //
-                // - The coarse corrected state. We want to know if the
-                //   frequency synchronizer was already coarse-corrected at the
-                //   time of the PLFRAME being processed, not at the time of the
-                //   next PLHEADER that is about to be processed.
+                // - The coarse corrected state. We want to know if the frequency
+                //   synchronizer was already coarse-corrected at the time of the PLFRAME
+                //   being processed, not at the time of the next PLHEADER that is about
+                //   to be processed.
                 //
-                // - The PLHEADER sequence itself. We need it in order to
-                //   estimate the PLHEADER phase when processing the payload.
+                // - The PLHEADER sequence itself. We need it in order to estimate the
+                //   PLHEADER phase when processing the payload.
                 //
-                // This metadata is contained within the plframe_info_t
-                // structure. Once `handle_plheader()` is called, it updates
-                // `d_next_frame_info`. Hence, cache the `d_next_frame_info`
-                // from the previous SOF, which is the current frame to be
-                // processed by the `handle_payload()` function.
+                // This metadata is contained within the plframe_info_t structure. Once
+                // `handle_plheader()` is called, it updates `d_next_frame_info`. Hence,
+                // cache the `d_next_frame_info` from the previous SOF, which is the
+                // current frame to be processed by the `handle_payload()` function.
                 d_curr_frame_info = d_next_frame_info;
 
-                // The PLHEADER can always be processed right away because it
-                // doesn't produce any output (no need to worry about
-                // noutput_items). Also, at this point, and only at this point,
-                // the PLHEADER is available inside the frame synchronizer and
-                // can be fetched via the `frame_sync.get_plheader()` method.
+                // The PLHEADER can always be processed right away because it doesn't
+                // produce any output (no need to worry about noutput_items). Also, at
+                // this point, and only at this point, the PLHEADER is available inside
+                // the frame synchronizer and can be fetched via the
+                // `frame_sync.get_plheader()` method.
                 handle_plheader(
                     abs_sof_idx, d_frame_sync->get_plheader(), d_next_frame_info);
 
-                // If this is the first SOF ever, keep going until the next. We
-                // take the PLFRAME payload as the sequence of symbols between
-                // two SOFs. Hence, we need at least two SOF detections.
+                // If this is the first SOF ever, keep going until the next. We take the
+                // PLFRAME payload as the sequence of symbols between two SOFs. Hence, we
+                // need at least two SOF detections.
                 static bool first_sof = true;
                 if (first_sof) {
                     first_sof = false;
                     continue;
                 }
-                // Before locking, it's hard to tell with some confidence that a
-                // valid PLFRAME lies between the preceding and the current SOF.
-                // Keep going until frame lock is achieved.
+
+                // Before locking, it's hard to tell with some confidence that a valid
+                // PLFRAME lies between the preceding and the current SOF. Keep going
+                // until frame lock is achieved.
                 if (!d_locked)
                     continue;
 
-                // If the PLFRAME between the present and the past SOFs is a
-                // dummy frame, it doesn't produce any output. Hence, skip it
-                // and keep going until the next payload.
+                // If the PLFRAME between the present and the past SOFs is a dummy frame,
+                // it doesn't produce any output. Hence, skip it and keep going until the
+                // next payload.
                 if (d_curr_frame_info.pls.dummy_frame)
                     continue;
 
-                // The payload can only be processed if the expected XFECFRAME
-                // output fits in the output buffer. Hence, unlike the PLHEADER,
-                // it may not be processed right away. Mark the processing as
-                // pending for now and don't consume any more input samples
-                // until this payload is handled.
+                // The payload can only be processed if the expected XFECFRAME output fits
+                // in the output buffer. Hence, unlike the PLHEADER, it may not be
+                // processed right away. Mark the processing as pending for now and don't
+                // consume any more input samples until this payload is handled.
                 //
-                // Also, tag the beginning of the XFECFRAME to follow in the
-                // output. Include the MODCOD and the FECFRAME length so that
-                // downstream blocks can de-map and decode this frame even if
-                // running in ACM/VCM mode.
+                // Also, tag the beginning of the XFECFRAME to follow in the output.
+                // Include the MODCOD and the FECFRAME length so that downstream blocks
+                // can de-map and decode this frame even if running in ACM/VCM mode.
                 d_payload_state = payload_state_t::pending;
                 add_item_tag(
-                    0,                 // output 0 (the only output port)
-                    nitems_written(0), // note n_produced = 0 at this point
+                    0, // output 0 (the only output port)
+                    nitems_written(0) + n_produced,
                     pmt::string_to_symbol("XFECFRAME"),
                     pmt::cons(pmt::from_long(d_curr_frame_info.pls.modcod),
                               pmt::from_bool(d_curr_frame_info.pls.short_fecframe)));
                 break;
             }
         }
-    }
-    if (d_payload_state != payload_state_t::searching) {
-        n_produced += handle_payload(noutput_items,
-                                     out,
-                                     d_frame_sync->get_payload(),
-                                     d_curr_frame_info,
-                                     d_next_frame_info);
+
+        if (d_payload_state != payload_state_t::searching) {
+            n_produced +=
+                handle_payload((noutput_items - n_produced), // remaining output items
+                               out + n_produced, // pointer to the next output item
+                               d_frame_sync->get_payload(), // buffered frame payload
+                               d_curr_frame_info,
+                               d_next_frame_info);
+        }
     }
 
     // Tell runtime system how many input/output items were consumed/produced.

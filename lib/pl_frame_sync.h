@@ -231,6 +231,16 @@ public:
     bool is_locked_or_almost() const { return d_state != frame_sync_state_t::searching; }
 
     /**
+     * @brief Get the symbol count on the internal payload buffer
+     *
+     * @return uint32_t Current number of payload symbols buffered internally if locked.
+     */
+    uint32_t get_sym_count() const
+    {
+        return std::min(d_sym_cnt, (uint32_t)MAX_PLFRAME_PAYLOAD);
+    }
+
+    /**
      * \brief Get the interval between the last two detected SOFs.
      * \return (uint32_t) Interval in symbol periods.
      */
