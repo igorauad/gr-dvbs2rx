@@ -222,25 +222,25 @@ public:
      * \brief Check whether frame lock has been achieved
      * \return (bool) True if locked.
      */
-    bool is_locked() { return d_state == frame_sync_state_t::locked; }
+    bool is_locked() const { return d_state == frame_sync_state_t::locked; }
 
     /**
      * \brief Check whether frame lock has been achieved or a SOF has been found.
      * \return (bool) True if locked or if at least a SOF has been found.
      */
-    bool is_locked_or_almost() { return d_state != frame_sync_state_t::searching; }
+    bool is_locked_or_almost() const { return d_state != frame_sync_state_t::searching; }
 
     /**
      * \brief Get the interval between the last two detected SOFs.
      * \return (uint32_t) Interval in symbol periods.
      */
-    uint32_t get_sof_interval() { return d_sof_interval; }
+    uint32_t get_sof_interval() const { return d_sof_interval; }
 
     /**
      * \brief Get the PLHEADER buffered internally.
      * \return (const gr_complex*) Pointer to the internal PLHEADER buffer.
      */
-    const gr_complex* get_plheader() { return &d_plheader_buf.back(); }
+    const gr_complex* get_plheader() const { return &d_plheader_buf.back(); }
 
     /**
      * \brief Get the PLFRAME payload (data + pilots) buffered internally.
@@ -252,19 +252,19 @@ public:
      *
      * \return (const gr_complex*) Pointer to the internal payload buffer.
      */
-    const gr_complex* get_payload() { return d_payload_buf.data(); }
+    const gr_complex* get_payload() const { return d_payload_buf.data(); }
 
     /**
      * \brief Get the SOF correlator taps.
      * \return (const gr_complex*) Pointer to the SOF correlator taps.
      */
-    const gr_complex* get_sof_corr_taps() { return d_sof_taps.data(); }
+    const gr_complex* get_sof_corr_taps() const { return d_sof_taps.data(); }
 
     /**
      * \brief Get the PLSC correlator taps.
      * \return (const gr_complex*) Pointer to the PLSC correlator taps.
      */
-    const gr_complex* get_plsc_corr_taps() { return d_plsc_taps.data(); }
+    const gr_complex* get_plsc_corr_taps() const { return d_plsc_taps.data(); }
 
     /**
      * \brief Get the last evaluated timing metric.
@@ -274,7 +274,7 @@ public:
      *
      * \return (float) Last evaluated timing metric.
      */
-    float get_timing_metric() { return d_timing_metric; }
+    float get_timing_metric() const { return d_timing_metric; }
 };
 
 } // namespace dvbs2rx
