@@ -235,10 +235,6 @@ float freq_sync::estimate_plheader_phase(const gr_complex* in, uint8_t plsc)
 
 void freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
 {
-    // This function should not be called before the initial coarse frequency
-    // offset correction, as it cannot produce reliable results at this state.
-    assert(coarse_corrected);
-
     // Validate the pilot block index
     assert(i_blk >= 0 && i_blk < MAX_PILOT_BLKS);
 
@@ -266,10 +262,6 @@ void freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
 
 void freq_sync::estimate_fine_pilot_mode(uint8_t n_pilot_blks)
 {
-    // This function should not be called before the initial coarse frequency
-    // offset correction, as it cannot produce reliable results at this state.
-    assert(coarse_corrected);
-
     /* Angle differences */
     volk_32f_x2_subtract_32f(
         angle_diff_f.data(), angle_pilot.data() + 1, angle_pilot.data(), n_pilot_blks);
