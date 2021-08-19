@@ -508,16 +508,14 @@ int plsync_cc_impl::general_work(int noutput_items,
         // the next SOF/PLHEADER is found by the frame synchronizer.
         if (d_payload_state == payload_state_t::searching) {
             for (int i = n_consumed; i < ninput_items[0]; i++) {
+                // Step the frame synchronizer and keep refreshing the locked state. It
+                // could change any time.
                 bool is_sof = d_frame_sync->step(in[i]);
+                d_locked = d_frame_sync->is_locked();
                 n_consumed++;
                 if (!is_sof)
                     continue;
-
                 d_sof_cnt++;
-
-                // If this SOF came where the previous PLSC told it would be, we
-                // are still locked.
-                d_locked = d_frame_sync->is_locked();
 
                 // Convert the relative SOF detection index to an absolute index
                 // corresponding to the first SOF/PLHEADER symbol. Consider that
