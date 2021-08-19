@@ -7,7 +7,6 @@
 #
 
 import random
-import unittest
 from math import sqrt, pi, floor
 
 import pmt
@@ -34,6 +33,82 @@ EXPJ225 = (-SQRT2_2 - JSQRT2_2)
 EXPJ315 = (+SQRT2_2 - JSQRT2_2)
 
 
+def get_test_plframe(pilots):
+    """Generate a PLFRAME for testing
+
+    Returns one of two PLFRAME options: (modcod=21, short_frame=1, pilots=1),
+    or (modcod=21, short_frame=1, pilots=0).
+
+    Args:
+        pilots (bool]): Whether the test frame should contain pilots.
+
+    Returns:
+        (tuple): Tuple containing the PLFRAME (tuple), MODCOD (int), short
+            frame flag (bool), and the number of slots (int).
+
+    """
+    if (pilots):
+        # This PLHEADER corresponds to:
+        # {MODCOD: 21, Short FECFRAME: 1, Pilots: 1}
+        # {n_mod: 4, S: 45, PLFRAME length: 4212}
+        modcod = 21
+        short_frame = True
+        slots = 45
+        plheader = (EXPJ45, EXPJ315, EXPJ225, EXPJ135, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ225, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ225, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ225, EXPJ315,
+                    EXPJ225, EXPJ315, EXPJ225, EXPJ135, EXPJ225, EXPJ315,
+                    EXPJ45, EXPJ135, EXPJ45, EXPJ315, EXPJ225, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ225, EXPJ135, EXPJ225, EXPJ135,
+                    EXPJ225, EXPJ315, EXPJ225, EXPJ315, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ45, EXPJ315,
+                    EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ225, EXPJ135,
+                    EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ45, EXPJ315,
+                    EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ225, EXPJ315)
+        pilot_blk_1 = generate_pilot_blk([
+            3, 2, 2, 2, 1, 1, 2, 3, 2, 0, 1, 3, 1, 2, 0, 0, 3, 0, 0, 0, 1, 2,
+            2, 3, 2, 2, 3, 3, 1, 2, 3, 2, 3, 1, 1, 0
+        ])
+        pilot_blk_2 = generate_pilot_blk([
+            0, 3, 1, 3, 3, 3, 1, 2, 2, 1, 1, 2, 2, 2, 3, 1, 2, 1, 3, 3, 2, 1,
+            3, 0, 3, 1, 3, 1, 0, 0, 2, 0, 3, 2, 2, 2
+        ])
+        plframe = plheader + tuple(np.zeros(16 * 90)) + pilot_blk_1 + \
+            tuple(np.zeros(16 * 90)) + pilot_blk_2 + \
+            tuple(np.zeros(13 * 90))
+
+    else:
+        # This PLHEADER corresponds to:
+        # {MODCOD: 21, Short FECFRAME: 1, Pilots: 0}
+        # {n_mod: 4, S: 45, PLFRAME length: 4140}
+        modcod = 21
+        short_frame = True
+        slots = 45
+        plheader = (EXPJ45, EXPJ315, EXPJ225, EXPJ135, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ225, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ225, EXPJ135, EXPJ225, EXPJ315,
+                    EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ225, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ225, EXPJ135,
+                    EXPJ45, EXPJ315, EXPJ45, EXPJ135, EXPJ225, EXPJ315,
+                    EXPJ225, EXPJ315, EXPJ225, EXPJ315, EXPJ225, EXPJ315,
+                    EXPJ225, EXPJ135, EXPJ225, EXPJ135, EXPJ45, EXPJ315,
+                    EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ225, EXPJ315,
+                    EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ45, EXPJ315,
+                    EXPJ225, EXPJ315, EXPJ225, EXPJ135, EXPJ45, EXPJ135,
+                    EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ225, EXPJ135)
+        payload = tuple(np.zeros(4140 - 90))
+        plframe = plheader + payload
+
+    return plframe, modcod, short_frame, slots
+
+
 def generate_pilot_blk(scrambler_seq):
     """Generate the 36-symbol pilot block for a given scrambler sequence"""
     assert (len(scrambler_seq) == 36)
@@ -51,6 +126,27 @@ def generate_pilot_blk(scrambler_seq):
     return tuple(p)
 
 
+def replicate_plframes(n, plframe):
+    """Replicate a given PLFRAME n times
+
+    Args:
+        n : Number of PLFRAMEs to generate.
+        plframe (tuple): Test PLFRAME.
+
+    Returns:
+        (tuple) IQ sequence with n PLFRAMEs and n+1 PLHEADERs.
+
+    """
+    assert (n > 0)
+    seq = tuple()
+    for _ in range(n):
+        seq += plframe
+    # Add an extra PLHEADER in the end due to how PLFRAMEs are found
+    # between two consecutive SOFs.
+    seq += plframe[:90]
+    return seq
+
+
 def calc_noise_std(snr_db):
     """Compute the complex AWGN standard deviation for a target SNR
 
@@ -59,8 +155,7 @@ def calc_noise_std(snr_db):
 
     """
     noise_var = 1.0 / (10**(float(snr_db) / 10))
-    noise_std = sqrt(noise_var)
-    return noise_std
+    return sqrt(noise_var)
 
 
 def rnd_const_mapper_input(n_symbols, bits_per_sym):
@@ -83,126 +178,100 @@ def rnd_const_mapper_input(n_symbols, bits_per_sym):
 class qa_plsync_cc(gr_unittest.TestCase):
     def setUp(self):
         self.tb = gr.top_block()
-
-        # Parameters
         self.gold_code = 0
         self.debug_level = 0
-        self.sps = 1.0  # oversampling
+        self.sps = 1.0  # oversampling ratio
         self.freq_est_period = 1
-        # NOTE: the oversampling parameter is only used for controlling an
-        # external rotator, which is not something that is within the unit
-        # tests. Hence, the actual sps value here doesn't matter.
-
-        # Set the test PLHEADER
-        self._set_test_plframe()
 
     def tearDown(self):
         self.tb = None
 
-    def _set_test_plframe(self, pilots=False):
-        """Define the PLFRAME to be used for testing
+    def _run_flowgraph(self,
+                       nframes,
+                       freq_offset=0,
+                       noise_std=0,
+                       rnd_offset=False,
+                       closed_loop=False,
+                       pilots=False,
+                       debug_tags=True):
+        """Set up and run the flowgraph to completion
 
-        The test PLHEADER is the sequence of 90 symbols obtained by mapping the
-        scrambled PLSC using a pi/2 BPSK mapper.
+        Args:
+            nframes (int): Number of PLFRAMEs to generate as input.
+            freq_offset (float): Frequency offset disturbing the input symbols.
+            noise_std (float): Standard deviation of the complex AWGN.
+            rnd_offset (bool): Whether to simulate a time offset by prepeding a
+                random-length all-zeros interval to the input stream.
+            closed_loop (bool): Whether to use the closed-loop architecture,
+                where the PL Sync block controls an external rotator block.
+            pilots (bool): Whether to use a test PLFRAME containing pilots.
+            debug_tags (bool): Wether to debug the XFECFRAME tags.
+
+        Returns:
+            (list) List of tags collected by the Tag Debug block if
+            debug_tags=True. None otherwise.
 
         """
-        if (pilots):
-            # This PLHEADER corresponds to:
-            # {MODCOD: 21, Short FECFRAME: 1, Pilots: 1}
-            # {n_mod: 4, S: 45, PLFRAME length: 4212}
-            slots = 45
-            n_pilot_blks = floor(slots / 16)
-            modcod = 21
-            short_frame = True
-            plheader = (EXPJ45, EXPJ315, EXPJ225, EXPJ135, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ225, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ225, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ225, EXPJ315,
-                        EXPJ225, EXPJ315, EXPJ225, EXPJ135, EXPJ225, EXPJ315,
-                        EXPJ45, EXPJ135, EXPJ45, EXPJ315, EXPJ225, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ225, EXPJ135, EXPJ225, EXPJ135,
-                        EXPJ225, EXPJ315, EXPJ225, EXPJ315, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ45, EXPJ315,
-                        EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ225, EXPJ135,
-                        EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ45, EXPJ315,
-                        EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ225, EXPJ315)
-            frame_len = ((slots + 1) * 90) + (n_pilot_blks * 36)
-            pilot_blk_1 = generate_pilot_blk([
-                3, 2, 2, 2, 1, 1, 2, 3, 2, 0, 1, 3, 1, 2, 0, 0, 3, 0, 0, 0, 1,
-                2, 2, 3, 2, 2, 3, 3, 1, 2, 3, 2, 3, 1, 1, 0
-            ])
-            pilot_blk_2 = generate_pilot_blk([
-                0, 3, 1, 3, 3, 3, 1, 2, 2, 1, 1, 2, 2, 2, 3, 1, 2, 1, 3, 3, 2,
-                1, 3, 0, 3, 1, 3, 1, 0, 0, 2, 0, 3, 2, 2, 2
-            ])
-            plframe = plheader + tuple(np.zeros(16 * 90)) + pilot_blk_1 + \
-                tuple(np.zeros(16 * 90)) + pilot_blk_2 + \
-                tuple(np.zeros(13 * 90))
+        # --- Input ---
+        self._set_test_plframe(pilots)
+        in_syms = replicate_plframes(nframes, self.plframe)
+        if (rnd_offset):
+            delay = 2 * np.random.randint(1000)
+            in_syms = tuple(np.zeros(delay)) + in_syms
+            # NOTE: the delay has to be an even number, otherwise the scheduler
+            # may not process all the test samples.
 
+        # --- Blocks ---
+        src = blocks.vector_source_c(in_syms)
+        phase_rot = 2 * pi * freq_offset
+        chan_rot = blocks.rotator_cc(phase_rot)  # channel rotation
+        freq_corr_rot = blocks.rotator_cc(0, True)  # frequency correction
+        # Restrict the rotator output buffer to reduce the chances of missing
+        # the frequency corrections published via message port.
+        freq_corr_rot.set_max_output_buffer(1024)
+        noise = analog.noise_source_c(analog.GR_GAUSSIAN, noise_std, 0)
+        nadder = blocks.add_cc()
+        self.plsync = plsync = plsync_cc(self.gold_code, self.freq_est_period,
+                                         self.sps, self.debug_level)
+        if debug_tags:
+            snk = blocks.tag_debug(gr.sizeof_gr_complex, "XFECFRAME")
+            snk.set_save_all(True)
         else:
-            # This PLHEADER corresponds to:
-            # {MODCOD: 21, Short FECFRAME: 1, Pilots: 0}
-            # {n_mod: 4, S: 45, PLFRAME length: 4140}
-            slots = 45
-            n_pilot_blks = 0
-            modcod = 21
-            short_frame = True
-            plheader = (EXPJ45, EXPJ315, EXPJ225, EXPJ135, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ225, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ225, EXPJ135, EXPJ225, EXPJ315,
-                        EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ225, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ225, EXPJ315, EXPJ225, EXPJ135,
-                        EXPJ45, EXPJ315, EXPJ45, EXPJ135, EXPJ225, EXPJ315,
-                        EXPJ225, EXPJ315, EXPJ225, EXPJ315, EXPJ225, EXPJ315,
-                        EXPJ225, EXPJ135, EXPJ225, EXPJ135, EXPJ45, EXPJ315,
-                        EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ225, EXPJ315,
-                        EXPJ225, EXPJ135, EXPJ45, EXPJ135, EXPJ45, EXPJ315,
-                        EXPJ225, EXPJ315, EXPJ225, EXPJ135, EXPJ45, EXPJ135,
-                        EXPJ225, EXPJ315, EXPJ45, EXPJ315, EXPJ225, EXPJ135)
-            frame_len = ((slots + 1) * 90)
-            payload = tuple(np.zeros(frame_len - 90))
-            plframe = plheader + payload
+            snk = blocks.null_sink(gr.sizeof_gr_complex)
 
-        xfecframe_len = slots * 90
+        # Scale the combination of signal+noise such that it achieves unit RMS.
+        # This scaling represents a static/converged (ideal) AGC. It is
+        # required because the PL Sync block assumes the input has unit RMS.
+        rms = sqrt(noise_std**2 + 1)  # assuming the original signal RMS=1
+        gain = 1 / rms
+        static_agc = blocks.multiply_const_cc(gain)
 
-        # Save some attributes
-        self.mod_plheader = plheader
-        self.frame_len = frame_len
-        self.xfecframe_len = xfecframe_len
+        # --- Connections ---
+        self.tb.connect(src, chan_rot)
+        self.tb.connect(chan_rot, (nadder, 0))
+        self.tb.connect(noise, (nadder, 1))
+        if (closed_loop):
+            self.tb.msg_connect((plsync, 'rotator_phase_inc'),
+                                (freq_corr_rot, 'cmd'))
+            self.tb.connect(nadder, static_agc, freq_corr_rot, plsync, snk)
+        else:
+            self.tb.connect(nadder, static_agc, plsync, snk)
+
+        # --- Run ---
+        self.tb.run()
+
+        if (debug_tags):
+            return snk.current_tags()
+
+    def _set_test_plframe(self, pilots):
+        """Define the PLFRAME to be used for testing"""
+        plframe, modcod, short_frame, slots = get_test_plframe(pilots)
+        n_pilot_blks = floor(slots / 16) if pilots else 0
+        self.frame_len = ((slots + 1) * 90) + (n_pilot_blks * 36)
+        self.xfecframe_len = slots * 90
         self.modcod = modcod
         self.short_frame = short_frame
         self.plframe = plframe
-
-    def _gen_plframes(self, n):
-        """Generate n blank PLFRAMEs
-
-        PLHEADER is legit, but data symbols are simply zero-valued
-
-        Args:
-            n : Number of PLFRAMEs to generate
-
-        """
-        assert (n > 0)
-
-        # Repeat the test PLFRAME n times
-        seq = self.plframe
-        i_rep = 0
-        while (i_rep < n - 1):
-            seq += self.plframe
-            i_rep += 1
-
-        # Add an extra PLHEADER in the end due to how PLFRAMEs are found
-        # between two consecutive SOFs. Ultimately, the sequence will have n
-        # full PLFRAMES and n+1 PLHEADERS.
-        seq += self.mod_plheader
-
-        return seq
 
     def _assert_tags(self,
                      tags,
@@ -211,27 +280,25 @@ class qa_plsync_cc(gr_unittest.TestCase):
                      val_expected,
                      offset_expected,
                      val_equality=True,
-                     places=1):
+                     places=7):
         """Assert that tag(s) are located and valued as expected
 
         Args:
-            tags            : vector of tags obtained with a Tag Debug block
-            key             : key of the tag of interest
-            n_expected      : number of tags that were expected
-            val_expected    : values expected for each tag
-            offset_expected : symbol index where we expect to see the tag
-            val_equality    : whether the expected value should be checked for
-                              equality. Otherwise, expect the tag value to be
-                              greater than the corresponding `val_expected`.
-            places          : decimal places when checking equality
+            tags (list): Vector of tags obtained from the Tag Debug block..
+            key (str): Key of the tag of interest.
+            n_expected (int): Number of tags that were expected.
+            val_expected (list): Values expected for each tag.
+            offset_expected (list): Symbol index where the tags are expected.
+            val_equality (bool): Whether the expected value should be checked
+                for equality. Otherwise, expect the tag value to be greater
+                than the corresponding `val_expected`.
+            places (int): decimal places when checking equality
 
         """
         assert (type(val_expected) is list)
         assert (type(offset_expected) is list)
-        assert(n_expected == len(val_expected)), \
-            "Please provide all {} expected values".format(n_expected)
-        assert(n_expected == len(offset_expected)), \
-            "Please provide all {} expected offsets".format(n_expected)
+        assert (n_expected == len(val_expected))
+        assert (n_expected == len(offset_expected))
 
         # Filter tags by key
         filt_tags = list()
@@ -247,167 +314,92 @@ class qa_plsync_cc(gr_unittest.TestCase):
                 tag_val = (pmt.to_long(pmt.car(tag.value)),
                            pmt.to_bool(pmt.cdr(tag.value)))
             else:
-                # Check the value of the tag
-                tag_val = pmt.to_double(tag.value)
+                tag_val = (pmt.to_double(tag.value), )
 
-            if (type(val_expected[i]) is tuple):
-                for j, val in enumerate(val_expected[i]):
-                    if (val_equality):
-                        self.assertAlmostEqual(tag_val[j], val, places=places)
-                    else:
-                        self.assertTrue(tag_val[j] > val)
-            else:
+            if (not isinstance(val_expected[i], tuple)):
+                val_expected[i] = (val_expected[i], )
+
+            for j, val in enumerate(val_expected[i]):
                 if (val_equality):
-                    self.assertAlmostEqual(tag_val,
-                                           val_expected[i],
-                                           places=places)
+                    self.assertAlmostEqual(tag_val[j], val, places=places)
                 else:
-                    self.assertTrue(tag_val > val_expected[i])
+                    self.assertTrue(tag_val[j] > val)
 
             # Check the location (symbol index/offset) of the tag
             self.assertEqual(tag.offset, offset_expected[i])
 
-    # @unittest.skip
     def test_detect_ideal_plheader(self):
-        """Test detection of ideal/noiseless modulated PLHEADER
+        """Test detection of ideal/noiseless modulated PLHEADERs
 
-        PLHEADER is the ideal pi/2 BPSK-modulated header with PLSC scrambled,
-        in the absence of noise and any other impairment.
+        The PL Sync block shall tag the first data symbol after each PLHEADER,
+        i.e., the start of each output XFECFRAME. Each tag must contain the
+        correct PLSC information.
 
         """
-
-        mod_syms = self._gen_plframes(2)  # at least two PLFRAMEs for locking
-
-        # Flowgraph
-        src = blocks.vector_source_c(mod_syms)
-        plsync = plsync_cc(self.gold_code, self.freq_est_period, self.sps,
-                           self.debug_level)
-        snk = blocks.tag_debug(gr.sizeof_gr_complex, "XFECFRAME")
-        snk.set_save_all(True)
-        self.tb.connect(src, plsync, snk)
-        self.tb.run()
-
-        # The block shall add a tag on the first data symbol after each
-        # PLHEADER, i.e., at the start of each output XFECFRAME. Each tag must
-        # contain the correct PLSC info.
-        tags = snk.current_tags()
+        nframes = 2  # at least two PLFRAMEs for locking
+        tags = self._run_flowgraph(nframes)
         self._assert_tags(tags, "XFECFRAME", 2,
                           [(self.modcod, self.short_frame),
                            (self.modcod, self.short_frame)],
                           [0, self.xfecframe_len])
 
-    # @unittest.skip
     def test_detect_noisy_plheader_open_loop(self):
         """Test detection of a noisy modulated PLHEADER in open loop
 
-        Test detection of a PLHEADER with phase rotation due to freq. offset,
-        AWGN, and a time offset. Test the open-loop approach, where the PL Sync
+        In this case, the PLHEADER is disturbed by frequency offset, AWGN, and
+        a time offset (delay). Test the open-loop approach, where the PL Sync
         block does not rely on an external rotator for frequency correction.
 
-        """
+        The PL Sync block should detect the PLHEADERs and tag the start of the
+        corresponding XFECFRAMEs. The random time offset should not change the
+        tag location, as the corresponding zero samples representing the time
+        offset do not reach the output (only the actual XFECFRAMEs are output).
 
-        # Parameters
+        """
         snr_db = 5.0  # SNR in dB
         fe = 0.2  # normalized frequency offset
-
-        # Constants
-        phase_inc = 2 * pi * fe
-        noise_std = calc_noise_std(snr_db)
-
-        # Random time offset: prepend zeros to the symbol sequence
-        mod_syms = tuple(np.zeros(np.random.randint(1000)))
-        mod_syms += self._gen_plframes(2)  # at least 2 PLFRAMEs for locking
-
-        # Flowgraph
-        src = blocks.vector_source_c(mod_syms)
-        rot = blocks.rotator_cc(phase_inc)
-        noise = analog.noise_source_c(analog.GR_GAUSSIAN, noise_std, 0)
-        nadder = blocks.add_cc()
-        plsync = plsync_cc(self.gold_code, self.freq_est_period, self.sps,
-                           self.debug_level)
-        snk = blocks.tag_debug(gr.sizeof_gr_complex, "XFECFRAME")
-        snk.set_save_all(True)
-        self.tb.connect(src, rot)
-        self.tb.connect(rot, (nadder, 0))
-        self.tb.connect(noise, (nadder, 1))
-        self.tb.connect(nadder, plsync, snk)
-        self.tb.run()
-
-        # Check the tag at the start of each output XFECFRAME. The zeros (i.e.,
-        # time offset) preceding the first PLFRAME should not change anything.
-        tags = snk.current_tags()
+        nframes = 2  # at least two PLFRAMEs for locking
+        tags = self._run_flowgraph(nframes,
+                                   freq_offset=fe,
+                                   noise_std=calc_noise_std(snr_db),
+                                   rnd_offset=True)
         self._assert_tags(tags, "XFECFRAME", 2,
                           [(self.modcod, self.short_frame),
                            (self.modcod, self.short_frame)],
                           [0, self.xfecframe_len])
 
-    # @unittest.skip
     def test_detect_noisy_plheader_closed_loop(self):
-        """Test detection of a noisy modulated PLHEADER
+        """Test detection of a noisy modulated PLHEADER in closed loop
 
-        Test detection of a PLHEADER with phase rotation due to freq. offset,
-        AWGN, and a time offset. Test the closed-loop approach, where the PL
-        Sync block relies on an external rotator for frequency correction.
+        Same as the preceding test, but in closed loop.
 
         """
-
-        # Parameters
         snr_db = 5.0  # SNR in dB
         fe = 0.2  # normalized frequency offset
-
-        # Constants
-        phase_inc = 2 * pi * fe
-        noise_std = calc_noise_std(snr_db)
-
-        # Overwrite the test PLHEADER - add pilot symbols to test the
-        # pilot-based fine frequency offset estimation
-        self._set_test_plframe(pilots=True)
-
-        # Random time offset: prepend zeros to the symbol sequence
-        mod_syms = tuple(np.zeros(np.random.randint(1000)))
-        mod_syms += self._gen_plframes(2)  # at least 2 PLFRAMEs for locking
-
-        # Flowgraph including the freq. offset correction derotator
-        src = blocks.vector_source_c(mod_syms)
-        channel_rot = blocks.rotator_cc(phase_inc)
-        freq_corr_rot = blocks.rotator_cc(0, True)
-        freq_corr_rot.set_max_output_buffer(1024)
-        # Restrict the rotator output buffer to reduce the chances of missing
-        # the frequency corrections published via message port.
-        noise = analog.noise_source_c(analog.GR_GAUSSIAN, noise_std, 0)
-        nadder = blocks.add_cc()
-        plsync = plsync_cc(self.gold_code, self.freq_est_period, self.sps,
-                           self.debug_level)
-        snk = blocks.tag_debug(gr.sizeof_gr_complex, "XFECFRAME")
-        snk.set_save_all(True)
-        self.tb.msg_connect((plsync, 'rotator_phase_inc'),
-                            (freq_corr_rot, 'cmd'))
-        self.tb.connect(src, channel_rot)
-        self.tb.connect(channel_rot, (nadder, 0))
-        self.tb.connect(noise, (nadder, 1))
-        self.tb.connect(nadder, freq_corr_rot, plsync, snk)
-        self.tb.run()
-
-        # Check the tag at the start of each output XFECFRAME. The zeros (i.e.,
-        # time offset) preceding the first PLFRAME should not change anything.
-        tags = snk.current_tags()
+        nframes = 2  # at least two PLFRAMEs for locking
+        tags = self._run_flowgraph(nframes,
+                                   freq_offset=fe,
+                                   noise_std=calc_noise_std(snr_db),
+                                   rnd_offset=True,
+                                   closed_loop=True)
         self._assert_tags(tags, "XFECFRAME", 2,
                           [(self.modcod, self.short_frame),
                            (self.modcod, self.short_frame)],
                           [0, self.xfecframe_len])
 
-    # @unittest.skip
     def test_non_plheader_qpsk(self):
         """Test random sequence of noisy QPSK symbols
 
-        This sequence does not contain the PLHEADER and, hence, it should not
-        lead to a false positive frame detection.
+        This sequence does not contain the PLHEADER and, therefore, it should
+        not lead to a false-positive frame detection.
 
         """
-
         # Parameters
-        snr_db = 10.0
+        snr_db = 0.0
         frame_len = 10000
+        agc_rate = 1e-2
+        agc_gain = 1
+        agc_ref = 1
 
         # Constants
         bits_per_sym = 2
@@ -424,6 +416,8 @@ class qa_plsync_cc(gr_unittest.TestCase):
         cmap = digital.chunks_to_symbols_bc(qpsk_const)
         noise = analog.noise_source_c(analog.GR_GAUSSIAN, noise_std, 0)
         nadder = blocks.add_cc()
+        agc = analog.agc_cc(agc_rate, agc_ref, agc_gain)
+        agc.set_max_gain(65536)
         plsync = plsync_cc(self.gold_code, self.freq_est_period, self.sps,
                            self.debug_level)
         snk = blocks.tag_debug(gr.sizeof_gr_complex, "SOF")
@@ -432,14 +426,13 @@ class qa_plsync_cc(gr_unittest.TestCase):
         self.tb.connect(src, pack, cmap)
         self.tb.connect(cmap, (nadder, 0))
         self.tb.connect(noise, (nadder, 1))
-        self.tb.connect(nadder, plsync, snk)
+        self.tb.connect(nadder, agc, plsync, snk)
         self.tb.run()
 
         # Check if there was any false positive
         tags = snk.current_tags()
         self.assertTrue(len(tags) == 0)
 
-    # @unittest.skip
     def test_freq_est_noiseless_rot_stream_open_loop(self):
         """Test frequency offset estimation over noiseless but rotated stream
 
@@ -450,183 +443,57 @@ class qa_plsync_cc(gr_unittest.TestCase):
         period=1 for the coarse frequency offset estimation.
 
         """
-
-        # Parameters
         fe = np.random.uniform(-.25, .25)  # normalized frequency offset
+        nframes = 1  # one frame is enough to estimate
+        self._run_flowgraph(nframes, freq_offset=fe, debug_tags=False)
+        self.assertAlmostEqual(self.plsync.get_freq_offset(), fe)
 
-        # Constants
-        phase_inc = 2 * pi * fe
-        frames = self._gen_plframes(1)  # one frame is enough to estimate
-
-        # Flowgraph
-        src = blocks.vector_source_c(frames)
-        rot = blocks.rotator_cc(phase_inc)
-        plsync = plsync_cc(self.gold_code, self.freq_est_period, self.sps,
-                           self.debug_level)
-        snk = blocks.null_sink(gr.sizeof_gr_complex)
-        self.tb.connect(src, rot, plsync, snk)
-        self.tb.run()
-
-        # Expect an accurate estimate for a noiseless stream
-        self.assertAlmostEqual(plsync.get_freq_offset(), fe)
-
-    # @unittest.skip
-    def test_freq_est_noisy_rot_stream_open_loop(self):
-        """Test frequency offset estimation over noisy and rotated stream
-
-        This time, introduce AWGN at various SNR levels. To overcome the noise,
-        estimate the coarse frequency offset over a non-unitary and
-        sufficiently large period to achieve better averaging.
-
-        Also, continue to use the open-loop approach, where the PL Sync works
-        standalone without an external rotator block. Note that, in the
-        open-loop configuration, the fine frequency offset estimation in most
-        cases won't be active, as the coarse frequency offset estimate never
-        falls into a lower range without the actual closed-loop corrections
-        (unless the actual offset is already low). Hence, the results are not
-        expected to be very accurate, especially under low SNR levels.
-
-        """
-
-        # Paramet3rs
-        n_frames = 200
-        freq_est_period = 100
-
-        # Generate the PLFRAME stream and prepend a random time offset
-        frames = tuple(np.zeros(np.random.randint(1000)))
-        frames += self._gen_plframes(n_frames)
-
-        # Iterate over SNR levels
-        for snr_db in reversed(range(-1, 10)):
-            print("Try SNR: %.1f dB" % (snr_db))
-            # Generate a new uniformly-distributed freq. offset realization
-            fe = np.random.uniform(-.25, .25)
-            phase_inc = 2 * pi * fe
-
-            # Update the noise amplitude for the target SNR
-            noise_std = calc_noise_std(snr_db)
-
-            # Re-generate the flowgraph every time to clear the state and the
-            # tags held within the Tag Debug block
-            src = blocks.vector_source_c(frames)
-            rot = blocks.rotator_cc(phase_inc)
-            noise = analog.noise_source_c(analog.GR_GAUSSIAN, noise_std, 0)
-            nadder = blocks.add_cc()
-            plsync = plsync_cc(self.gold_code, freq_est_period, self.sps,
-                               self.debug_level)
-            snk = blocks.null_sink(gr.sizeof_gr_complex)
-            self.tb.connect(src, rot)
-            self.tb.connect(rot, (nadder, 0))
-            self.tb.connect(noise, (nadder, 1))
-            self.tb.connect(nadder, plsync, snk)
-            self.tb.run()
-
-            # Expect a rough estimate, especially due to the low SNR levels
-            self.assertAlmostEqual(plsync.get_freq_offset(), fe, places=2)
-
-    # @unittest.skip
     def test_freq_est_noiseless_rot_stream_closed_loop(self):
-        """Test closed-loop freq. estimation over a noiseless but rotated stream
+        """Test closed-loop freq. estimation over a noiseless+rotated stream
 
-        Test PLFRAMEs disturbed by frequency and phase offset only, without any
-        AWG noise. Test the closed-loop correction, where the PL Sync block
-        coordinates an external rotator block. Assume the PLFRAMEs contain
-        pilot symbols so that the pilot-mode fine offset estimation is used by
-        the PL Sync block when the residual frequency offset (after
-        corrections) falls within the fine estimation range.
+        Same as the previous test, but in closed-loop and with PLFRAMEs
+        containing pilot symbols so that the pilot-mode fine frequency offset
+        estimation can be used by the PL Sync block.
 
         """
-
-        # Parameters
         fe = np.random.uniform(-.25, .25)  # normalized frequency offset
+        nframes = 3
+        # Three frames are enough to produce one fine frequency offset
+        # estimate. The second PLHEADER is when the frame synchronizer locks,
+        # so it sends the frequency correction to the rotator. On the third
+        # PLHEADER, the correction is already applied, so the frequency
+        # synchronizer should enter the coarse-corrected state. Finally, the
+        # fine estimate is obtained after processing the third payload.
+        self._run_flowgraph(nframes,
+                            freq_offset=fe,
+                            closed_loop=True,
+                            pilots=True,
+                            debug_tags=False)
+        self.assertAlmostEqual(self.plsync.get_freq_offset(), fe)
 
-        # Constants
-        phase_inc = 2 * pi * fe
-
-        # Overwrite the default pilotless test PLHEADER to one with pilots.
-        self._set_test_plframe(pilots=True)
-
-        # Generate the PLFRAMEs and prepend a random time offset
-        mod_syms = tuple(np.zeros(np.random.randint(1000)))
-        mod_syms += self._gen_plframes(2)
-        # Two frames are enough to produce one fine estimate. The first frame
-        # leads to a coarse frequency offset estimate and a corresponding
-        # correction scheduled to the start of the succeeding frame. On the
-        # second frame, the coarse corrected state is achieved. Hence, when
-        # processing the second payload, the fine estimate is produced.
-
-        # Flowgraph including the freq. offset correction derotator
-        src = blocks.vector_source_c(mod_syms)
-        channel_rot = blocks.rotator_cc(phase_inc)
-        freq_corr_rot = blocks.rotator_cc(0, True)
-        freq_corr_rot.set_max_output_buffer(1024)
-        # Restrict the rotator output buffer to reduce the chances of missing
-        # the frequency corrections published via message port.
-        plsync = plsync_cc(self.gold_code, self.freq_est_period, self.sps,
-                           self.debug_level)
-        snk = blocks.null_sink(gr.sizeof_gr_complex)
-        self.tb.msg_connect((plsync, 'rotator_phase_inc'),
-                            (freq_corr_rot, 'cmd'))
-        self.tb.connect(src, channel_rot, freq_corr_rot, plsync, snk)
-        self.tb.run()
-
-        # The PL Sync block returns the cumulative frequency offset, not the
-        # residual frequency offset. Hence, the result should converge to fe.
-        self.assertAlmostEqual(plsync.get_freq_offset(), fe)
-
-    # @unittest.skip
     def test_freq_est_noisy_rot_stream_closed_loop(self):
         """Test closed-loop freq. estimation over a noisy but rotated stream
 
-        Similar to test_freq_est_noisy_rot_stream_open_loop, but in closed
-        loop, i.e., with an external rotator block for frequency correction.
+        This time, introduce AWGN at various SNR levels. To overcome the noise,
+        estimate the coarse frequency offset over a sufficiently large period
+        to achieve better averaging. Also, use the closed-loop architecture,
+        and PLFRAMEs containing pilot symbols, such that fine frequency offset
+        estimations can be used to boost the performance.
 
         """
-
-        # Paramet3rs
-        n_frames = 200
-        freq_est_period = 100
-
-        # Overwrite the default pilotless test PLHEADER to one with pilots.
-        self._set_test_plframe(pilots=True)
-
-        # Generate the PLFRAME stream and prepend a random time offset
-        frames = tuple(np.zeros(np.random.randint(1000)))
-        frames += self._gen_plframes(n_frames)
-
-        # Iterate over SNR levels
-        for snr_db in [-1]:  #reversed(range(-1, 10)):
+        nframes = 200
+        self.freq_est_period = 30
+        for snr_db in reversed(range(0, 10)):
             print("Try SNR: %.1f dB" % (snr_db))
-            # Generate a new uniformly-distributed freq. offset realization
-            fe = np.random.uniform(-.25, .25)
-            phase_inc = 2 * pi * fe
-
-            # Update the noise amplitude for the target SNR
-            noise_std = calc_noise_std(snr_db)
-
-            # Re-generate the flowgraph every time to clear the state and the
-            # tags held within the Tag Debug block
-            src = blocks.vector_source_c(frames)
-            channel_rot = blocks.rotator_cc(phase_inc)
-            freq_corr_rot = blocks.rotator_cc(0, True)
-            freq_corr_rot.set_max_output_buffer(1024)
-            # Restrict the rotator output buffer to reduce the chances of missing
-            # the frequency corrections published via message port.
-            noise = analog.noise_source_c(analog.GR_GAUSSIAN, noise_std, 0)
-            nadder = blocks.add_cc()
-            plsync = plsync_cc(self.gold_code, freq_est_period, self.sps,
-                               self.debug_level)
-            snk = blocks.null_sink(gr.sizeof_gr_complex)
-            self.tb.msg_connect((plsync, 'rotator_phase_inc'),
-                                (freq_corr_rot, 'cmd'))
-            self.tb.connect(src, channel_rot)
-            self.tb.connect(channel_rot, (nadder, 0))
-            self.tb.connect(noise, (nadder, 1))
-            self.tb.connect(nadder, freq_corr_rot, plsync, snk)
-            self.tb.run()
-
+            fe = np.random.uniform(-.25, .25)  # random frequency offset
+            self._run_flowgraph(nframes,
+                                freq_offset=fe,
+                                noise_std=calc_noise_std(snr_db),
+                                closed_loop=True,
+                                pilots=True,
+                                debug_tags=False)
             # Expect a rough estimate, especially due to the low SNR levels
-            self.assertAlmostEqual(plsync.get_freq_offset(), fe, places=2)
+            self.assertAlmostEqual(self.plsync.get_freq_offset(), fe, places=2)
 
 
 if __name__ == '__main__':
