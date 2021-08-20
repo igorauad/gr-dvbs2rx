@@ -9,93 +9,76 @@
 # Full DVB-S2 receiver. Processes input IQ samples and outputs MPEG TS packets.
 
 import ctypes
-import os
 import signal
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from distutils.version import StrictVersion
 
 import sip
 from PyQt5 import Qt
-from gnuradio import qtgui
+from gnuradio import analog
 from gnuradio import blocks
-from gnuradio import gr
-from gnuradio.fft import window
-
-from gnuradio.eng_arg import eng_float, intx
+from gnuradio import digital
 from gnuradio import eng_notation
+from gnuradio import gr
+from gnuradio import qtgui
+from gnuradio import soapy
+from gnuradio.eng_arg import eng_float, intx
+from gnuradio.fft import window
+from gnuradio.filter import firdes
 
-sys.path.append(
-    os.environ.get('GRC_HIER_PATH', os.path.expanduser('~/.grc_gnuradio')))
-from dvbs2rx_rx_hier import dvbs2rx_rx_hier  # noqa: E402
+import dvbs2rx
 
 
 class dvbs2_rx(gr.top_block, Qt.QWidget):
-    def __init__(self,
-                 agc_gain=1,
-                 agc_rate=1e-5,
-                 agc_ref=1,
-                 debug=0,
-                 frame_size='normal',
-                 gold_code=0,
-                 gui=False,
-                 in_fd=0,
-                 modcod='QPSK1/4',
-                 out_fd='1',
-                 out_filename="",
-                 pl_freq_est_period=20,
-                 rolloff=0.2,
-                 rrc_delay=50,
-                 rrc_nfilts=32,
-                 sink="fd",
-                 source="fd",
-                 sps=2,
-                 sym_rate=1000000,
-                 sym_sync_damping=1.0,
-                 sym_sync_loop_bw=0.0045):
+    def __init__(self, options):
         gr.top_block.__init__(self, "DVB-S2 Rx", catch_exceptions=True)
 
         ##################################################
         # Parameters
         ##################################################
-        self.agc_gain = agc_gain
-        self.agc_rate = agc_rate
-        self.agc_ref = agc_ref
-        self.debug = debug
-        self.frame_size = frame_size
-        self.gold_code = gold_code
-        self.gui = gui
-        self.in_fd = in_fd
-        self.modcod = modcod
-        self.out_fd = out_fd
-        self.out_filename = out_filename
-        self.pl_freq_est_period = pl_freq_est_period
-        self.rolloff = rolloff
-        self.rrc_delay = rrc_delay
-        self.rrc_nfilts = rrc_nfilts
-        self.sink = sink
-        self.source = source
-        self.sps = sps
-        self.sym_rate = sym_rate
-        self.sym_sync_damping = sym_sync_damping
-        self.sym_sync_loop_bw = sym_sync_loop_bw
+        self.agc_gain = options.agc_gain
+        self.agc_rate = options.agc_rate
+        self.agc_ref = options.agc_ref
+        self.debug = options.debug
+        self.frame_size = options.frame_size
+        self.freq = options.freq
+        self.gain = options.gain
+        self.gold_code = options.gold_code
+        self.gui = options.gui
+        self.in_fd = options.in_fd
+        self.in_filename = options.in_filename
+        self.modcod = options.modcod
+        self.out_fd = options.out_fd
+        self.out_filename = options.out_filename
+        self.pl_freq_est_period = options.pl_freq_est_period
+        self.rolloff = options.rolloff
+        self.rrc_delay = options.rrc_delay
+        self.rrc_nfilts = options.rrc_nfilts
+        self.sink = options.sink
+        self.source = options.source
+        self.sps = options.sps
+        self.sym_rate = options.sym_rate
+        self.sym_sync_damping = options.sym_sync_damping
+        self.sym_sync_loop_bw = options.sym_sync_loop_bw
 
         ##################################################
         # Variables
         ##################################################
-        code_rate = modcod.upper().replace("8PSK", "").replace("QPSK", "")
+        code_rate = self.modcod.upper().replace("8PSK", "").replace("QPSK", "")
         self.code_rate = code_rate
-        self.samp_rate = sym_rate * sps
+        self.samp_rate = self.sym_rate * self.sps
         self.plheader_len = 90
         self.plframe_len = 33282
         self.pilot_len = int((360 - 1) / 16) * 36
-        self.n_rrc_taps = int(rrc_delay * sps) + 1
-        self.constellation = modcod.replace(code_rate, "")
+        self.n_rrc_taps = int(self.rrc_delay * self.sps) + 1
+        self.constellation = self.modcod.replace(code_rate, "")
 
         if (self.gui):
             self.setup_gui()
-
-        self.setup_flowgraph()
+        source_block = self.connect_source()
+        sink_block = self.connect_sink()
+        self.connect_dvbs2rx(source_block, sink_block)
 
     def setup_gui(self):
         Qt.QWidget.__init__(self)
@@ -424,88 +407,139 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
             self.qtgui_const_sink_x_1.pyqwidget(), Qt.QWidget)
         self.tabs_layout_4.addWidget(self._qtgui_const_sink_x_1_win)
 
-    def setup_flowgraph(self):
-        # IQ Sample Source
-        if (self.source == "fd"):
-            # Read IQ stream from a file descriptor while assuming the stream
-            # is composed of uint8_t I and Q values. Convert the independent
-            # uint8_t streams into a single complex stream.
-            self.blocks_fd_source = blocks.file_descriptor_source(
-                gr.sizeof_char, self.in_fd, False)
-            self.blocks_deinterleave = blocks.deinterleave(gr.sizeof_char, 1)
-            self.blocks_uchar_to_float_0 = blocks.uchar_to_float()
-            self.blocks_uchar_to_float_1 = blocks.uchar_to_float()
-            self.blocks_add_const_ff_0 = blocks.add_const_ff(-127)
-            self.blocks_add_const_ff_1 = blocks.add_const_ff(-127)
-            self.blocks_multiply_const_ff_1 = blocks.multiply_const_ff(1 / 128)
-            self.blocks_multiply_const_ff_0 = blocks.multiply_const_ff(1 / 128)
-            self.blocks_float_to_complex_0 = blocks.float_to_complex(1)
-            self.blocks_throttle_0 = blocks.throttle(gr.sizeof_gr_complex,
-                                                     self.samp_rate, True)
-            self.connect((self.blocks_fd_source, 0),
-                         (self.blocks_deinterleave, 0))
-            self.connect((self.blocks_deinterleave, 0),
-                         (self.blocks_uchar_to_float_0, 0),
-                         (self.blocks_add_const_ff_0, 0),
-                         (self.blocks_multiply_const_ff_0, 0),
-                         (self.blocks_float_to_complex_0, 0))
-            self.connect((self.blocks_deinterleave, 1),
-                         (self.blocks_uchar_to_float_1, 0),
-                         (self.blocks_add_const_ff_1, 0),
-                         (self.blocks_multiply_const_ff_1, 0),
-                         (self.blocks_float_to_complex_0, 1))
-            self.connect((self.blocks_float_to_complex_0, 0),
-                         (self.blocks_throttle_0, 0))
-            # Alias to connect to the IQ source
-            self.source_block = self.blocks_throttle_0
+    def connect_source(self):
+        """Connect the IQ sample source
 
-        # DVB-S2 Rx
-        self.dvbs2rx_rx_hier_0 = dvbs2rx_rx_hier(
-            agc_gain=self.agc_gain,
-            agc_rate=self.agc_rate,
-            agc_ref=self.agc_ref,
-            debug=self.debug,
-            frame_size=self.frame_size,
-            gold_code=self.gold_code,
-            modcod=self.modcod,
-            pl_freq_est_period=self.pl_freq_est_period,
-            rolloff=self.rolloff,
-            rrc_delay=self.rrc_delay,
-            rrc_nfilts=self.rrc_nfilts,
-            sps=self.sps,
-            sym_rate=self.sym_rate,
-            sym_sync_damping=self.sym_sync_damping,
-            sym_sync_loop_bw=self.sym_sync_loop_bw,
-        )
-        self.connect((self.source_block, 0), (self.dvbs2rx_rx_hier_0, 0))
-
-        # Sink
-        if (self.sink == "fd"):
-            self.blocks_fd_sink = blocks.file_descriptor_sink(
-                gr.sizeof_char, self.out_fd)
-            self.connect((self.dvbs2rx_rx_hier_0, 0), (self.blocks_fd_sink, 0))
-        elif (self.sink == "file"):
-            self.blocks_file_sink = blocks.file_sink(gr.sizeof_char,
-                                                     self.out_filename)
-            self.connect((self.dvbs2rx_rx_hier_0, 0), (self.blocks_fd_sink, 0))
+        Returns:
+            block: Last block object on the source pipeline, which should
+            connect to the DVB-S2 Rx input.
+        """
+        if (self.source == "fd" or self.source == "file"):
+            if (self.source == "fd"):
+                blocks_file_or_fd_source = blocks.file_descriptor_source(
+                    gr.sizeof_char, self.in_fd, False)
+            else:
+                blocks_file_or_fd_source = blocks.file_source(
+                    gr.sizeof_char, self.in_filename, False)
+            # Pipeline to convert the fd/file IQ stream into a complex stream,
+            # assuming the independent I and Q are uint8_t streams.
+            blocks_deinterleave = blocks.deinterleave(gr.sizeof_char, 1)
+            blocks_uchar_to_float_0 = blocks.uchar_to_float()
+            blocks_uchar_to_float_1 = blocks.uchar_to_float()
+            blocks_add_const_ff_0 = blocks.add_const_ff(-127)
+            blocks_add_const_ff_1 = blocks.add_const_ff(-127)
+            blocks_multiply_const_ff_1 = blocks.multiply_const_ff(1 / 128)
+            blocks_multiply_const_ff_0 = blocks.multiply_const_ff(1 / 128)
+            blocks_float_to_complex_0 = blocks.float_to_complex(1)
+            blocks_throttle_0 = blocks.throttle(gr.sizeof_gr_complex,
+                                                self.samp_rate, True)
+            self.connect((blocks_file_or_fd_source, 0),
+                         (blocks_deinterleave, 0))
+            self.connect(
+                (blocks_deinterleave, 0), (blocks_uchar_to_float_0, 0),
+                (blocks_add_const_ff_0, 0), (blocks_multiply_const_ff_0, 0),
+                (blocks_float_to_complex_0, 0))
+            self.connect(
+                (blocks_deinterleave, 1), (blocks_uchar_to_float_1, 0),
+                (blocks_add_const_ff_1, 0), (blocks_multiply_const_ff_1, 0),
+                (blocks_float_to_complex_0, 1))
+            self.connect((blocks_float_to_complex_0, 0),
+                         (blocks_throttle_0, 0))
+            source = blocks_throttle_0
+        elif (self.source == "rtl"):
+            dev = 'driver=rtlsdr'
+            stream_args = ''
+            tune_args = ['']
+            settings = ['']
+            soapy_rtlsdr_source_0 = soapy.source(dev, "fc32", 1, '',
+                                                 stream_args, tune_args,
+                                                 settings)
+            soapy_rtlsdr_source_0.set_sample_rate(0, self.samp_rate)
+            soapy_rtlsdr_source_0.set_gain_mode(0, False)
+            soapy_rtlsdr_source_0.set_frequency(0, self.freq)
+            soapy_rtlsdr_source_0.set_frequency_correction(0, 0)
+            soapy_rtlsdr_source_0.set_gain(0, 'TUNER', self.gain)
+            source = soapy_rtlsdr_source_0
 
         if (self.gui):
             self.blocks_rms_xx_0 = blocks.rms_cf(0.0001)
-            self.connect((self.source_block, 0), (self.blocks_rms_xx_0, 0))
-            self.connect((self.source_block, 0),
-                         (self.qtgui_waterfall_sink_x_0, 0))
+            self.connect((source, 0), (self.blocks_rms_xx_0, 0))
+            self.connect((source, 0), (self.qtgui_waterfall_sink_x_0, 0))
             self.connect((self.blocks_rms_xx_0, 0),
                          (self.qtgui_number_sink_0, 0))
-            self.connect((self.dvbs2rx_rx_hier_0, 1),
-                         (self.qtgui_const_sink_x_1_0, 0))
-            self.connect((self.dvbs2rx_rx_hier_0, 2),
-                         (self.qtgui_const_sink_x_1, 0))
-            self.connect((self.dvbs2rx_rx_hier_0, 2),
-                         (self.qtgui_time_sink_x_1, 0))
-            self.connect((self.dvbs2rx_rx_hier_0, 3),
-                         (self.qtgui_freq_sink_x_0, 1))
-            self.connect((self.dvbs2rx_rx_hier_0, 4),
-                         (self.qtgui_freq_sink_x_0, 0))
+
+        return source
+
+    def connect_sink(self):
+        """Connect the MPEG TS Sink
+
+        Returns:
+            block: First block on the sink pipeline, which should connect to
+            the DVB-S2 Rx output.
+        """
+        if (self.sink == "fd"):
+            sink = blocks.file_descriptor_sink(gr.sizeof_char, self.out_fd)
+        elif (self.sink == "file"):
+            sink = blocks.file_sink(gr.sizeof_char, self.out_filename)
+        return sink
+
+    def connect_dvbs2rx(self, source_block, sink_block):
+        """Connect the DVB-S2 Rx Pipeline
+
+        Implement the following pipeline:
+
+        IQ Input -> AGC -> Rotator -> Symbol Synch -> DVB-S2 PL Sync  ->|
+                                                                        |
+                                                                        |
+        MPEG TS Output <- BBFRAME Processing <- BCH Dec. <- LDPC Dec. <-|
+
+        Args:
+            source_block : The block providing IQ samples into the DVB-S2 Rx.
+            sink_block : The block consuming the MPEG TS output stream.
+
+
+        """
+        translated_params = dvbs2rx.params.translate('DVB-S2', self.frame_size,
+                                                     self.code_rate,
+                                                     self.constellation)
+        standard, frame_size, code_rate, constellation = translated_params
+
+        plsync = dvbs2rx.plsync_cc(self.gold_code, self.pl_freq_est_period,
+                                   self.sps, self.debug)
+        ldpc_decoder = dvbs2rx.ldpc_decoder_cb(standard, frame_size, code_rate,
+                                               constellation,
+                                               dvbs2rx.OM_MESSAGE,
+                                               dvbs2rx.INFO_OFF)
+        bch_decoder = dvbs2rx.bch_decoder_bb(standard, frame_size, code_rate,
+                                             dvbs2rx.OM_MESSAGE)
+        bbdescrambler = dvbs2rx.bbdescrambler_bb(standard, frame_size,
+                                                 code_rate)
+        bbdeheader = dvbs2rx.bbdeheader_bb(standard, frame_size, code_rate)
+        symbol_sync = digital.symbol_sync_cc(
+            digital.TED_GARDNER, self.sps, self.sym_sync_loop_bw,
+            self.sym_sync_damping, 1.0, 1.5, 1,
+            digital.constellation_bpsk().base(), digital.IR_PFB_MF,
+            self.rrc_nfilts,
+            firdes.root_raised_cosine(self.rrc_nfilts,
+                                      self.samp_rate * self.rrc_nfilts,
+                                      self.sym_rate, self.rolloff,
+                                      self.n_rrc_taps * self.rrc_nfilts))
+        rotator = blocks.rotator_cc(0, True)
+        analog_agc = analog.agc_cc(self.agc_rate, self.agc_ref, self.agc_gain)
+        analog_agc.set_max_gain(65536)
+
+        self.msg_connect((plsync, 'rotator_phase_inc'), (rotator, 'cmd'))
+        self.connect((source_block, 0), (analog_agc, 0), (rotator, 0),
+                     (symbol_sync, 0), (plsync, 0), (ldpc_decoder, 0),
+                     (bch_decoder, 0), (bbdescrambler, 0), (bbdeheader, 0),
+                     (sink_block, 0))
+
+        if (self.gui):
+            self.connect((symbol_sync, 0), (self.qtgui_const_sink_x_1_0, 0))
+            self.connect((plsync, 0), (self.qtgui_const_sink_x_1, 0))
+            self.connect((plsync, 0), (self.qtgui_time_sink_x_1, 0))
+            self.connect((analog_agc, 0), (self.qtgui_freq_sink_x_0, 0))
+            self.connect((rotator, 0), (self.qtgui_freq_sink_x_0, 1))
 
     def closeEvent(self, event):
         self.settings = Qt.QSettings("GNU Radio", "dvbs2_rx")
@@ -517,124 +551,108 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
 
 def argument_parser():
     description = 'DVB-S2 receiver'
-    parser = ArgumentParser(description=description)
-    parser.add_argument("--source",
-                        choices=["fd"],
-                        default="fd",
-                        help="Source of the input IQ sample stream")
-    parser.add_argument("--sink",
-                        choices=["fd", "file"],
-                        default="fd",
-                        help="Sink for the output MPEG transport stream")
+    parser = ArgumentParser(prog="dvbs2-rx",
+                            description=description,
+                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--agc-gain",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1)),
+                        help="AGC gain")
+    parser.add_argument("--agc-rate",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1e-5)),
+                        help="AGC update rate")
+    parser.add_argument("--agc-ref",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1)),
+                        help="AGC's reference value")
+    parser.add_argument("-d",
+                        "--debug",
+                        type=int,
+                        default=0,
+                        help="Debugging level")
+    parser.add_argument("--frame-size",
+                        type=str,
+                        default='normal',
+                        help="FECFRAME size")
+    parser.add_argument('-f',
+                        "--freq",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1e9)),
+                        help="Carrier/intermediate frequency in Hz")
+    parser.add_argument('-g',
+                        "--gain",
+                        type=float,
+                        default=40,
+                        help="Receiver gain")
+    parser.add_argument("--gold-code", type=intx, default=0, help="Gold code")
     parser.add_argument("--gui",
                         action='store_true',
                         default=False,
                         help="Launch a graphical user interface (GUI).")
-    parser.add_argument("--agc-gain",
-                        dest="agc_gain",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(1)),
-                        help="AGC gain [default=%(default)r]")
-    parser.add_argument("--agc-rate",
-                        dest="agc_rate",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(1e-5)),
-                        help="AGC update rate [default=%(default)r]")
-    parser.add_argument("--agc-ref",
-                        dest="agc_ref",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(1)),
-                        help="AGC's reference value [default=%(default)r]")
-    parser.add_argument("-d",
-                        "--debug",
-                        dest="debug",
+    parser.add_argument("--in-fd",
                         type=intx,
                         default=0,
-                        help="Debugging level [default=%(default)r]")
-    parser.add_argument("-f",
-                        "--frame-size",
-                        dest="frame_size",
+                        help="Input file descriptor used if \"--source=fd\"")
+    parser.add_argument("--in-filename",
                         type=str,
-                        default='normal',
-                        help="FECFRAME size [default=%(default)r]")
-    parser.add_argument("--gold-code",
-                        dest="gold_code",
-                        type=intx,
-                        default=0,
-                        help="Gold code [default=%(default)r]")
-    parser.add_argument("-I",
-                        "--in-fd",
-                        dest="in_fd",
-                        type=intx,
-                        default=0,
-                        help="Input file descriptor [default=%(default)r]")
+                        help="Input file name used if \"--source=file\"")
     parser.add_argument("-m",
                         "--modcod",
-                        dest="modcod",
                         type=str,
                         default='QPSK1/4',
-                        help="Target MODCOD [default=%(default)r]")
-    parser.add_argument(
-        "-O",
-        "--out-fd",
-        dest="out_fd",
-        type=intx,
-        default=1,
-        help="Output file descriptor if \"--sink=fd\" [default=%(default)r]")
-    parser.add_argument(
-        "--out-filename",
-        type=str,
-        help="Output file name if \"--sink=file\" [default=%(default)r]")
+                        help="Target MODCOD")
+    parser.add_argument("--out-fd",
+                        type=intx,
+                        default=1,
+                        help="Output file descriptor used if \"--sink=fd\"")
+    parser.add_argument("--out-filename",
+                        type=str,
+                        help="Output file name used if \"--sink=file\"")
     parser.add_argument(
         "--pl-freq-est-period",
-        dest="pl_freq_est_period",
-        type=intx,
+        type=int,
         default=20,
-        help="Coarse frequency offset estimation period in frames "
-        "[default=%(default)r]")
+        help="Coarse frequency offset estimation period in frames ")
     parser.add_argument("-r",
                         "--rolloff",
-                        dest="rolloff",
                         type=eng_float,
                         default=eng_notation.num_to_str(float(0.2)),
-                        help="Rolloff factor [default=%(default)r]")
-    parser.add_argument(
-        "--rrc-delay",
-        dest="rrc_delay",
-        type=intx,
-        default=50,
-        help="RRC filter delay in symbol periods [default=%(default)r]")
+                        help="Rolloff factor")
+    parser.add_argument("--rrc-delay",
+                        type=int,
+                        default=50,
+                        help="RRC filter delay in symbol periods")
     parser.add_argument("--rrc-nfilts",
-                        dest="rrc_nfilts",
-                        type=intx,
+                        type=int,
                         default=32,
-                        help="Number of branches on the polyphase RRC filter "
-                        "[default=%(default)r]")
-    parser.add_argument(
-        "-o",
-        "--sps",
-        dest="sps",
-        type=eng_float,
-        default=eng_notation.num_to_str(float(2)),
-        help="Oversampling ratio in samples per symbol [default=%(default)r]")
+                        help="Number of branches on the polyphase RRC filter")
+    parser.add_argument("--sink",
+                        choices=["fd", "file"],
+                        default="fd",
+                        help="Sink for the output MPEG transport stream")
+    parser.add_argument("--source",
+                        choices=["fd", "file", "rtl"],
+                        default="fd",
+                        help="Source of the input IQ sample stream")
+    parser.add_argument("-o",
+                        "--sps",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(2)),
+                        help="Oversampling ratio in samples per symbol")
     parser.add_argument("-s",
                         "--sym-rate",
-                        dest="sym_rate",
-                        type=intx,
-                        default=1000000,
-                        help="Symbol rate in bauds [default=%(default)r]")
-    parser.add_argument(
-        "--sym-sync-damping",
-        dest="sym_sync_damping",
-        type=eng_float,
-        default=eng_notation.num_to_str(float(1.0)),
-        help="Symbol synchronizer's damping factor [default=%(default)r]")
-    parser.add_argument(
-        "--sym-sync-loop-bw",
-        dest="sym_sync_loop_bw",
-        type=eng_float,
-        default=eng_notation.num_to_str(float(0.0045)),
-        help="Symbol synchronizer's loop bandwidth [default=%(default)r]")
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1000000)),
+                        help="Symbol rate in bauds")
+    parser.add_argument("--sym-sync-damping",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1.0)),
+                        help="Symbol synchronizer's damping factor")
+    parser.add_argument("--sym-sync-loop-bw",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(0.0045)),
+                        help="Symbol synchronizer's loop bandwidth")
     return parser
 
 
@@ -656,27 +674,7 @@ def main():
             Qt.QApplication.setGraphicsSystem(style)
         qapp = Qt.QApplication(sys.argv)
 
-    tb = dvbs2_rx(agc_gain=options.agc_gain,
-                  agc_rate=options.agc_rate,
-                  agc_ref=options.agc_ref,
-                  debug=options.debug,
-                  frame_size=options.frame_size,
-                  gold_code=options.gold_code,
-                  gui=options.gui,
-                  in_fd=options.in_fd,
-                  modcod=options.modcod,
-                  out_fd=options.out_fd,
-                  out_filename=options.out_filename,
-                  pl_freq_est_period=options.pl_freq_est_period,
-                  rolloff=options.rolloff,
-                  rrc_delay=options.rrc_delay,
-                  rrc_nfilts=options.rrc_nfilts,
-                  sink=options.sink,
-                  source=options.source,
-                  sps=options.sps,
-                  sym_rate=options.sym_rate,
-                  sym_sync_damping=options.sym_sync_damping,
-                  sym_sync_loop_bw=options.sym_sync_loop_bw)
+    tb = dvbs2_rx(options)
 
     tb.start()
     if (gui_mode):
