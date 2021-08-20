@@ -161,9 +161,8 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
         // blocks is actively helping this block).
         d_closed_loop = true;
 
-        if (abs(d_rot_ctrl.tag_delay) > tolerance) // sanity check
-            printf("Warning: rot_phase_inc tag delay %d seems too high\n",
-                   d_rot_ctrl.tag_delay);
+        if (abs(error) > tolerance) // sanity check
+            printf("Warning: rot_phase_inc tag offset error is too high: %d\n", error);
 
         if (d_debug_level > 2) {
             printf("[Rotator ctrl] "
