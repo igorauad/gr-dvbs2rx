@@ -11,9 +11,11 @@ namespace gr {
 namespace dvbs2rx {
 
 pl_descrambler::pl_descrambler(int gold_code)
-    : d_gold_code(gold_code), d_payload_buf(MAX_PLFRAME_PAYLOAD)
+    : d_gold_code(gold_code),
+      d_descrambling_seq(MAX_PLFRAME_PAYLOAD),
+      d_payload_buf(MAX_PLFRAME_PAYLOAD)
 {
-    build_symbol_scrambler_table();
+    compute_descrambling_sequence();
 }
 
 int pl_descrambler::parity_chk(long a, long b) const
@@ -29,10 +31,31 @@ int pl_descrambler::parity_chk(long a, long b) const
     return c & 1;
 }
 
-void pl_descrambler::build_symbol_scrambler_table()
+void pl_descrambler::compute_descrambling_sequence()
 {
-    /* From gr-dtv's dvbs2_physical_cc_impl.cc */
-    // Initialisation
+    // The goal of the complex descrambling sequence is to undo the randomization
+    // described in Section 5.5.4 of the standard. The original scrambling sequence
+    // depends only on the Gold code. Hence, the descrambling sequence also follows the
+    // same property. This means that, given the Gold code remains constant throughout the
+    // existence of this object, we can compute the descrambling sequence in advance.
+    //
+    // The i-th value of the scrambling sequence applies to the i-th payload symbol,
+    // counting from the first symbol after the PLHEADER. This i-th scrambling value is
+    // given by "exp(j*Rn[i]*π/2)", which depends on Rn(i), a number within [0,3]. Hence,
+    // the original scrambling is obtained by multiplying each payload symbol by one of
+    // the four possibilities below:
+    //
+    //   - exp(j*0) = 1
+    //   - exp(j*π/2) = j1
+    //   - exp(j*π) = -1
+    //   - exp(j*3*π/2) = -j1
+    //
+    // The descrambling is achieved by multiplying the input symbols by the complex
+    // conjugate of the scrambling factors, which take the following possible values:
+    constexpr gr_complex descrambling_lut[4] = { 1.0, -1.0j, -1.0, 1.0j };
+
+    // In the sequel, compute Rn[i] over MAX_PLFRAME_PAYLOAD. Reuse the implementation
+    // from gr-dtv's dvbs2_physical_cc_impl.cc.
     long x = 0x00001;
     long y = 0x3FFFF;
 
@@ -66,29 +89,15 @@ void pl_descrambler::build_symbol_scrambler_table()
 
         int zna = xc ^ yc;
         int znb = xa ^ yb;
-        d_Rn[i] = (znb << 1) + zna;
+        int Rn = (znb << 1) + zna;
+        d_descrambling_seq[i] = descrambling_lut[Rn];
     }
 }
 
 void pl_descrambler::descramble(const gr_complex* in, uint16_t payload_len)
 {
-    // Undo the mapping given in Section 5.5.4 of the standard
-    for (int i = 0; i < payload_len; i++) {
-        switch (d_Rn[i]) {
-        case 0:
-            d_payload_buf[i] = in[i]; // TODO remove (redudant)
-            break;
-        case 1:
-            d_payload_buf[i] = gr_complex(in[i].imag(), -in[i].real());
-            break;
-        case 2:
-            d_payload_buf[i] = -in[i];
-            break;
-        case 3:
-            d_payload_buf[i] = gr_complex(-in[i].imag(), in[i].real());
-            break;
-        }
-    }
+    volk_32fc_x2_multiply_32fc(
+        d_payload_buf.data(), in, d_descrambling_seq.data(), payload_len);
 }
 
 } // namespace dvbs2rx

@@ -10,6 +10,7 @@
 
 #include "pl_defs.h"
 #include <gnuradio/gr_complex.h>
+#include <dvbs2rx/api.h>
 #include <volk/volk_alloc.hh>
 
 namespace gr {
@@ -18,30 +19,26 @@ namespace dvbs2rx {
 /**
  * \brief PL Descrambler
  *
- * Multiplies the PLFRAME IQ samples (excluding the PLHEADER) by a complex
- * randomization sequence defined by a chosen Gold code.
- *
- * The complex randomization sequence is implemented as a complex symbol mapping
- * table, as specified in Section 5.5.4 of the standard. The table has four
- * mapping possibilities. The rule that applies to the n-th symbol in the
- * payload depends on the value of the integer-valued variable "Rn". The Rn
- * value, in turn, is pre-computed by this class's constructor for all possible
- * payload indexes, starting from n=0 (first payload symbol following the
- * PLHEADER) up to the maximum PLFRAME payload length.
+ * Multiplies the scrambled payload of a PLFRAME by the conjugate of the complex
+ * randomization sequence used on the Tx side for PL scrambling. This multiplication
+ * effectively undoes the scrambling, and the resulting descrambled payload is stored
+ * internally for later access through the `get_payload()` method. This processes depends
+ * only on the Gold code defining the complex scrambling sequence, which must be provided
+ * to the constructor.
  */
-class pl_descrambler
+class DVBS2RX_API pl_descrambler
 {
 private:
-    const int d_gold_code;                  /**< Gold code (scrambling code) */
-    int d_Rn[MAX_PLFRAME_PAYLOAD];          /**< Pre-computed Rn sequence */
-    volk::vector<gr_complex> d_payload_buf; /**< Descrambled payload buffer */
+    const int d_gold_code;                       /**< Gold code (scrambling code) */
+    volk::vector<gr_complex> d_descrambling_seq; /**< Complex descrambling sequence */
+    volk::vector<gr_complex> d_payload_buf;      /**< Descrambled payload buffer */
     int parity_chk(long a, long b) const;
 
     /**
-     * \brief Pre-compute the scrambler table
+     * \brief Pre-compute the complex descrambling sequence
      * \return Void
      */
-    void build_symbol_scrambler_table();
+    void compute_descrambling_sequence();
 
 public:
     pl_descrambler(int gold_code);
@@ -54,7 +51,7 @@ public:
      * the internal descrambled payload buffer, which can be accessed through
      * method `get_payload()`.
      *
-     * \param in (const gr_complex*) Pointer to the target PLFRAME payload
+     * \param in (const gr_complex*) Pointer to the target scrambled PLFRAME payload
      *                               buffer.
      * \param payload_len (uint16_t) Payload length.
      * \note The payload length must be equal to the PLFRAME length minus 90
