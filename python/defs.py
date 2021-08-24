@@ -33,6 +33,35 @@ constellations = {
     }
 }
 
+rolloffs = {
+    0.35: {
+        'def': 'RO_0_35',
+        'standard': ['DVB-S2', 'DVB-S2X']
+    },
+    0.25: {
+        'def': 'RO_0_25',
+        'standard': ['DVB-S2', 'DVB-S2X']
+    },
+    0.2: {
+        'def': 'RO_0_20',
+        'standard': ['DVB-S2', 'DVB-S2X']
+    },
+    0.15: {
+        'def': 'RO_0_15',
+        'standard': ['DVB-S2X']
+    },
+    0.1: {
+        'def': 'RO_0_10',
+        'standard': ['DVB-S2X']
+    },
+    0.05: {
+        'def': 'RO_0_05',
+        'standard': ['DVB-S2X']
+    },
+}
+
+pilots = {False: "PILOTS_OFF", True: "PILOTS_ON"}
+
 ldpc_codes = {
     '1/4': {
         'def': 'C1_4',

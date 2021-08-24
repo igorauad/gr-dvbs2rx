@@ -20,20 +20,27 @@ def _adjust_case(standard, frame_size, constellation):
     return standard, frame_size, constellation
 
 
-def validate(standard, frame_size, code, constellation, vl_snr=False):
+def validate(standard,
+             frame_size,
+             code,
+             constellation=None,
+             rolloff=None,
+             pilots=None,
+             vl_snr=False):
     """Validate DVB-S2/S2X/T2 parameters
 
     Args:
-        standard: DVB standard (DVB-S2, DVB-S2X, DVB-T2)
-        frame_size: Frame size (normal, medium, short)
-        code: LDPC code rate identifier (e.g., 1/4, 1/3, etc.)
-        constellation: Constellation (QPSK, 8PSK, 16QAM, etc.)
-        vl_snr: DVB-S2X very-low (VL) SNR mode
+        standard: DVB standard (DVB-S2, DVB-S2X, DVB-T2).
+        frame_size: Frame size (normal, medium, short).
+        code: LDPC code rate identifier (e.g., 1/4, 1/3, etc.).
+        constellation: Constellation (QPSK, 8PSK, 16QAM, etc.).
+        rolloff: Roll-off factor.
+        pilots: Whether physical layer pilots are enabled.
+        vl_snr: DVB-S2X very-low (VL) SNR mode.
 
     Note:
-        Most blocks take the standard, frame size, and LDPC code as
-        parameters. In contrast, the constellation is only used by the LDPC
-        decoder. Hence, the constellation parameter can be empty.
+        This function assumes the constellation, rolloff, and pilots parameters
+        can be empty, while the other parameters are always defined.
 
     Returns:
         Boolean indicating whether the set of parameters is valid.
@@ -85,24 +92,48 @@ def validate(standard, frame_size, code, constellation, vl_snr=False):
         print("Code rate {} does not support VL-SNR DVB-S2X mode".format(code))
         return False
 
+    if (rolloff is not None):
+        filtered_rolloffs = [
+            key for key, val in defs.rolloffs.items()
+            if standard in val['standard']
+        ]
+        if (rolloff not in filtered_rolloffs):
+            print("{} is not a supported {} roll-off factor".format(
+                rolloff, standard))
+            return False
+
+    if (pilots is not None):
+        if (not isinstance(pilots, bool)):
+            print("The \"pilots\" flag must be a Boolean")
+            return False
+
     return True
 
 
-def translate(standard, frame_size, code, constellation=None, vl_snr=False):
+def translate(standard,
+              frame_size,
+              code,
+              constellation=None,
+              rolloff=None,
+              pilots=None,
+              vl_snr=False):
     """Translate DVB-S2/S2X/T2 parameters to the pybind11 C++ definitions
 
     Args:
-        standard: DVB standard (DVB-S2, DVB-S2X, DVB-T2)
-        frame_size: Frame size (normal, medium, short)
-        code: LDPC code rate identifier (e.g., 1/4, 1/3, etc.)
-        constellation: Constellation (QPSK, 8PSK, 16QAM, etc.)
-        vl_snr: DVB-S2X very-low (VL) SNR mode
+        standard: DVB standard (DVB-S2, DVB-S2X, DVB-T2).
+        frame_size: Frame size (normal, medium, short).
+        code: LDPC code rate identifier (e.g., 1/4, 1/3, etc.).
+        constellation: Constellation (QPSK, 8PSK, 16QAM, etc.).
+        rolloff: Roll-off factor.
+        pilots: Whether physical layer pilots are enabled.
+        vl_snr: DVB-S2X very-low (VL) SNR mode.
 
     Note:
         Most blocks take the standard, frame size, and LDPC code as
-        parameters. In contrast, the constellation is only used by the LDPC
-        decoder. Hence, the constellation is only translated and included in
-        the output when the corresponding argument is provided.
+        parameters. In contrast, the constellation, roll-off, and pilots
+        parameters are only taken by a few blocks. Such optional parameters are
+        only translated and included in the output when the corresponding
+        input argument is provided.
 
     Returns:
         Tuple with the corresponding pybind11 C++ definitions.
@@ -110,8 +141,9 @@ def translate(standard, frame_size, code, constellation=None, vl_snr=False):
     """
     standard, frame_size, constellation = _adjust_case(standard, frame_size,
                                                        constellation)
-
-    if (not validate(standard, frame_size, code, constellation)):
+    valid = validate(standard, frame_size, code, constellation, rolloff,
+                     pilots)
+    if (not valid):
         raise ValueError("Invalid {} parameters".format(standard))
 
     t_standard = eval("dvbs2rx." + defs.standards[standard])
@@ -142,5 +174,13 @@ def translate(standard, frame_size, code, constellation=None, vl_snr=False):
         t_constellation = eval("dvbs2rx." +
                                defs.constellations[constellation]['def'])
         res += (t_constellation, )
+
+    if rolloff is not None:
+        t_rolloff = eval("dvbs2rx." + defs.rolloffs[rolloff]['def'])
+        res += (t_rolloff, )
+
+    if pilots is not None:
+        t_pilots = eval("dvbs2rx." + defs.pilots[bool(pilots)])
+        res += (t_pilots, )
 
     return res
