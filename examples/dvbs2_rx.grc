@@ -280,7 +280,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    const: '0.008'
+    const: 1/128
     maxoutbuf: '0'
     minoutbuf: '0'
     type: float
@@ -298,7 +298,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    const: '0.008'
+    const: 1/128
     maxoutbuf: '0'
     minoutbuf: '0'
     type: float

@@ -22,7 +22,6 @@ from gnuradio import digital
 from gnuradio import eng_notation
 from gnuradio import gr
 from gnuradio import qtgui
-from gnuradio import soapy
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio.fft import window
 from gnuradio.filter import firdes
@@ -47,10 +46,10 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.gold_code = options.gold_code
         self.gui = options.gui
         self.in_fd = options.in_fd
-        self.in_filename = options.in_filename
+        self.in_file = options.in_file
         self.modcod = options.modcod
         self.out_fd = options.out_fd
-        self.out_filename = options.out_filename
+        self.out_file = options.out_file
         self.pl_freq_est_period = options.pl_freq_est_period
         self.rolloff = options.rolloff
         self.rrc_delay = options.rrc_delay
@@ -420,7 +419,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
                     gr.sizeof_char, self.in_fd, False)
             else:
                 blocks_file_or_fd_source = blocks.file_source(
-                    gr.sizeof_char, self.in_filename, False)
+                    gr.sizeof_char, self.in_file, False)
             # Pipeline to convert the fd/file IQ stream into a complex stream,
             # assuming the independent I and Q are uint8_t streams.
             blocks_deinterleave = blocks.deinterleave(gr.sizeof_char, 1)
@@ -447,6 +446,8 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
                          (blocks_throttle_0, 0))
             source = blocks_throttle_0
         elif (self.source == "rtl"):
+            from gnuradio import soapy  # lazy import
+
             dev = 'driver=rtlsdr'
             stream_args = ''
             tune_args = ['']
@@ -480,7 +481,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         if (self.sink == "fd"):
             sink = blocks.file_descriptor_sink(gr.sizeof_char, self.out_fd)
         elif (self.sink == "file"):
-            sink = blocks.file_sink(gr.sizeof_char, self.out_filename)
+            sink = blocks.file_sink(gr.sizeof_char, self.out_file)
         return sink
 
     def connect_dvbs2rx(self, source_block, sink_block):
@@ -573,13 +574,14 @@ def argument_parser():
                         help="Debugging level")
     parser.add_argument("--frame-size",
                         type=str,
+                        choices=['normal', 'short'],
                         default='normal',
                         help="FECFRAME size")
     parser.add_argument('-f',
                         "--freq",
                         type=eng_float,
                         default=eng_notation.num_to_str(float(1e9)),
-                        help="Carrier/intermediate frequency in Hz")
+                        help="Carrier or intermediate frequency in Hz")
     parser.add_argument('-g',
                         "--gain",
                         type=float,
@@ -590,25 +592,11 @@ def argument_parser():
                         action='store_true',
                         default=False,
                         help="Launch a graphical user interface (GUI).")
-    parser.add_argument("--in-fd",
-                        type=intx,
-                        default=0,
-                        help="Input file descriptor used if \"--source=fd\"")
-    parser.add_argument("--in-filename",
-                        type=str,
-                        help="Input file name used if \"--source=file\"")
     parser.add_argument("-m",
                         "--modcod",
                         type=str,
                         default='QPSK1/4',
                         help="Target MODCOD")
-    parser.add_argument("--out-fd",
-                        type=intx,
-                        default=1,
-                        help="Output file descriptor used if \"--sink=fd\"")
-    parser.add_argument("--out-filename",
-                        type=str,
-                        help="Output file name used if \"--sink=file\"")
     parser.add_argument(
         "--pl-freq-est-period",
         type=int,
@@ -617,6 +605,7 @@ def argument_parser():
     parser.add_argument("-r",
                         "--rolloff",
                         type=eng_float,
+                        choices=[0.35, 0.25, 0.2],
                         default=eng_notation.num_to_str(float(0.2)),
                         help="Rolloff factor")
     parser.add_argument("--rrc-delay",
@@ -627,14 +616,6 @@ def argument_parser():
                         type=int,
                         default=32,
                         help="Number of branches on the polyphase RRC filter")
-    parser.add_argument("--sink",
-                        choices=["fd", "file"],
-                        default="fd",
-                        help="Sink for the output MPEG transport stream")
-    parser.add_argument("--source",
-                        choices=["fd", "file", "rtl"],
-                        default="fd",
-                        help="Source of the input IQ sample stream")
     parser.add_argument("-o",
                         "--sps",
                         type=eng_float,
@@ -653,6 +634,33 @@ def argument_parser():
                         type=eng_float,
                         default=eng_notation.num_to_str(float(0.0045)),
                         help="Symbol synchronizer's loop bandwidth")
+
+    src_group = parser.add_argument_group('Source Options')
+    src_group.add_argument("--source",
+                           choices=["fd", "file", "rtl"],
+                           default="fd",
+                           help="Source of the input IQ sample stream")
+    src_group.add_argument("--in-fd",
+                           type=intx,
+                           default=0,
+                           help="Input file descriptor used if source=fd")
+    src_group.add_argument("--in-file",
+                           type=str,
+                           help="Input file used if source=file")
+
+    snk_group = parser.add_argument_group('Sink Options')
+    snk_group.add_argument("--sink",
+                           choices=["fd", "file"],
+                           default="fd",
+                           help="Sink for the output MPEG transport stream")
+    snk_group.add_argument("--out-fd",
+                           type=intx,
+                           default=1,
+                           help="Output file descriptor used if sink=fd")
+    snk_group.add_argument("--out-file",
+                           type=str,
+                           help="Output file used if sink=file")
+
     return parser
 
 
