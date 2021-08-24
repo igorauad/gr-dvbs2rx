@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+#
+# SPDX-License-Identifier: GPL-3.0
+#
+# GNU Radio Python Flow Graph
+# Title: DVB-S2 Transmitter
+# Description: DVB-S2 Loopback Tx/Rx Simulation
+# GNU Radio version: v3.10.0.0git-279-g0b3dc1b1
+
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+import signal
+import sys
+
+import pmt
+from gnuradio import blocks
+from gnuradio import dtv
+from gnuradio import eng_notation
+from gnuradio import filter
+from gnuradio import gr
+from gnuradio import uhd
+from gnuradio.eng_arg import eng_float, intx
+from gnuradio.filter import firdes
+
+import dvbs2rx
+
+
+class dvbs2_tx(gr.top_block):
+    def __init__(self, options):
+        gr.top_block.__init__(self, "DVB-S2 Tx", catch_exceptions=True)
+
+        ##################################################
+        # Parameters
+        ##################################################
+        self.frame_size = options.frame_size
+        self.freq = options.freq
+        self.gain = options.gain
+        self.gold_code = options.gold_code
+        self.in_fd = options.in_fd
+        self.in_file = options.in_file
+        self.modcod = options.modcod
+        self.out_fd = options.out_fd
+        self.out_file = options.out_file
+        self.pilots = options.pilots
+        self.rolloff = options.rolloff
+        self.rrc_delay = options.rrc_delay
+        self.sink = options.sink
+        self.source = options.source
+        self.sps = options.sps
+        self.sym_rate = options.sym_rate
+        self.usrp_antenna = options.usrp_antenna
+
+        ##################################################
+        # Variables
+        ##################################################
+        code_rate = self.modcod.upper().replace("8PSK", "").replace("QPSK", "")
+        self.code_rate = code_rate
+        self.samp_rate = self.sym_rate * self.sps
+        self.n_rrc_taps = int(self.rrc_delay * self.sps) + 1
+        self.constellation = self.modcod.replace(code_rate, "")
+
+        ##################################################
+        # Flowgraph
+        ##################################################
+        source_block = self.connect_source()
+        sink_block = self.connect_sink()
+        self.connect_dvbs2tx(source_block, sink_block)
+
+    def connect_source(self):
+        """Connect the MPEG TS source
+
+        Returns:
+            block: Last block object on the source pipeline, which should
+            connect to the DVB-S2 Tx input.
+        """
+        if (self.source == "fd"):
+            source = blocks.file_descriptor_source(gr.sizeof_char, self.in_fd,
+                                                   False)
+        elif (self.source == "file"):
+            source = blocks.file_source(gr.sizeof_char, self.in_file, True, 0,
+                                        0)
+            source.set_begin_tag(pmt.PMT_NIL)
+        return source
+
+    def connect_sink(self):
+        """Connect the IQ sample Sink
+
+        Returns:
+            block: First block on the sink pipeline, which should connect to
+            the DVB-S2 Tx output.
+        """
+
+        if (self.sink == "fd" or self.sink == "file"):
+            # Convert the complex IQ stream into an interleaved uchar stream.
+            throttle = blocks.throttle(gr.sizeof_gr_complex, self.samp_rate,
+                                       True)
+            complex_to_float_0 = blocks.complex_to_float(1)
+            multiply_const_0 = blocks.multiply_const_ff(128)
+            multiply_const_1 = blocks.multiply_const_ff(128)
+            add_const_0 = blocks.add_const_ff(127)
+            add_const_1 = blocks.add_const_ff(127)
+            float_to_uchar_0 = blocks.float_to_uchar()
+            float_to_uchar_1 = blocks.float_to_uchar()
+            interleaver = blocks.interleave(gr.sizeof_char, 1)
+
+            if (self.sink == "fd"):
+                file_or_fd_sink = blocks.file_descriptor_sink(
+                    gr.sizeof_char, self.out_fd)
+            else:
+                file_or_fd_sink = blocks.file_sink(gr.sizeof_char,
+                                                   self.out_file)
+            self.connect((throttle, 0), (complex_to_float_0, 0))
+            self.connect((complex_to_float_0, 0), (multiply_const_0, 0))
+            self.connect((complex_to_float_0, 1), (multiply_const_1, 0))
+            self.connect((multiply_const_0, 0), (add_const_0, 0),
+                         (float_to_uchar_0, 0), (interleaver, 0))
+            self.connect((multiply_const_1, 0), (add_const_1, 0),
+                         (float_to_uchar_1, 0), (interleaver, 1))
+            self.connect((interleaver, 0), (file_or_fd_sink, 0))
+            # First block on the pipeline
+            sink = throttle
+        elif (self.sink == "usrp"):
+            sink = uhd.usrp_sink(
+                ",".join((self.out_usrp, '')),
+                uhd.stream_args(
+                    cpu_format="fc32",
+                    args='',
+                    channels=list(range(0, 1)),
+                ),
+                "",
+            )
+            sink.set_samp_rate(self.samp_rate)
+            sink.set_time_unknown_pps(uhd.time_spec(0))
+            sink.set_center_freq(self.freq, 0)
+            sink.set_antenna(self.usrp_antenna, 0)
+            sink.set_gain(self.gain, 0)
+        return sink
+
+    def connect_dvbs2tx(self, source_block, sink_block):
+        """Connect the DVB-S2 Tx Pipeline
+
+        Implement the following pipeline:
+
+        BBFRAME Processing -> BCH Enc. -> LDPC Enc. -> Interleaver ->|
+                                                                    |
+                                                                    |
+        <- Interpolator/Filter <- PL Framer <- Modulator (Mapping) <-|
+
+        Args:
+            source_block : The block providing IQ samples into the DVB-S2 Rx.
+            sink_block : The block consuming the MPEG TS output stream.
+
+
+        """
+
+        translated_params = dvbs2rx.params.translate('DVB-S2', self.frame_size,
+                                                     self.code_rate,
+                                                     self.constellation,
+                                                     self.rolloff, self.pilots)
+        (standard, frame_size, code_rate, constellation, rolloff,
+         pilots) = translated_params
+
+        bbheader = dtv.dvb_bbheader_bb(standard, frame_size, code_rate,
+                                       rolloff, dtv.INPUTMODE_NORMAL,
+                                       dtv.INBAND_OFF, 168, 4000000)
+        bbscrambler = dtv.dvb_bbscrambler_bb(standard, frame_size, code_rate)
+        bch_encoder = dtv.dvb_bch_bb(standard, frame_size, code_rate)
+        ldpc_encoder = dtv.dvb_ldpc_bb(standard, frame_size, code_rate,
+                                       dtv.MOD_OTHER)
+        interleaver = dtv.dvbs2_interleaver_bb(frame_size, code_rate,
+                                               constellation)
+        xfecframe_mapper = dtv.dvbs2_modulator_bc(frame_size, code_rate,
+                                                  constellation,
+                                                  dtv.INTERPOLATION_OFF)
+        pl_framer = dtv.dvbs2_physical_cc(frame_size, code_rate, constellation,
+                                          pilots, 0)
+        interp_fir_filter = filter.interp_fir_filter_ccf(
+            int(self.sps / 2),
+            firdes.root_raised_cosine(1.0, self.samp_rate, self.sym_rate,
+                                      self.rolloff, self.n_rrc_taps))
+        interp_fir_filter.declare_sample_delay(0)
+
+        self.connect((source_block, 0), (bbheader, 0), (bbscrambler, 0),
+                     (bch_encoder, 0), (ldpc_encoder, 0), (interleaver, 0),
+                     (xfecframe_mapper, 0), (pl_framer, 0),
+                     (interp_fir_filter, 0), (sink_block, 0))
+
+
+def argument_parser():
+    description = 'DVB-S2 Transmitter'
+    parser = ArgumentParser(prog="dvbs2-tx",
+                            description=description,
+                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--frame-size",
+                        type=str,
+                        choices=['normal', 'short'],
+                        default='normal',
+                        help="FECFRAME size")
+    parser.add_argument("-f",
+                        "--freq",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1e9)),
+                        help="Carrier or intermediate frequency in Hz")
+    parser.add_argument("-g",
+                        "--gain",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(0)),
+                        help="Tx gain in dB")
+    parser.add_argument("--gold-code", type=intx, default=0, help="Gold code")
+    parser.add_argument("-m",
+                        "--modcod",
+                        type=str,
+                        default='QPSK1/4',
+                        help="MODCOD")
+    parser.add_argument("--pilots",
+                        action='store_true',
+                        default=False,
+                        help="Include pilot blocks on the PLFRAMEs")
+    parser.add_argument("-r",
+                        "--rolloff",
+                        choices=[0.35, 0.25, 0.2],
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(0.2)),
+                        help="Rolloff factor")
+    parser.add_argument("--rrc-delay",
+                        type=intx,
+                        default=50,
+                        help="RRC filter delay in symbol periods")
+    parser.add_argument("-o",
+                        "--sps",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(2)),
+                        help="Oversampling ratio in samples per symbol")
+    parser.add_argument("-s",
+                        "--sym-rate",
+                        type=intx,
+                        default=1000000,
+                        help="Symbol rate in bauds")
+
+    src_group = parser.add_argument_group('Source Options')
+    src_group.add_argument("--source",
+                           choices=["fd", "file"],
+                           default="fd",
+                           help="Source of the input MPEG transport stream")
+    src_group.add_argument("--in-fd",
+                           type=intx,
+                           default=0,
+                           help="Input file descriptor used if source=fd")
+    src_group.add_argument("--in-file",
+                           type=str,
+                           help="Input file used if source=file")
+
+    snk_group = parser.add_argument_group('Sink Options')
+    snk_group.add_argument("--sink",
+                           choices=["fd", "file", "usrp"],
+                           default="fd",
+                           help="Sink for the output IQ sample stream")
+    snk_group.add_argument("--out-fd",
+                           type=intx,
+                           default=1,
+                           help="Output file descriptor used if sink=fd")
+    snk_group.add_argument("--out-file",
+                           type=str,
+                           help="Output file used if sink=file")
+    snk_group.add_argument("--out-usrp", type=str, help="USRP address")
+
+    snk_group = parser.add_argument_group('USRP Options')
+    snk_group.add_argument("--usrp-antenna",
+                           type=str,
+                           default="TX/RX",
+                           help="USRP antenna")
+
+    return parser
+
+
+def main():
+    options = argument_parser().parse_args()
+    tb = dvbs2_tx(options)
+
+    def sig_handler(sig=None, frame=None):
+        tb.stop()
+        tb.wait()
+
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
+
+    tb.start()
+
+    tb.wait()
+
+
+if __name__ == '__main__':
+    main()
