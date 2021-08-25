@@ -38,10 +38,10 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
       d_debug_level(debug_level),
       d_sps(sps),
       d_locked(false),
-      d_da_phase(0.0),
       d_closed_loop(false),
       d_payload_state(payload_state_t::searching),
-      d_sof_cnt(0)
+      d_sof_cnt(0),
+      d_phase_corr(0.0)
 {
     d_frame_sync = new frame_sync(debug_level);
     d_plsc_decoder = new plsc_decoder(debug_level);
@@ -397,9 +397,13 @@ void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
                              false /* reference is the current frame */);
     }
 
-    /* Copy the full PLHEADER to the frame information structure. The PLHEADER
-     * can be used later, e.g., for fine frequency offset estimation. */
+    /* Copy the full original PLHEADER (before derotation) to the frame info structure.
+     * The PLHEADER can be used later, e.g., for fine frequency offset estimation. */
     memcpy(frame_info.plheader.data(), p_plheader, PLHEADER_LEN * sizeof(gr_complex));
+
+    // Estimate also the PLHEADER phase and save for later
+    frame_info.plheader_phase =
+        d_freq_sync->estimate_plheader_phase(p_plheader, frame_info.pls.plsc);
 }
 
 int plsync_cc_impl::handle_payload(int noutput_items,
@@ -418,8 +422,7 @@ int plsync_cc_impl::handle_payload(int noutput_items,
         /* Estimate the phase of the PLHEADER preceding the payload. This phase estimate
          * is used later for phase correction of the output data symbols. */
         const gr_complex* p_plheader = frame_info.plheader.data();
-        d_da_phase =
-            d_freq_sync->estimate_plheader_phase(p_plheader, frame_info.pls.plsc);
+        d_phase_corr = gr_expj(-frame_info.plheader_phase);
 
         // If the PLFRAME has pilot symbols, estimate the phase of each pilot
         // block and, then, estimate the fine frequency offset.
@@ -464,13 +467,13 @@ int plsync_cc_impl::handle_payload(int noutput_items,
         // pilot phase estimates would be uninitialized.
         if (d_idx.is_pilot_sym && frame_info.coarse_corrected &&
             d_idx.i_in_pilot_blk == (PILOT_BLK_LEN - 1)) {
-            d_da_phase = d_freq_sync->get_pilot_phase(d_idx.i_pilot_blk);
+            float pilot_phase = d_freq_sync->get_pilot_phase(d_idx.i_pilot_blk);
+            d_phase_corr = gr_expj(-pilot_phase);
         }
 
         // Output
         if (d_idx.is_data_sym) {
-            out[n_produced] =
-                gr_expj(-d_da_phase) * p_descrambled_payload[d_idx.i_in_frame];
+            out[n_produced] = d_phase_corr * p_descrambled_payload[d_idx.i_in_frame];
             n_produced++;
         }
 

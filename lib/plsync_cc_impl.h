@@ -50,6 +50,7 @@ struct plframe_idx_t {
 // Frame information cache
 struct plframe_info_t {
     volk::vector<gr_complex> plheader;
+    float plheader_phase;
     pls_info_t pls;
     bool coarse_corrected = false;
     uint64_t abs_sof_idx = 0;
@@ -77,7 +78,6 @@ private:
 
     /* State */
     bool d_locked;      /**< Whether the frame timing is locked */
-    float d_da_phase;   /**< Last data-aided phase estimate */
     bool d_closed_loop; /**< Whether any freq. correction has been applied to the
                            external rotator. False while still waiting for the first
                            correction (i.e., while effectively in open loop) */
@@ -85,6 +85,7 @@ private:
     rot_ctrl_t d_rot_ctrl;           /**< Upstream rotator control */
     plframe_idx_t d_idx;             /**< PLFRAME index state */
     uint64_t d_sof_cnt;              /**< Count of detected SOFs */
+    gr_complex d_phase_corr;         /**< Phase correction */
 
     /* Cache structures used to hold frame metadata/information from the current
      * PLFRAME (whose payload may be under processing if locked) and from the
