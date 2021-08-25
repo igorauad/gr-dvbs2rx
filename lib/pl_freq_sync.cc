@@ -203,33 +203,31 @@ bool freq_sync::estimate_coarse(const gr_complex* in, bool full, uint8_t plsc)
     return true;
 }
 
-float freq_sync::estimate_sof_phase(const gr_complex* in)
+float freq_sync::estimate_phase_data_aided(const gr_complex* in,
+                                           const gr_complex* expected,
+                                           unsigned int len)
 {
     // Remove the modulation to obtain a noisy CW. At this point, the CW should
     // be barely rotating if the residual frequency offset is low enough.
-    volk_32fc_x2_multiply_32fc(pilot_mod_rm.data(), in, plheader_conj.data(), SOF_LEN);
+    volk_32fc_x2_multiply_32fc(pilot_mod_rm.data(), in, expected, len);
 
     // Return the average angle of the modulation-removed CW symbols
     gr_complex ck_sum = 0;
-    for (int i = 0; i < SOF_LEN; i++)
+    for (unsigned int i = 0; i < len; i++)
         ck_sum += pilot_mod_rm[i];
 
     return gr::fast_atan2f(ck_sum);
 }
 
+float freq_sync::estimate_sof_phase(const gr_complex* in)
+{
+    return estimate_phase_data_aided(in, plheader_conj.data(), SOF_LEN);
+}
+
 float freq_sync::estimate_plheader_phase(const gr_complex* in, uint8_t plsc)
 {
-    /* "Remove" modulation */
-    volk_32fc_x2_multiply_32fc(
-        pilot_mod_rm.data(), in, &plheader_conj[plsc * PLHEADER_LEN], PLHEADER_LEN);
-
-    /* Angle of the sum of the PLHEADER symbols */
-    gr_complex ck_sum = 0;
-    for (int i = 0; i < PLHEADER_LEN; i++)
-        ck_sum += pilot_mod_rm[i];
-
-    angle_pilot[0] = gr::fast_atan2f(ck_sum);
-
+    angle_pilot[0] =
+        estimate_phase_data_aided(in, &plheader_conj[plsc * PLHEADER_LEN], PLHEADER_LEN);
     return angle_pilot[0];
 }
 

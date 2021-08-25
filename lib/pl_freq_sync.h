@@ -124,6 +124,18 @@ private:
     volk::vector<float> angle_pilot;  /**< average angle of pilot segments */
     volk::vector<float> angle_diff_f; /**< diff of average pilot angles */
 
+    /**
+     * \brief Data-aided phase estimation
+     *
+     * \param in Input symbols disturbed by frequency/phase offset.
+     * \param expected Expected symbols known a priori.
+     * \param len Number of symbols to consider for the estimation.
+     * \return float Phase estimate in radians within -pi to +pi.
+     */
+    float estimate_phase_data_aided(const gr_complex* in,
+                                    const gr_complex* expected,
+                                    unsigned int len);
+
 public:
     /**
      * \brief Construct the frequency synchronizer object.
