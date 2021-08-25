@@ -12,23 +12,20 @@
 #include <dvbs2rx/api.h>
 #include <volk/volk_alloc.hh>
 
-const double fine_foffset_corr_range = 3.268e-4;
-/* When only the pilot blocks are use for fine offset estimation, the normalized
- * frequency offset that the fine frequency estimator can "observe" is upper
- * limited to:
+const double fine_foffset_corr_range = 3.3875e-4;
+/* The fine frequency offset estimate is based on the phase difference accumulated between
+ * consecutive pilot blocks, i.e., after an interval of 1440+36=1476 symbols. Hence, the
+ * maximum observable frequency offset is given by:
  *
  * 1/(2*(1440 + 36)) = 3.3875e-4
  *
- * When the SOF/PLHEADER phase is also used within the fine offset estimation,
- * the upper limit changes. The rationale is that the first phase difference
- * interval spans (1440 + 90) symbol periods. Consequently, the maximum
- * frequency offset that this interval can observe becomes:
+ * When the frequency offset exceeds this, the phase changes by more than +-pi from pilot
+ * segment to pilot segment. Consequently, the fine estimation approach does not work.
  *
- * 1/(2*(1440 + 90)) = 3.268e-4
- *
- * Here, we adopt the latter approach. When the frequency offset exceeds
- * 3.268e-4, the phase changes by more than +-pi from pilot segment to pilot
- * segment. Consequently, the fine estimation approach does not work.
+ * When including the PLHEADER phase within the fine frequency estimate, note the interval
+ * between the PLHEADER and the first pilot block is slightly different (of 1440 + 90
+ * symbols). However, the fine frequency offset estimator considers only the last 36
+ * symbols of the plheader, which preserves the interval of 1476 symbols.
  */
 
 namespace gr {
@@ -64,9 +61,7 @@ namespace dvbs2rx {
  * `has_fine_foffset_est()`. As of this version, a fine offset can be computed whenever
  * the processed DVB-S2 frames contain pilot blocks and the system is already
  * coarse-corrected. The estimate is based on the independent phases of each pilot block
- * composing the frame, each estimated through method `estimate_pilot_phase()`. After all
- * pilot block phases have been estimated, the fine frequency offset estimate can be
- * obtained by calling method `estimate_fine_pilot_mode()`.
+ * composing the frame, and is obtained by calling method `estimate_fine_pilot_mode()`.
  *
  * In contrast, the coarse frequency offset can be computed regardless of the presence of
  * pilots. Also, unlike the fine frequency offset estimation, which is computed and
@@ -190,32 +185,35 @@ public:
 
     /**
      * \brief Estimate the average phase of a pilot block.
+     *
      * \param in (gr_complex *) Pointer to the pilot symbol array.
      * \param i_blk (int) Index of this pilot block within the PLFRAME
      * \return (float) The phase estimate within -pi to +pi.
-     *
-     * \note The gr_complex array pointed `in` is expected to contain
-     * the PLHEADER within its first 90 positions, then all 36-symbol
-     * pilot blocks consecutively in the indexes that follow. The pilot
-     * block index `i_blk` is used internally in order to fetch the
-     * correct input pilots for phase estimation. The result will be
-     * stored in an internal pilot angle buffer.
      */
-    void estimate_pilot_phase(const gr_complex* in, int i_blk);
+    float estimate_pilot_phase(const gr_complex* in, int i_blk);
 
     /**
      * \brief Pilot-aided fine frequency offset estimation.
      *
      * Should be executed only for PLFRAMEs containing pilot symbols.
      *
+     * \param p_plheader (const gr_complex*) Pointer to the frame's PLHEADER.
+     * \param p_payload (const gr_complex*) Pointer to the descrambled PLFRAME payload.
      * \param n_pilot_blks (uint8_t) Number of pilot blocks in the PLFRAME being
      *                               processed.
+     * \param plsc (uint8_t) PLSC corresponding to the PLHEADER being
+     *                       processed. Must be within the range from 0 to 127.
      * \return Void.
      *
      * \note The fine frequency offset estimate is kept internally. It can be
      * fetched using the `get_fine_foffset()` method.
+     * \note The payload pointed by `p_payload` must be descrambled. This function
+     * assumes the pilot symbols on this array are descrambled already.
      */
-    void estimate_fine_pilot_mode(uint8_t n_pilot_blks);
+    void estimate_fine_pilot_mode(const gr_complex* p_plheader,
+                                  const gr_complex* p_payload,
+                                  uint8_t n_pilot_blks,
+                                  uint8_t plsc);
 
     /**
      * \brief De-rotate PLHEADER symbols.
@@ -256,6 +254,10 @@ public:
 
     /**
      * \brief Get the phase estimate corresponding to a pilot block.
+     *
+     * This phase estimate becomes available only after calling
+     * `estimate_fine_pilot_mode()`. Otherwise, it's undefined.
+     *
      * \param i_blk (int) Pilot block index from 0 up to 21.
      * \return (float) Phase estimate in radians within -pi to +pi.
      */

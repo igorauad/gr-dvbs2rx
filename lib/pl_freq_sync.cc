@@ -226,12 +226,11 @@ float freq_sync::estimate_sof_phase(const gr_complex* in)
 
 float freq_sync::estimate_plheader_phase(const gr_complex* in, uint8_t plsc)
 {
-    angle_pilot[0] =
-        estimate_phase_data_aided(in, &plheader_conj[plsc * PLHEADER_LEN], PLHEADER_LEN);
-    return angle_pilot[0];
+    return estimate_phase_data_aided(
+        in, &plheader_conj[plsc * PLHEADER_LEN], PLHEADER_LEN);
 }
 
-void freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
+float freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
 {
     // Validate the pilot block index
     assert(i_blk >= 0 && i_blk < MAX_PILOT_BLKS);
@@ -255,11 +254,34 @@ void freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
         avg_phase += 2 * M_PI;
     /* TODO find a branchless way of computing this - maybe with fmod */
 
-    angle_pilot[i_blk + 1] = avg_phase;
+    if (debug_level > 4) {
+        std::string label = "Pilot block " + std::to_string(i_blk);
+        dump_complex_vec(in, PILOT_BLK_LEN, label.c_str());
+    }
+
+    return avg_phase;
 }
 
-void freq_sync::estimate_fine_pilot_mode(uint8_t n_pilot_blks)
+void freq_sync::estimate_fine_pilot_mode(const gr_complex* p_plheader,
+                                         const gr_complex* p_payload,
+                                         uint8_t n_pilot_blks,
+                                         uint8_t plsc)
 {
+    // Fill in the average phase of the PLHEADER. Consider the last 36 symbols of the
+    // PLHEADER only so that all phase estimates (PLHEADER and pilots) are based on the
+    // same sequence length (36 symbols), and spaced by an equal interval (1476 symbols).
+    angle_pilot[0] = estimate_phase_data_aided(
+        p_plheader + (PLHEADER_LEN - PILOT_BLK_LEN),
+        &plheader_conj[plsc * PLHEADER_LEN] + (PLHEADER_LEN - PILOT_BLK_LEN),
+        PILOT_BLK_LEN);
+
+    // Fill in the average phase of the descrambled pilot blocks
+    for (int i = 0; i < n_pilot_blks; i++) {
+        const gr_complex* p_pilots =
+            p_payload + ((i + 1) * PILOT_BLK_PERIOD) - PILOT_BLK_LEN;
+        angle_pilot[i + 1] = estimate_pilot_phase(p_pilots, i);
+    }
+
     /* Angle differences */
     volk_32f_x2_subtract_32f(
         angle_diff_f.data(), angle_pilot.data() + 1, angle_pilot.data(), n_pilot_blks);
@@ -272,27 +294,19 @@ void freq_sync::estimate_fine_pilot_mode(uint8_t n_pilot_blks)
             angle_diff_f[i] += 2.0 * GR_M_PI;
     }
 
-    /* Sum of the angle differences between pilot blocks
-     *
-     * NOTE: skip the angle difference between the PLHEADER and the first pilot
-     * block because this difference occurs over a slightly longer interval. */
+    /* Sum of the angle differences between pilot blocks */
     float sum_diff;
-    volk_32f_accumulator_s32f(&sum_diff, angle_diff_f.data() + 1, n_pilot_blks - 1);
+    volk_32f_accumulator_s32f(&sum_diff, angle_diff_f.data(), n_pilot_blks);
 
     /* Final estimate
      *
-     * The phase difference between two pilot blocks accumulates over
-     * PILOT_BLK_PERIOD, namely over 1476 symbols. The phase difference between
-     * the PLHEADER and the first pilot block accumulates over (PLHEADER_LEN +
-     * PILOT_BLK_INTERVAL), namely over 1530 symbols. Each phase difference
-     * divided by (2*pi*interval) gives the corresponding frequency offset
-     * estimate over that interval. In total, there are n_pilot_blks
-     * estimates. The arithmetic average of them is computed by summing each
+     * The phase difference between two pilot blocks accumulates over PILOT_BLK_PERIOD,
+     * namely over 1476 symbols. Each phase difference divided by (2*pi*interval) gives
+     * the corresponding frequency offset estimate over that interval. In total, there are
+     * n_pilot_blks estimates. The arithmetic average of them is computed by summing each
      * estimate weighted by a factor of "1 / n_pilot_blks".
      **/
-    fine_foffset = sum_diff / (2.0 * GR_M_PI * PILOT_BLK_PERIOD * n_pilot_blks) +
-                   angle_diff_f[0] / (2.0 * GR_M_PI *
-                                      (PLHEADER_LEN + PILOT_BLK_INTERVAL) * n_pilot_blks);
+    fine_foffset = sum_diff / (2.0 * GR_M_PI * PILOT_BLK_PERIOD * n_pilot_blks);
 
     if (debug_level > 1)
         printf("- Fine frequency offset: %g\n", fine_foffset);

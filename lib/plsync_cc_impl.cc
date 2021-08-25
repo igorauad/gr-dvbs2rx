@@ -415,9 +415,8 @@ int plsync_cc_impl::handle_payload(int noutput_items,
         // Descramble the payload
         d_pl_descrambler->descramble(p_payload, frame_info.pls.payload_len);
 
-        /* Estimate the phase of the PLHEADER preceding the payload. This phase
-         * is used both for phase correction of the output data symbols and fine
-         * frequency offset estimation. */
+        /* Estimate the phase of the PLHEADER preceding the payload. This phase estimate
+         * is used later for phase correction of the output data symbols. */
         const gr_complex* p_plheader = frame_info.plheader.data();
         d_da_phase =
             d_freq_sync->estimate_plheader_phase(p_plheader, frame_info.pls.plsc);
@@ -429,15 +428,11 @@ int plsync_cc_impl::handle_payload(int noutput_items,
         // offset correction. The residual offset must fall within the fine
         // estimation range of up to ~3.3e-4 in normalized frequency.
         if (frame_info.pls.has_pilots && frame_info.coarse_corrected) {
-            // Average phase of each descrambled pilot block
-            for (int i = 0; i < frame_info.pls.n_pilots; i++) {
-                const gr_complex* p_pilots =
-                    p_descrambled_payload + ((i + 1) * PILOT_BLK_PERIOD) - PILOT_BLK_LEN;
-                d_freq_sync->estimate_pilot_phase(p_pilots, i);
-            }
-
             // Fine freq. offset based on the phase jump between pilot blocks
-            d_freq_sync->estimate_fine_pilot_mode(frame_info.pls.n_pilots);
+            d_freq_sync->estimate_fine_pilot_mode(p_plheader,
+                                                  p_descrambled_payload,
+                                                  frame_info.pls.n_pilots,
+                                                  frame_info.pls.plsc);
 
             // Schedule the rotator update
             //

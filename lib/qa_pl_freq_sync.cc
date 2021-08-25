@@ -260,10 +260,9 @@ BOOST_DATA_TEST_CASE_F(
 
     // Estimate the phase of the pilot block
     int i_blk = 0;
-    p_freq_sync->estimate_pilot_phase(rotated.data(), i_blk);
+    float phase_0_est = p_freq_sync->estimate_pilot_phase(rotated.data(), i_blk);
 
     // Check
-    float phase_0_est = p_freq_sync->get_pilot_phase(i_blk);
     BOOST_CHECK_CLOSE(phase_0_est, phase_0, 1e-3);
 }
 
@@ -281,45 +280,37 @@ BOOST_DATA_TEST_CASE_F(
     // the frequency offset is below an upper limit:
     BOOST_TEST(abs(freq_offset) < fine_foffset_corr_range);
 
-    // Assume there are three pilot blocks (e.g., for a PLFRAME with 60 slots)
-    volk::vector<gr_complex> pilot_blk_1(PILOT_BLK_LEN, (+SQRT2_2 + SQRT2_2i));
-    volk::vector<gr_complex> pilot_blk_2(PILOT_BLK_LEN, (+SQRT2_2 + SQRT2_2i));
-    volk::vector<gr_complex> pilot_blk_3(PILOT_BLK_LEN, (+SQRT2_2 + SQRT2_2i));
+    // Generate a PLFRAME with 60 slots and 3 pilot blocks
+    uint8_t n_slots = 60;
+    uint8_t n_pilot_blks = 3;
+    uint32_t plframe_len =
+        PLHEADER_LEN + (n_slots * SLOT_LEN) + (n_pilot_blks * PILOT_BLK_LEN);
+    volk::vector<gr_complex> pilot_blk(PILOT_BLK_LEN, (+SQRT2_2 + SQRT2_2i));
+    volk::vector<gr_complex> plframe(plframe_len);
+    memcpy(plframe.data(), plheader.data(), PLHEADER_LEN * sizeof(gr_complex));
+    for (int i = 0; i < n_pilot_blks; i++) {
+        gr_complex* p_pilot =
+            plframe.data() + PLHEADER_LEN + ((i + 1) * PILOT_BLK_PERIOD) - PILOT_BLK_LEN;
+        memcpy(p_pilot, pilot_blk.data(), PILOT_BLK_LEN * sizeof(gr_complex));
+    }
 
     // Add frequency and phase offset
-    volk::vector<gr_complex> rot_plheader(PLHEADER_LEN);
-    volk::vector<gr_complex> rot_pilot_blk_1(PILOT_BLK_LEN);
-    volk::vector<gr_complex> rot_pilot_blk_2(PILOT_BLK_LEN);
-    volk::vector<gr_complex> rot_pilot_blk_3(PILOT_BLK_LEN);
-    float phase = phase_0;
-    rotate(rot_plheader.data(), plheader.data(), freq_offset, phase, PILOT_BLK_LEN);
-    phase += (PLHEADER_LEN + PILOT_BLK_INTERVAL) * (2 * M_PI * freq_offset);
-    rotate(rot_pilot_blk_1.data(), pilot_blk_1.data(), freq_offset, phase, PILOT_BLK_LEN);
-    phase += PILOT_BLK_PERIOD * (2 * M_PI * freq_offset);
-    rotate(rot_pilot_blk_2.data(), pilot_blk_2.data(), freq_offset, phase, PILOT_BLK_LEN);
-    phase += PILOT_BLK_PERIOD * (2 * M_PI * freq_offset);
-    rotate(rot_pilot_blk_3.data(), pilot_blk_3.data(), freq_offset, phase, PILOT_BLK_LEN);
-
-    // To estimate the PLHEADER phase, the underlying PLSC must be known. The
-    // test PLHEADER has modcod=21 and short_fecframe=1:
-    uint8_t plsc = (21 << 2) | (1 << 1);
-
-    // Estimate the phase of the PLHEADER and the pilot blocks
-    p_freq_sync->estimate_plheader_phase(rot_plheader.data(), plsc);
-    p_freq_sync->estimate_pilot_phase(rot_pilot_blk_1.data(), 0);
-    p_freq_sync->estimate_pilot_phase(rot_pilot_blk_2.data(), 1);
-    p_freq_sync->estimate_pilot_phase(rot_pilot_blk_3.data(), 2);
+    volk::vector<gr_complex> rot_plframe(plframe_len);
+    rotate(rot_plframe.data(), plframe.data(), freq_offset, phase_0, plframe_len);
 
     // The synchronizer object records when the first fine frequency offset
     // estimate becomes available internally. At this point, it should be false.
     BOOST_CHECK_EQUAL(p_freq_sync->has_fine_foffset_est(), false);
 
     // Fine frequency offset estimate
-    uint8_t n_pilot_blks = 3;
-    p_freq_sync->estimate_fine_pilot_mode(n_pilot_blks);
-    float freq_offset_est = p_freq_sync->get_fine_foffset();
+    uint8_t plsc = (21 << 2) | (1 << 1); // test PLHEADER info
+    const gr_complex* p_rot_plheader = rot_plframe.data();
+    const gr_complex* p_rot_payload = rot_plframe.data() + PLHEADER_LEN;
+    p_freq_sync->estimate_fine_pilot_mode(
+        p_rot_plheader, p_rot_payload, n_pilot_blks, plsc);
 
     // Check
+    float freq_offset_est = p_freq_sync->get_fine_foffset();
     BOOST_CHECK_EQUAL(p_freq_sync->has_fine_foffset_est(), true);
     BOOST_CHECK_CLOSE(freq_offset_est, freq_offset, 1e-3);
 }
