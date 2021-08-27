@@ -47,6 +47,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.gui = options.gui
         self.in_fd = options.in_fd
         self.in_file = options.in_file
+        self.in_repeat = options.in_repeat
         self.modcod = options.modcod
         self.out_fd = options.out_fd
         self.out_file = options.out_file
@@ -420,7 +421,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
                     gr.sizeof_char, self.in_fd, False)
             else:
                 blocks_file_or_fd_source = blocks.file_source(
-                    gr.sizeof_char, self.in_file, False)
+                    gr.sizeof_char, self.in_file, self.in_repeat)
             # Pipeline to convert the fd/file IQ stream into a complex stream,
             # assuming the independent I and Q are uint8_t streams.
             blocks_deinterleave = blocks.deinterleave(gr.sizeof_char, 1)
@@ -658,6 +659,11 @@ def argument_parser():
     src_group.add_argument("--in-file",
                            type=str,
                            help="Input file used if source=file")
+    src_group.add_argument(
+        "--in-repeat",
+        action='store_true',
+        default=False,
+        help="Read repeatedly from the input file if source=file")
 
     snk_group = parser.add_argument_group('Sink Options')
     snk_group.add_argument("--sink",

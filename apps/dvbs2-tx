@@ -42,6 +42,7 @@ class dvbs2_tx(gr.top_block):
         self.gold_code = options.gold_code
         self.in_fd = options.in_fd
         self.in_file = options.in_file
+        self.in_repeat = options.in_repeat
         self.modcod = options.modcod
         self.out_fd = options.out_fd
         self.out_file = options.out_file
@@ -82,8 +83,8 @@ class dvbs2_tx(gr.top_block):
             source = blocks.file_descriptor_source(gr.sizeof_char, self.in_fd,
                                                    False)
         elif (self.source == "file"):
-            source = blocks.file_source(gr.sizeof_char, self.in_file, True, 0,
-                                        0)
+            source = blocks.file_source(gr.sizeof_char, self.in_file,
+                                        self.in_repeat)
             source.set_begin_tag(pmt.PMT_NIL)
         return source
 
@@ -276,6 +277,11 @@ def argument_parser():
     src_group.add_argument("--in-file",
                            type=str,
                            help="Input file used if source=file")
+    src_group.add_argument(
+        "--in-repeat",
+        action='store_true',
+        default=False,
+        help="Read repeatedly from the input file if source=file")
 
     snk_group = parser.add_argument_group('Sink Options')
     snk_group.add_argument("--sink",
