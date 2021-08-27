@@ -514,8 +514,20 @@ int plsync_cc_impl::general_work(int noutput_items,
     gr_complex* out = (gr_complex*)output_items[0];
     int n_produced = 0, n_consumed = 0;
 
-    while ((n_consumed < ninput_items[0] || ninput_items[0] == 0) &&
-           n_produced < noutput_items) {
+    // Keep processing as long as:
+    //
+    // 1) There are input samples to consume. If the input buffer is empty, we may still
+    //    produce some output if there is a payload whose processing is pending.
+    //
+    // 2) There is space in the output buffer. If the output buffer is full, we may still
+    //    consume input samples as long as we are still searching for the next frame.
+    //
+    const bool empty_input = ninput_items[0] == 0;
+    bool full_output = false;
+    while ((n_consumed < ninput_items[0] ||
+            (empty_input && d_payload_state != payload_state_t::searching)) &&
+           (n_produced < noutput_items ||
+            (full_output && d_payload_state == payload_state_t::searching))) {
         // If there is no payload waiting to be processed, consume the input stream until
         // the next SOF/PLHEADER is found by the frame synchronizer.
         if (d_payload_state == payload_state_t::searching) {
@@ -616,6 +628,8 @@ int plsync_cc_impl::general_work(int noutput_items,
                                d_frame_sync->get_payload(), // buffered frame payload
                                d_curr_frame_info,
                                d_next_frame_info);
+            assert(n_produced <= noutput_items);
+            full_output = n_produced == noutput_items;
         }
     }
 
