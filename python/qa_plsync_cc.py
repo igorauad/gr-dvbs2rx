@@ -448,12 +448,10 @@ class qa_plsync_cc(gr_unittest.TestCase):
         self._run_flowgraph(nframes, freq_offset=fe, debug_tags=False)
         self.assertAlmostEqual(self.plsync.get_freq_offset(), fe)
 
-    def test_freq_est_noiseless_rot_stream_closed_loop(self):
+    def test_freq_est_noiseless_rot_stream_closed_loop_pilotless_mode(self):
         """Test closed-loop freq. estimation over a noiseless+rotated stream
 
-        Same as the previous test, but in closed-loop and with PLFRAMEs
-        containing pilot symbols so that the pilot-mode fine frequency offset
-        estimation can be used by the PL Sync block.
+        Same as the previous test, but in closed-loop.
 
         """
         fe = np.random.uniform(-.25, .25)  # normalized frequency offset
@@ -464,6 +462,22 @@ class qa_plsync_cc(gr_unittest.TestCase):
         # PLHEADER, the correction is already applied, so the frequency
         # synchronizer should enter the coarse-corrected state. Finally, the
         # fine estimate is obtained after processing the third payload.
+        self._run_flowgraph(nframes,
+                            freq_offset=fe,
+                            closed_loop=True,
+                            debug_tags=False)
+        self.assertAlmostEqual(self.plsync.get_freq_offset(), fe)
+
+    def test_freq_est_noiseless_rot_stream_closed_loop_pilot_mode(self):
+        """Test closed-loop freq. estimation over a noiseless+rotated stream
+
+        Same as the previous test, but now with PLFRAMEs containing pilot
+        symbols so that the pilot-mode fine frequency offset estimation can be
+        used by the PL Sync block.
+
+        """
+        fe = np.random.uniform(-.25, .25)  # normalized frequency offset
+        nframes = 3  # see the explanation in the previous test
         self._run_flowgraph(nframes,
                             freq_offset=fe,
                             closed_loop=True,

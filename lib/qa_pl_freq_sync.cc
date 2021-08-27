@@ -317,6 +317,52 @@ BOOST_DATA_TEST_CASE_F(
 
 BOOST_DATA_TEST_CASE_F(
     F,
+    test_fine_freq_est_pilotless_mode,
+    bdata::make(
+        { (-M_PI / 2), (-3 * M_PI / 4), (M_PI / 2), (3 * M_PI / 4), (M_PI - 1e-5) }) *
+        bdata::make({ -1e-5, -1e-6, 1e-5, 1e-6 }),
+    phase_0,
+    freq_offset)
+{
+    // Generate a full PLFRAME with 360 slots, plus an extra PLHEADER
+    uint16_t plframe_len = PLHEADER_LEN + (360 * SLOT_LEN);
+    uint16_t total_len = plframe_len + PLHEADER_LEN;
+    volk::vector<gr_complex> syms(total_len);
+    memcpy(syms.data(), plheader.data(), PLHEADER_LEN * sizeof(gr_complex));
+    memcpy(syms.data() + plframe_len, plheader.data(), PLHEADER_LEN * sizeof(gr_complex));
+
+    // Add frequency and phase offset
+    volk::vector<gr_complex> rot_syms(total_len);
+    rotate(rot_syms.data(), syms.data(), freq_offset, phase_0, total_len);
+
+    // Estimate the two PLHEADER phases
+    uint8_t plsc = (21 << 2) | (1 << 1); // test PLHEADER info
+    float phase_1 = p_freq_sync->estimate_plheader_phase(rot_syms.data(), plsc);
+    float phase_2 =
+        p_freq_sync->estimate_plheader_phase(rot_syms.data() + plframe_len, plsc);
+
+    // The fine estimation should only be executed after the residual frequency offset
+    // (indicated by the coarse estimator) falls within an acceptable range. The caller
+    // should make sure that the frequency synchronizer is at least in coarse-corrected
+    // state before calling the pilotless fine estimator.
+    bool use_full_plheader = true;
+    p_freq_sync->estimate_coarse(rot_syms.data(), use_full_plheader, plsc);
+    double coarse_foffset = p_freq_sync->get_coarse_foffset();
+    BOOST_CHECK_EQUAL(p_freq_sync->is_coarse_corrected(), true);
+
+    // Now, compute the fine frequency offset estimate
+    bool new_est = p_freq_sync->estimate_fine_pilotless_mode(
+        phase_1, phase_2, plframe_len, coarse_foffset);
+    BOOST_CHECK_EQUAL(new_est, true);
+    BOOST_CHECK_EQUAL(p_freq_sync->has_fine_foffset_est(), true);
+
+    // Check the estimate
+    float freq_offset_est = p_freq_sync->get_fine_foffset();
+    BOOST_CHECK_CLOSE(freq_offset_est, freq_offset, 1e-2);
+}
+
+BOOST_DATA_TEST_CASE_F(
+    F,
     test_derotate_plheader_open_loop,
     bdata::make(
         { (-M_PI / 2), (-3 * M_PI / 4), (M_PI / 2), (3 * M_PI / 4), (M_PI - 1e-5) }) *

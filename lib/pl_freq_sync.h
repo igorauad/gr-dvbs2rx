@@ -13,9 +13,9 @@
 #include <volk/volk_alloc.hh>
 
 const double fine_foffset_corr_range = 3.3875e-4;
-/* The fine frequency offset estimate is based on the phase difference accumulated between
- * consecutive pilot blocks, i.e., after an interval of 1440+36=1476 symbols. Hence, the
- * maximum observable frequency offset is given by:
+/* The pilot-mode fine frequency offset estimate is based on the phase difference
+ * accumulated between consecutive pilot blocks, i.e., after an interval of 1440+36=1476
+ * symbols. Hence, the maximum observable frequency offset is given by:
  *
  * 1/(2*(1440 + 36)) = 3.3875e-4
  *
@@ -26,6 +26,11 @@ const double fine_foffset_corr_range = 3.3875e-4;
  * between the PLHEADER and the first pilot block is slightly different (of 1440 + 90
  * symbols). However, the fine frequency offset estimator considers only the last 36
  * symbols of the plheader, which preserves the interval of 1476 symbols.
+ *
+ * Besides, note the pilotless-mode fine frequency offset estimate has a different upper
+ * limit for the observable frequency offset, which depends on the PLFRAME length. Hence,
+ * the pilotless-mode estimator does not use the above constant. See the implementation at
+ * `estimate_fine_pilotless_mode()`.
  */
 
 namespace gr {
@@ -195,7 +200,8 @@ public:
     /**
      * \brief Pilot-aided fine frequency offset estimation.
      *
-     * Should be executed only for PLFRAMEs containing pilot symbols.
+     * Should be executed only for PLFRAMEs containing pilot symbols, and after the coarse
+     * correction is sufficiently accurate (after reaching the coarse-corrected state).
      *
      * \param p_plheader (const gr_complex*) Pointer to the frame's PLHEADER.
      * \param p_payload (const gr_complex*) Pointer to the descrambled PLFRAME payload.
@@ -214,6 +220,40 @@ public:
                                   const gr_complex* p_payload,
                                   uint8_t n_pilot_blks,
                                   uint8_t plsc);
+
+    /**
+     * \brief Pilotless fine frequency offset estimation.
+     *
+     * Works for any PLFRAME, but should only be called for PLFRAMEs without pilots. For
+     * frames containing pilot symbols, the pilot-mode estimator should be preferred.
+     *
+     * \param curr_plheader_phase (float) Phase of the current PLHEADER.
+     * \param next_plheader_phase (float) Phase of the next PLHEADER.
+     * \param curr_plframe_len (uint16_t) Length of the current PLFRAME.
+     * \param curr_coarse_foffset (double) Coarse frequency offset over the current frame.
+     * \return (bool) Whether a new estimate was computed during this call.
+     *
+     * \note The fine frequency offset estimate is kept internally. It can be
+     * fetched using the `get_fine_foffset()` method.
+     *
+     * \note This function can only compute a new fine frequency offset estimate if the
+     * residual coarse frequency offset lies within an acceptable range. Otherwise, it
+     * returns early and does not produce a new estimate. Hence, before accessing the
+     * estimate, check the result returned by the `has_fine_foffset_est()` method.
+     *
+     * \note Even though this class stores the most recent coarse frequency offset
+     * estimate as an attribute, the coarse offset that matters is the one affecting the
+     * current PLFRAME. This important distinction arises when the current payload is only
+     * processed after handling the subsequent PLHEADER (whose phase is
+     * `next_plheader_phase`), as is the case on the PL Sync logic. In this scenario, by
+     * the time this function is called, the coarse estimate held internally may already
+     * be that of the subsequent PLHEADER. Hence, to avoid confusion, the coarse offset
+     * distubing the current frame must be provided by argument.
+     */
+    bool estimate_fine_pilotless_mode(float curr_plheader_phase,
+                                      float next_plheader_phase,
+                                      uint16_t curr_plframe_len,
+                                      double curr_coarse_foffset);
 
     /**
      * \brief De-rotate PLHEADER symbols.

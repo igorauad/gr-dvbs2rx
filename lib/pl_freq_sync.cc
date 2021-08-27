@@ -307,6 +307,7 @@ void freq_sync::estimate_fine_pilot_mode(const gr_complex* p_plheader,
      * estimate weighted by a factor of "1 / n_pilot_blks".
      **/
     fine_foffset = sum_diff / (2.0 * GR_M_PI * PILOT_BLK_PERIOD * n_pilot_blks);
+    fine_est_ready = true;
 
     if (debug_level > 1)
         printf("- Fine frequency offset: %g\n", fine_foffset);
@@ -315,8 +316,53 @@ void freq_sync::estimate_fine_pilot_mode(const gr_complex* p_plheader,
         dump_real_vec(angle_pilot.data(), n_pilot_blks + 1, "Pilot angles");
         dump_real_vec(angle_diff_f.data(), n_pilot_blks, "Pilot angle diff");
     }
+}
 
+bool freq_sync::estimate_fine_pilotless_mode(float curr_plheader_phase,
+                                             float next_plheader_phase,
+                                             uint16_t curr_plframe_len,
+                                             double curr_coarse_foffset)
+{
+    // The pilotless frequency offset estimator is based on the phase change accumulated
+    // from PLHEADER to PLHEADER. If the magnitude of this phase variation exceeds pi, the
+    // measurement becomes untrustworthy, as clarified in the sequel. In this case, it is
+    // better not to proceed with the estimation unless the residual frequency offset read
+    // by the coarse estimator is within an acceptable range.
+    //
+    // Unlike the pilot-mode estimator, the acceptable frequency offset range varies here
+    // depending on the PLFRAME length. For the pilot-mode estimator, the estimate comes
+    // from the phase accumulated from pilot to pilot, whereas, here, it comes from the
+    // phase accrued from PLHEADER to PLHEADER. The latter is a longer interval, which
+    // depends on the PLFRAME length. Hence, the observable frequency offset range in
+    // pilotless mode is always narrower than in pilot mode. Secondly, the range is
+    // dynamic, since the PLFRAME length could be changing (e.g., in ACM/VCM). Hence,
+    // instead of using the hard-coded limit from `fine_foffset_corr_range`, it is
+    // necessary to recompute the maximum observable frequency offset every time.
+    double max_foffset = 1.0 / (2 * curr_plframe_len);
+    if (abs(curr_coarse_foffset) > max_foffset)
+        return false;
+
+    double delta_phase = next_plheader_phase - curr_plheader_phase;
+    // The limit imposed by max_foffset means the phase change accumulated from PLHEADER
+    // to PLHEADER should not exceed +-pi. If `delta_phase` does exceed +-pi, it's
+    // probably due to the rotation direction. For example, if the current phase is -90°
+    // and the next phase is 150°, the phase difference could either be 240° if rotating
+    // counterclockwise (positive frequency offset) or -120° if rotating clockwise
+    // (negative frequency offset). Since the former exceeds 180°, the more appropriate
+    // answer is the 120° phase shift clockwise, corresponding to a negative frequency
+    // offset. The following operation ensures the phase difference lies within +-pi.
+    if (delta_phase > M_PI)
+        delta_phase -= 2.0 * GR_M_PI;
+    else if (delta_phase < -M_PI)
+        delta_phase += 2.0 * GR_M_PI;
+
+    fine_foffset = delta_phase / (2.0 * GR_M_PI * curr_plframe_len);
     fine_est_ready = true;
+
+    if (debug_level > 1)
+        printf("- Fine frequency offset: %g\n", fine_foffset);
+
+    return true;
 }
 
 void freq_sync::derotate_plheader(const gr_complex* in, bool open_loop)

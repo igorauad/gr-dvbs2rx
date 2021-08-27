@@ -53,6 +53,7 @@ struct plframe_info_t {
     float plheader_phase;
     pls_info_t pls;
     bool coarse_corrected = false;
+    double coarse_foffset = 0;
     uint64_t abs_sof_idx = 0;
     plframe_info_t() : plheader(PLHEADER_LEN){};
 };

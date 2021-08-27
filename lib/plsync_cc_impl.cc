@@ -379,6 +379,10 @@ void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
         frame_info.coarse_corrected = d_freq_sync->is_coarse_corrected();
     }
 
+    // Save the coarse frequency offset estimate so that we can know the offset affecting
+    // each frame. The frequency synchronizer object only tracks the most recent estimate.
+    frame_info.coarse_foffset = d_freq_sync->get_coarse_foffset();
+
     /* Control the frequency correction applied by the external rotator.
      *
      * Do so only when locked to maximize the chances of the actual phase increment update
@@ -393,7 +397,7 @@ void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
         !frame_info.pls.dummy_frame) {
         control_rotator_freq(abs_sof_idx,
                              frame_info.pls.plframe_len,
-                             d_freq_sync->get_coarse_foffset(),
+                             frame_info.coarse_foffset,
                              false /* reference is the current frame */);
     }
 
@@ -419,26 +423,37 @@ int plsync_cc_impl::handle_payload(int noutput_items,
         // Descramble the payload
         d_pl_descrambler->descramble(p_payload, frame_info.pls.payload_len);
 
-        /* Estimate the phase of the PLHEADER preceding the payload. This phase estimate
-         * is used later for phase correction of the output data symbols. */
-        const gr_complex* p_plheader = frame_info.plheader.data();
+        // Update the phase correction based on the PLHEADER phase
         d_phase_corr = gr_expj(-frame_info.plheader_phase);
 
-        // If the PLFRAME has pilot symbols, estimate the phase of each pilot
-        // block and, then, estimate the fine frequency offset.
+        // Fine frequency offset estimation
         //
-        // Note the fine estimate only makes sense after the coarse frequency
-        // offset correction. The residual offset must fall within the fine
-        // estimation range of up to ~3.3e-4 in normalized frequency.
-        if (frame_info.pls.has_pilots && frame_info.coarse_corrected) {
-            // Fine freq. offset based on the phase jump between pilot blocks
-            d_freq_sync->estimate_fine_pilot_mode(p_plheader,
-                                                  p_descrambled_payload,
-                                                  frame_info.pls.n_pilots,
-                                                  frame_info.pls.plsc);
+        // Note the fine estimate only makes sense after the coarse frequency offset
+        // correction. The residual normalized frequency offset must fall within the fine
+        // estimation range of up to ~3.3e-4. Furthermore, note the coarse-corrected state
+        // that matters is the one that the frequency synchronizer had at the start of
+        // this PLFRAME. Since, at this point, the frequency synchronizer has already
+        // processed the subsequent PLHEADER, we must check the state cached on the
+        // `frame_info` structure.
+        bool new_fine_est = false;
+        if (frame_info.coarse_corrected) {
+            if (frame_info.pls.has_pilots) {
+                d_freq_sync->estimate_fine_pilot_mode(frame_info.plheader.data(),
+                                                      p_descrambled_payload,
+                                                      frame_info.pls.n_pilots,
+                                                      frame_info.pls.plsc);
+                new_fine_est = true;
+            } else {
+                new_fine_est = d_freq_sync->estimate_fine_pilotless_mode(
+                    frame_info.plheader_phase,
+                    next_frame_info.plheader_phase,
+                    frame_info.pls.plframe_len,
+                    frame_info.coarse_foffset);
+            }
+        }
 
-            // Schedule the rotator update
-            //
+        // If there is a new fine frequency offset estimate, update the external rotator
+        if (new_fine_est) {
             // NOTE: Since we always process the payload in between two SOFs,
             // we've already processed SOF n+1 at this point while we are
             // processing the n-th payload. Hence, we must schedule the
