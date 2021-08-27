@@ -9,11 +9,13 @@
 # Description: DVB-S2 Loopback Tx/Rx Simulation
 # GNU Radio version: v3.10.0.0git-279-g0b3dc1b1
 
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import signal
 import sys
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from math import pi, sqrt
 
 import pmt
+from gnuradio import analog
 from gnuradio import blocks
 from gnuradio import dtv
 from gnuradio import eng_notation
@@ -35,6 +37,7 @@ class dvbs2_tx(gr.top_block):
         ##################################################
         self.frame_size = options.frame_size
         self.freq = options.freq
+        self.freq_offset = options.freq_offset
         self.gain = options.gain
         self.gold_code = options.gold_code
         self.in_fd = options.in_fd
@@ -46,6 +49,7 @@ class dvbs2_tx(gr.top_block):
         self.rolloff = options.rolloff
         self.rrc_delay = options.rrc_delay
         self.sink = options.sink
+        self.snr = options.snr
         self.source = options.source
         self.sps = options.sps
         self.sym_rate = options.sym_rate
@@ -135,6 +139,28 @@ class dvbs2_tx(gr.top_block):
             sink.set_center_freq(self.freq, 0)
             sink.set_antenna(self.usrp_antenna, 0)
             sink.set_gain(self.gain, 0)
+
+        # Simulation options
+        # 1) Noise
+        if (self.snr is not None):
+            Es = 1
+            EsN0_db = self.snr
+            EsN0 = 10**(EsN0_db / 10)
+            N0 = Es / EsN0
+            noise_source = analog.noise_source_c(analog.GR_GAUSSIAN,
+                                                 sqrt(N0 / self.sps), 0)
+            add_block = blocks.add_vcc(1)
+            self.connect((noise_source, 0), (add_block, 1))
+            self.connect((add_block, 0), (sink, 0))
+            sink = add_block  # new first block on the sink pipeline
+
+        # 2) Frequency offset
+        if (self.freq_offset is not None):
+            rotator_cc_0_0 = blocks.rotator_cc(
+                -2 * pi * (self.freq_offset / self.samp_rate), False)
+            self.connect((rotator_cc_0_0, 0), (sink, 0))
+            sink = rotator_cc_0_0  # new first block on the sink pipeline
+
         return sink
 
     def connect_dvbs2tx(self, source_block, sink_block):
@@ -270,6 +296,16 @@ def argument_parser():
                            type=str,
                            default="TX/RX",
                            help="USRP antenna")
+
+    sim_group = parser.add_argument_group('Simulation Options')
+    sim_group.add_argument(
+        "--snr",
+        type=eng_float,
+        help="Signal-to-noise ratio to simulate on the output stream")
+    sim_group.add_argument(
+        "--freq-offset",
+        type=eng_float,
+        help="Frequency offset in Hz to simulate on the output stream")
 
     return parser
 
