@@ -56,6 +56,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.rrc_nfilts = options.rrc_nfilts
         self.sink = options.sink
         self.source = options.source
+        self.spectral_inversion = options.spectral_inversion
         self.sps = options.sps
         self.sym_rate = options.sym_rate
         self.sym_sync_damping = options.sym_sync_damping
@@ -530,10 +531,15 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         analog_agc.set_max_gain(65536)
 
         self.msg_connect((plsync, 'rotator_phase_inc'), (rotator, 'cmd'))
-        self.connect((source_block, 0), (analog_agc, 0), (rotator, 0),
-                     (symbol_sync, 0), (plsync, 0), (ldpc_decoder, 0),
-                     (bch_decoder, 0), (bbdescrambler, 0), (bbdeheader, 0),
-                     (sink_block, 0))
+        self.connect((analog_agc, 0), (rotator, 0), (symbol_sync, 0),
+                     (plsync, 0), (ldpc_decoder, 0), (bch_decoder, 0),
+                     (bbdescrambler, 0), (bbdeheader, 0), (sink_block, 0))
+
+        if (self.spectral_inversion):
+            iq_swap = blocks.swap_iq(1, gr.sizeof_gr_complex)
+            self.connect((source_block, 0), (iq_swap, 0), (analog_agc, 0))
+        else:
+            self.connect((source_block, 0), (analog_agc, 0))
 
         if (self.gui):
             self.connect((symbol_sync, 0), (self.qtgui_const_sink_x_1_0, 0))
@@ -616,6 +622,11 @@ def argument_parser():
                         type=int,
                         default=32,
                         help="Number of branches on the polyphase RRC filter")
+    parser.add_argument(
+        "--spectral-inversion",
+        action='store_true',
+        default=False,
+        help="Whether the input is spectrally inverted (LO freq. > RF freq.)")
     parser.add_argument("-o",
                         "--sps",
                         type=eng_float,
