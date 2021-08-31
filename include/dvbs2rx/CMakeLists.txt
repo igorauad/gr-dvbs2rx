@@ -15,5 +15,6 @@ install(FILES
     bbdescrambler_bb.h
     bch_decoder_bb.h
     ldpc_decoder_cb.h
-    plsync_cc.h DESTINATION include/dvbs2rx
+    plsync_cc.h
+    symbol_sync_cc.h DESTINATION include/dvbs2rx
 )

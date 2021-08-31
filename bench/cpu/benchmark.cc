@@ -1,7 +1,9 @@
 #include "pi2_bpsk.h"
 #include "pl_defs.h"
 #include "pl_descrambler.h"
+#include "symbol_sync_cc_impl.h"
 #include <benchmark/benchmark.h>
+#include <volk/volk_alloc.hh>
 
 static void BM_map_bpsk(benchmark::State& state)
 {
@@ -134,5 +136,29 @@ static void BM_pl_descrambler(benchmark::State& state)
     }
 }
 BENCHMARK(BM_pl_descrambler);
+
+static void BM_symbol_sync(benchmark::State& state)
+{
+    float sps = 2.0;
+    float loop_bw = 0.01;
+    float damping_factor = 1.0;
+    float rolloff = 0.2;
+
+    int ninput_items = 1025;
+    int noutput_items = 512;
+    volk::vector<gr_complex> in_buf(ninput_items);
+    volk::vector<gr_complex> out_buf(noutput_items);
+
+    gr::dvbs2rx::symbol_sync_cc_impl symbol_sync(sps, loop_bw, damping_factor, rolloff);
+
+    // Run the loop once before the benchmarking loop so that the initialization routine
+    // (with an std::vector resize call) does not disturb the benchmarking results
+    symbol_sync.loop(in_buf.data(), out_buf.data(), ninput_items, noutput_items);
+
+    for (auto _ : state) {
+        symbol_sync.loop(in_buf.data(), out_buf.data(), ninput_items, noutput_items);
+    }
+}
+BENCHMARK(BM_symbol_sync);
 
 BENCHMARK_MAIN();

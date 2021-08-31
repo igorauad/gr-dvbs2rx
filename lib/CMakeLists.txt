@@ -23,6 +23,7 @@ list(APPEND dvbs2rx_sources
     pl_signaling.cc
     plsync_cc_impl.cc
     reed_muller.cc
+    symbol_sync_cc_impl.cc
     util.cc
 )
 
@@ -69,6 +70,7 @@ include(GrTest)
 #include_directories()
 # List all files that contain Boost.UTF unit tests here
 list(APPEND test_dvbs2rx_sources
+  qa_symbol_sync_cc.cc
   qa_cdeque.cc
   qa_delay_line.cc
   qa_pi2_bpsk.cc

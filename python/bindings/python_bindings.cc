@@ -24,11 +24,12 @@ namespace py = pybind11;
 void bind_bbdeheader_bb(py::module& m);
 void bind_bbdescrambler_bb(py::module& m);
 void bind_bch_decoder_bb(py::module& m);
-void bind_ldpc_decoder_cb(py::module& m);
-void bind_plsync_cc(py::module& m);
 void bind_dvb_config(py::module& m);
 void bind_dvbs2_config(py::module& m);
 void bind_dvbt2_config(py::module& m);
+void bind_ldpc_decoder_cb(py::module& m);
+void bind_plsync_cc(py::module& m);
+void bind_symbol_sync_cc(py::module& m);
 
 
 // We need this hack because import_array() returns NULL
@@ -59,10 +60,11 @@ PYBIND11_MODULE(dvbs2rx_python, m)
     bind_bbdeheader_bb(m);
     bind_bbdescrambler_bb(m);
     bind_bch_decoder_bb(m);
-    bind_ldpc_decoder_cb(m);
-    bind_plsync_cc(m);
     bind_dvb_config(m);
     bind_dvbs2_config(m);
     bind_dvbt2_config(m);
+    bind_ldpc_decoder_cb(m);
+    bind_plsync_cc(m);
+    bind_symbol_sync_cc(m);
     // ) END BINDING_FUNCTION_CALLS
 }

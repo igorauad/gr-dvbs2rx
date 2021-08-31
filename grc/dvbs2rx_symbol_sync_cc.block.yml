@@ -1,0 +1,41 @@
+id: dvbs2rx_symbol_sync_cc
+label: Symbol Synchronizer
+category: '[Core]/Digital Television/DVB-S2'
+
+templates:
+  imports: import dvbs2rx
+  make: dvbs2rx.symbol_sync_cc(${sps}, ${loop_bw}, ${damping_factor}, ${rolloff})
+
+parameters:
+- id: sps
+  label: Oversampling Factor
+  dtype: int
+  default: 2
+- id: loop_bw
+  label: Loop Bandwidth
+  dtype: float
+  default: 0.01
+- id: damping_factor
+  label: Damping Factor
+  dtype: float
+  default: 1.0
+- id: rolloff
+  label: RRC Rolloff Factor
+  dtype: float
+  default: 1.0
+
+inputs:
+- label: in
+  domain: stream
+  dtype: complex
+  vlen: 1
+  optional: 0
+
+outputs:
+- label: out
+  domain: stream
+  dtype: complex
+  vlen: 1
+  optional: 0
+
+file_format: 1

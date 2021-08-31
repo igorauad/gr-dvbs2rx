@@ -185,34 +185,6 @@ blocks:
     coordinate: [8, 116.0]
     rotation: 0
     state: true
-- name: digital_symbol_sync_xx_1
-  id: digital_symbol_sync_xx
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    constellation: digital.constellation_bpsk().base()
-    damping: sym_sync_damping
-    loop_bw: sym_sync_loop_bw
-    max_dev: '1.5'
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    nfilters: rrc_nfilts
-    osps: '1'
-    pfb_mf_taps: firdes.root_raised_cosine(rrc_nfilts, samp_rate*rrc_nfilts, sym_rate,
-      rolloff, n_rrc_taps*rrc_nfilts)
-    resamp_type: digital.IR_PFB_MF
-    sps: sps
-    ted_gain: '1.0'
-    ted_type: digital.TED_GARDNER
-    type: cc
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [488, 444.0]
-    rotation: 0
-    state: true
 - name: dvbs2rx_bbdeheader_bb_0
   id: dvbs2rx_bbdeheader_bb
   parameters:
@@ -305,9 +277,28 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [880, 492.0]
+    coordinate: [968, 492.0]
     rotation: 0
     state: true
+- name: dvbs2rx_symbol_sync_cc_0
+  id: dvbs2rx_symbol_sync_cc
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    damping_factor: sym_sync_damping
+    loop_bw: sym_sync_loop_bw
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    rolloff: rolloff
+    sps: sps
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [736, 452.0]
+    rotation: 0
+    state: enabled
 - name: frame_size
   id: parameter
   parameters:
@@ -392,7 +383,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [888, 420.0]
+    coordinate: [968, 420.0]
     rotation: 0
     state: true
 - name: pad_sink_1_0
@@ -410,7 +401,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1096, 420.0]
+    coordinate: [1176, 420.0]
     rotation: 0
     state: true
 - name: pad_sink_2
@@ -428,7 +419,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [488, 388.0]
+    coordinate: [504, 388.0]
     rotation: 0
     state: true
 - name: pad_sink_2_0
@@ -503,6 +494,29 @@ blocks:
     coordinate: [600, 4.0]
     rotation: 0
     state: true
+- name: root_raised_cosine_filter_0
+  id: root_raised_cosine_filter
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha: rolloff
+    comment: ''
+    decim: '1'
+    gain: '1'
+    interp: '1'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    ntaps: n_rrc_taps
+    samp_rate: sps
+    sym_rate: '1.0'
+    type: fir_filter_ccf
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [496, 460.0]
+    rotation: 0
+    state: enabled
 - name: rrc_delay
   id: parameter
   parameters:
@@ -609,10 +623,8 @@ blocks:
 connections:
 - [analog_agc_xx_0, '0', blocks_rotator_cc_0_0_0, '0']
 - [analog_agc_xx_0, '0', pad_sink_2_0, '0']
-- [blocks_rotator_cc_0_0_0, '0', digital_symbol_sync_xx_1, '0']
 - [blocks_rotator_cc_0_0_0, '0', pad_sink_2, '0']
-- [digital_symbol_sync_xx_1, '0', dvbs2rx_plsync_cc_0, '0']
-- [digital_symbol_sync_xx_1, '0', pad_sink_1, '0']
+- [blocks_rotator_cc_0_0_0, '0', root_raised_cosine_filter_0, '0']
 - [dvbs2rx_bbdeheader_bb_0, '0', pad_sink_0, '0']
 - [dvbs2rx_bbdescrambler_bb_0, '0', dvbs2rx_bbdeheader_bb_0, '0']
 - [dvbs2rx_bch_decoder_bb_0, '0', dvbs2rx_bbdescrambler_bb_0, '0']
@@ -620,7 +632,10 @@ connections:
 - [dvbs2rx_plsync_cc_0, '0', dvbs2rx_ldpc_decoder_cb_0, '0']
 - [dvbs2rx_plsync_cc_0, '0', pad_sink_1_0, '0']
 - [dvbs2rx_plsync_cc_0, rotator_phase_inc, blocks_rotator_cc_0_0_0, cmd]
+- [dvbs2rx_symbol_sync_cc_0, '0', dvbs2rx_plsync_cc_0, '0']
+- [dvbs2rx_symbol_sync_cc_0, '0', pad_sink_1, '0']
 - [pad_source_0, '0', analog_agc_xx_0, '0']
+- [root_raised_cosine_filter_0, '0', dvbs2rx_symbol_sync_cc_0, '0']
 
 metadata:
   file_format: 1
