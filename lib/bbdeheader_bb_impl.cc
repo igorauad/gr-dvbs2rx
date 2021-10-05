@@ -393,7 +393,7 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
         }
         in += 8; // Skip the last byte (CRC-8), processed in the beginning.
 
-        // Validate the DFL and the SYNCD fields of the BBHEADER
+        // Validate the UPL, DFL and the SYNCD fields of the BBHEADER
         if (h->dfl > max_dfl) {
             synched = FALSE;
             printf("Baseband header invalid (dfl > kbch - 80).\n");
@@ -411,6 +411,13 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
         if (h->syncd > h->dfl) {
             synched = FALSE;
             printf("Baseband header invalid (syncd > dfl).\n");
+            in += max_dfl;
+            continue;
+        }
+
+        if (h->upl != (TRANSPORT_PACKET_LENGTH * 8)) {
+            synched = FALSE;
+            printf("Baseband header unsupported (upl != 188 bytes).\n");
             in += max_dfl;
             continue;
         }
