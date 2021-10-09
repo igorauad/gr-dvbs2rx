@@ -101,6 +101,13 @@ plsc_decoder::plsc_decoder(int debug_level)
 {
 }
 
+plsc_decoder::plsc_decoder(std::vector<uint8_t>&& expected_pls, int debug_level)
+    : d_debug_level(debug_level),
+      d_reed_muller_decoder(std::move(expected_pls), &map_plsc_codeword_to_bpsk),
+      d_soft_dec_buf(PLSC_LEN)
+{
+}
+
 void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
 {
     if (soft && coherent) {
@@ -158,11 +165,6 @@ void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
                d_pls_info.S,
                d_pls_info.plframe_len);
     }
-}
-
-void plsc_decoder::get_info(pls_info_t* out) const
-{
-    memcpy(out, &d_pls_info, sizeof(pls_info_t));
 }
 
 } // namespace dvbs2rx

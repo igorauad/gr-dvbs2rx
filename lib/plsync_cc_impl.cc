@@ -17,11 +17,23 @@
 namespace gr {
 namespace dvbs2rx {
 
-plsync_cc::sptr
-plsync_cc::make(int gold_code, int freq_est_period, float sps, int debug_level)
+plsync_cc::sptr plsync_cc::make(int gold_code,
+                                int freq_est_period,
+                                float sps,
+                                int debug_level,
+                                bool acm_vcm,
+                                bool multistream,
+                                uint64_t pls_filter_lo,
+                                uint64_t pls_filter_hi)
 {
-    return gnuradio::get_initial_sptr(
-        new plsync_cc_impl(gold_code, freq_est_period, sps, debug_level));
+    return gnuradio::get_initial_sptr(new plsync_cc_impl(gold_code,
+                                                         freq_est_period,
+                                                         sps,
+                                                         debug_level,
+                                                         acm_vcm,
+                                                         multistream,
+                                                         pls_filter_lo,
+                                                         pls_filter_hi));
 }
 
 
@@ -31,22 +43,114 @@ plsync_cc::make(int gold_code, int freq_est_period, float sps, int debug_level)
 plsync_cc_impl::plsync_cc_impl(int gold_code,
                                int freq_est_period,
                                float sps,
-                               int debug_level)
+                               int debug_level,
+                               bool acm_vcm,
+                               bool multistream,
+                               uint64_t pls_filter_lo,
+                               uint64_t pls_filter_hi)
     : gr::block("plsync_cc",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(1, 1, sizeof(gr_complex))),
       d_debug_level(debug_level),
       d_sps(sps),
+      d_acm_vcm(acm_vcm),
+      d_multistream(multistream),
+      d_plsc_decoder_enabled(true),
       d_locked(false),
       d_closed_loop(false),
       d_payload_state(payload_state_t::searching),
       d_sof_cnt(0),
       d_phase_corr(0.0)
 {
+    // Validate the PLS filters based on their population counts (Hamming weights)
+    //
+    // NOTE: a popcnt of 2 is ok in CCM if the target PLSs differ on the pilots flag only.
+    // This is verified in the sequel after the PLS filters are parsed. On the other hand,
+    // a popcnt greater than 2 is certainly a problem in CCM mode.
+    uint64_t popcnt1, popcnt2;
+    volk_64u_popcnt(&popcnt1, pls_filter_lo);
+    volk_64u_popcnt(&popcnt2, pls_filter_hi);
+    if (!acm_vcm && (popcnt1 + popcnt2) > 2)
+        throw std::runtime_error(
+            "PLS filter configured for multiple MODCOD or frame sizes in CCM mode");
+    if ((popcnt1 + popcnt2) == 0)
+        throw std::runtime_error("At least one PLS should be enabled in the filters");
+
+    // PLS filters
+    //
+    // NOTE the "d_pls_enabled" and "expected_plsc" arrays play distinct roles:
+    //
+    // - The "d_pls_enabled" array determines whether this block shall output XFECFRAMEs
+    //   embedded on PLFRAMEs with the given PLS.
+    //
+    // - The "expected_plsc" vector specifies the distinct PLS values that can be found in
+    //   the input stream, which are equivalent to the expected PLSC (codeword) indexes to
+    //   be processed by the PLSC decoder. More specifically, the "expected_plsc" vector
+    //   holds a priori knowledge used to reduce the set of possibilities searched by the
+    //   PLSC decoder. In ACM/VCM mode, it will either contain all 128 possible DVB-S2 PLS
+    //   values, or a selected number of them. In CCM mode, it must contain a single
+    //   value, in which case the PLSC decoder is effectively disabled for simplicity.
+    //
+    // - When operating in CCM mode with multiple TS streams (MIS mode), instead of single
+    //   stream (SIS) mode, the input PLFRAME stream may contain dummy frames in addition
+    //   to the selected PLS. Similarly, in ACM/VCM mode, even if running with a single TS
+    //   stream, dummy frames must be expected and processed by the PLSC decoder). See the
+    //   second row in Table D.2 of the standard.
+    std::vector<uint8_t> expected_plsc;
+    for (uint8_t pls = 0; pls < n_plsc_codewords; pls++) {
+        pls_info_t info(pls);
+        bool enabled = (pls < 64) ? (pls_filter_lo & (1ULL << pls))
+                                  : (pls_filter_hi & (1ULL << pls));
+        d_pls_enabled[pls] = enabled;
+        if (enabled) {
+            expected_plsc.push_back(pls);
+        }
+    }
+    // In CCM mode, up to two PLSs are allowed, as long as they refer to the same MODCOD
+    // and frame size (differring only on the pilots flag).
+    if (!acm_vcm && expected_plsc.size() == 2) {
+        pls_info_t info1(expected_plsc[0]);
+        pls_info_t info2(expected_plsc[1]);
+        if (info1.modcod != info2.modcod ||
+            info1.short_fecframe != info2.short_fecframe) {
+            throw std::runtime_error(
+                "A single MODCOD and frame size should be selected in "
+                "CCM mode");
+        }
+    }
+    // Include the PLSs of the dummy PLFRAMEs allowed in MIS or ACM/VCM mode
+    //
+    // Dummy PLFRAMES have modcod=0, so the corresponding PLS should be 0. However, there
+    // are no guarantees that the Tx sets short_fecframe=0 and pilots=0 when sending dummy
+    // frames, so PLS values from 0 to 3 can be expected (TODO: confirm).
+    if (multistream || acm_vcm) {
+        for (uint8_t pls = 0; pls < 4; pls++) {
+            // Add if not enabled in the pls_filter already:
+            if (!(pls_filter_lo & (1 << pls))) {
+                expected_plsc.push_back(pls);
+            }
+        }
+    }
+    // If a single PLS is expected in the end (CCM/SIS mode with pilot configuration
+    // known), then cache the constant PLS info and simply disable the PLSC decoder. It
+    // would return the same PLS for every frame anyway.
+    if (expected_plsc.size() == 1) {
+        d_plsc_decoder_enabled = false;
+        d_ccm_sis_pls = pls_info_t(expected_plsc[0]);
+    }
+    std::sort(expected_plsc.begin(), expected_plsc.end());
+
+    // Heap-allocated modules
     d_frame_sync = new frame_sync(debug_level);
-    d_plsc_decoder = new plsc_decoder(debug_level);
+    d_plsc_decoder = new plsc_decoder(std::move(expected_plsc), debug_level);
     d_freq_sync = new freq_sync(freq_est_period, debug_level);
     d_pl_descrambler = new pl_descrambler(gold_code);
+
+    // When the PLSC decoder is disabled, set a fixed PLFRAME length on the frame
+    // synchronizer instead of updating the length for every detected frame.
+    if (!d_plsc_decoder_enabled) {
+        d_frame_sync->set_frame_len(d_ccm_sis_pls.plframe_len);
+    }
 
     /* Message port */
     message_port_register_out(d_port_id);
@@ -354,22 +458,29 @@ void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
         frame_info.coarse_corrected = d_freq_sync->is_coarse_corrected();
     }
 
-    /* Try to de-rotate the PLHEADER's pi/2 BPSK symbols and fetch the post-processed
-     * (de-rotated) PLHEADER pi/2 BPSK symbols. Run the derotation in open-loop mode while
-     * the external de-rotator block is not adjusted yet. */
-    d_freq_sync->derotate_plheader(p_plheader, !d_closed_loop);
-    const gr_complex* p_pp_plheader = d_freq_sync->get_plheader();
-
     /* Decode the pi/2 BPSK-mapped and scrambled PLSC symbols
      *
      * The PLSC decoder offers coherent and non-coherent decoding alternatives,
-     * both with hard or soft demapping. Use the default coherent soft decoder. */
-    d_plsc_decoder->decode(p_pp_plheader + SOF_LEN - 1);
-    d_plsc_decoder->get_info(&frame_info.pls);
+     * both with hard or soft demapping. Use the default coherent soft decoder.
+     *
+     * In CCM/SIS mode, skip the decoding and assume the PLS is always the same. */
+    if (d_plsc_decoder_enabled) {
+        /* First, de-rotate the PLHEADER's pi/2 BPSK symbols. Run the derotation in
+         * open-loop mode while the external de-rotator block is not adjusted yet. */
+        d_freq_sync->derotate_plheader(p_plheader, !d_closed_loop);
+        const gr_complex* p_pp_plheader = d_freq_sync->get_plheader();
 
-    /* Tell the frame synchronizer what the frame length is, so that it
-     * knows when to expect the next SOF */
-    d_frame_sync->set_frame_len(frame_info.pls.plframe_len);
+        /* Decode the de-rotated PLHEADER */
+        d_plsc_decoder->decode(p_pp_plheader + SOF_LEN - 1);
+        d_plsc_decoder->get_info(&frame_info.pls);
+
+        /* Tell the frame synchronizer what the frame length is, so that it
+         * knows when to expect the next SOF */
+        d_frame_sync->set_frame_len(frame_info.pls.plframe_len);
+    } else {
+        frame_info.pls = d_ccm_sis_pls;
+    }
+
 
     // As mentioned earlier, estimate the coarse frequency offset here (after the PLSC
     // decoding) if the frequency synchronizer was already coarse-corrected before
@@ -596,9 +707,20 @@ int plsync_cc_impl::general_work(int noutput_items,
                 if (!d_locked)
                     continue;
 
+                // Reject the frame if its PLS value is not enabled for processing. In CCM
+                // mode, this rejection ensures the downstream blocks won't get any
+                // accidental XFECFRAME of differing size, which could break the block's
+                // notion of the XFECFRAME boundaries. In ACM/VCM mode, this rejection is
+                // useful to prevent wrong frame detection when it's known a priori that
+                // certain PLS values cannot be found in the input stream.
+                if (!d_pls_enabled[d_curr_frame_info.pls.plsc]) {
+                    if (d_debug_level > 1)
+                        printf("PLFRAME rejected (PLS=%u)\n", d_curr_frame_info.pls.plsc);
+                    continue;
+                }
+
                 // If the PLFRAME between the present and the past SOFs is a dummy frame,
-                // it doesn't produce any output. Hence, skip it and keep going until the
-                // next payload.
+                // it doesn't produce any output. Skip it and keep going until the next.
                 if (d_curr_frame_info.pls.dummy_frame)
                     continue;
 
@@ -606,17 +728,19 @@ int plsync_cc_impl::general_work(int noutput_items,
                 // in the output buffer. Hence, unlike the PLHEADER, it may not be
                 // processed right away. Mark the processing as pending for now and don't
                 // consume any more input samples until this payload is handled.
-                //
-                // Also, tag the beginning of the XFECFRAME to follow in the output.
-                // Include the MODCOD and the FECFRAME length so that downstream blocks
-                // can de-map and decode this frame even if running in ACM/VCM mode.
                 d_payload_state = payload_state_t::pending;
-                add_item_tag(
-                    0, // output 0 (the only output port)
-                    nitems_written(0) + n_produced,
-                    pmt::string_to_symbol("XFECFRAME"),
-                    pmt::cons(pmt::from_long(d_curr_frame_info.pls.modcod),
-                              pmt::from_bool(d_curr_frame_info.pls.short_fecframe)));
+
+                // If running in ACM/VCM mode, tag the beginning of the XFECFRAME to
+                // follow in the output. Include the MODCOD and the FECFRAME length so
+                // that downstream blocks can de-map and decode this frame.
+                if (d_acm_vcm) {
+                    add_item_tag(
+                        0, // output 0 (the only output port)
+                        nitems_written(0) + n_produced,
+                        pmt::string_to_symbol("XFECFRAME"),
+                        pmt::cons(pmt::from_long(d_curr_frame_info.pls.modcod),
+                                  pmt::from_bool(d_curr_frame_info.pls.short_fecframe)));
+                }
                 break;
             }
         }

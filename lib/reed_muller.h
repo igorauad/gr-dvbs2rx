@@ -27,12 +27,25 @@ typedef void (*euclidean_map_func_ptr)(float* dptr, uint64_t codeword);
 class DVBS2RX_API reed_muller
 {
 private:
+    // Vector with all possible codeword indexes. When the constructor does not specify
+    // the enabled codewords, this vector holds the sequence from 0 to 127. Otherwise,
+    // when it's known a priori that only a subset of the codewords can be present in the
+    // incoming signal, this vector can be reduced to a subset of the codewords.
+    std::vector<uint8_t> d_enabled_codewords;
     // LUT with all the 64-bit codewords:
     uint64_t d_codeword_lut[n_plsc_codewords];
     // LUT with the Euclidean-space image of the codewords (real vectors):
     volk::vector<float> d_euclidean_img_lut;
     // Buffer used by the maximum inner product soft decoder:
     volk::vector<float> d_dot_prod_buf;
+
+    /**
+     * @brief Initialize the codeword and Euclidean-space image LUTs
+     *
+     * @param p_custom_map Custom Euclidean space mapping function defined on the
+     * constructor.
+     */
+    void init(euclidean_map_func_ptr p_custom_map = nullptr);
 
 public:
     // Function used to map binary codewords into the corresponding real vector:
@@ -45,6 +58,18 @@ public:
      *        not defined, method "default_euclidean_map" is used.
      */
     explicit reed_muller(euclidean_map_func_ptr p_custom_map = nullptr);
+
+    /**
+     * @brief Construct the Reed-Muller encoder/decoder for a codeword subset.
+     * @param enabled_codewords Temporary vector with the indexes within [0, 128)
+     * corresponding to subset of codewords that may appear (according to a priori
+     * knowledge) on the incoming signal.
+     * @param p_custom_map Pointer to a custom mapping function used to map the
+     *        binary the codewords into real-valued Euclidean-space images. If
+     *        not defined, method "default_euclidean_map" is used.
+     */
+    explicit reed_muller(std::vector<uint8_t>&& enabled_codewords,
+                         euclidean_map_func_ptr p_custom_map = nullptr);
 
     /**
      * @brief Map codeword to a real vector using 2-PAM.

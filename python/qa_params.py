@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-
+import itertools
 from gnuradio import gr_unittest
 try:
     from dvbs2rx import params, dvbs2rx_python
@@ -78,6 +78,14 @@ class qa_params(gr_unittest.TestCase):
             self.assertTrue(params.validate(standard, 'normal', code, const))
             self.assertFalse(params.validate(standard, 'short', code, const))
 
+        # Unsupported MODCOD combinations
+        unsupported_8psk = itertools.product(
+            ['8psk'], ['1/4', '1/3', '2/5', '1/2', '4/5'])
+        for const, code in unsupported_8psk:
+            for frame_size in ['normal', 'short']:
+                self.assertFalse(
+                    params.validate(standard, frame_size, code, const))
+
     def test_dvbs2_modcod_translation(self):
         standard = 'DVB-S2'
         frame_size = 'normal'
@@ -111,6 +119,37 @@ class qa_params(gr_unittest.TestCase):
         self.assertIsInstance(t_params[4],
                               dvbs2rx_python.dvbs2_rolloff_factor_t)
         self.assertIsInstance(t_params[5], dvbs2rx_python.dvbs2_pilots_t)
+
+    def test_pls_parsing(self):
+        self.assertEqual(params.dvbs2_pls("QPSK", "1/4", "normal", False),
+                         1 << 2)
+        self.assertEqual(params.dvbs2_pls("8PSK", "3/5", "normal", False),
+                         12 << 2)
+        self.assertEqual(params.dvbs2_pls("QPSK", "3/5", "normal", False),
+                         5 << 2)
+        self.assertEqual(params.dvbs2_pls("QPSK", "3/5", "normal", True),
+                         (5 << 2) + 1)
+        self.assertEqual(params.dvbs2_pls("QPSK", "3/5", "short", False),
+                         (5 << 2) + 2)
+        self.assertEqual(params.dvbs2_pls("QPSK", "3/5", "short", True),
+                         (5 << 2) + 3)
+
+    def test_pls_filter(self):
+        # Single PLS, lower u64 bits only
+        self.assertEqual(params.pls_filter(0), (1, 0))
+        self.assertEqual(params.pls_filter(1), (2, 0))
+        self.assertEqual(params.pls_filter(2), (1 << 2, 0))
+        self.assertEqual(params.pls_filter(63), (1 << 63, 0))
+        # Single PLS, upper u64 bits only
+        self.assertEqual(params.pls_filter(64), (0, 1))
+        self.assertEqual(params.pls_filter(65), (0, 2))
+        self.assertEqual(params.pls_filter(66), (0, 1 << 2))
+        self.assertEqual(params.pls_filter(127), (0, 1 << 63))
+        # Multiple PLSs
+        self.assertEqual(params.pls_filter(0, 1, 2, 3), (15, 0))
+        self.assertEqual(params.pls_filter(64, 65, 66, 67), (0, 15))
+        with self.assertRaises(ValueError):
+            params.pls_filter(128)
 
 
 if __name__ == '__main__':

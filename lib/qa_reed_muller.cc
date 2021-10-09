@@ -58,5 +58,39 @@ BOOST_DATA_TEST_CASE(test_reed_muller, bdata::make({ false, true }), soft)
     }
 }
 
+BOOST_DATA_TEST_CASE(test_reed_muller_codeword_subset, bdata::make({ false, true }), soft)
+{
+    reed_muller codec({ 0, 32, 64, 96 });
+    volk::vector<float> soft_decisions(64);
+
+    for (uint8_t i = 0; i < n_plsc_codewords; i++) {
+        // Encode
+        uint64_t codeword = codec.encode(i);
+
+        // Decode the codeword as-is (error-free)
+        uint8_t dataword;
+        if (soft) {
+            codec.euclidean_map(soft_decisions.data(), codeword);
+            dataword = codec.decode(soft_decisions.data());
+        } else {
+            dataword = codec.decode(codeword);
+        }
+
+        // The decoder can only return results within the selected codeword subset
+        if (i != 0 && i != 32 && i != 64 && i != 96) {
+            BOOST_CHECK(i != dataword); // i not in the subset
+        } else {
+            BOOST_CHECK_EQUAL(dataword, i); // i in the subset
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_reed_muller_codeword_subset_validation)
+{
+    BOOST_CHECK_THROW(reed_muller codec({ 0, 64, 128 }), std::runtime_error);
+    BOOST_CHECK_THROW(reed_muller codec({ 0, 64, 255 }), std::runtime_error);
+    BOOST_CHECK_NO_THROW(reed_muller codec({ 0, 64, 127 }));
+}
+
 } // namespace dvbs2rx
 } // namespace gr

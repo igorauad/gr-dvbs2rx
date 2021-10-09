@@ -12,6 +12,7 @@
 #include <gnuradio/gr_complex.h>
 #include <dvbs2rx/api.h>
 #include <volk/volk_alloc.hh>
+#include <cstring>
 
 namespace gr {
 namespace dvbs2rx {
@@ -61,8 +62,17 @@ struct DVBS2RX_API pls_info_t {
     uint16_t payload_len = 0;    /**< Payload length */
     uint16_t xfecframe_len = 0;  /**< XFECFRAME length */
     uint8_t n_pilots = 0;        /**< Number of pilot blocks */
+    pls_info_t() = default;
+    pls_info_t(uint8_t dec_plsc) { parse(dec_plsc); }
     void parse(uint8_t dec_plsc);
     void parse(uint8_t _modcod, bool _short_fecframe, bool _has_pilots);
+    pls_info_t& operator=(const pls_info_t& other)
+    {
+        if (other.plsc != plsc) {
+            memcpy(this, &other, sizeof(pls_info_t));
+        }
+        return *this;
+    }
 };
 
 /**
@@ -84,6 +94,7 @@ public:
     uint8_t d_plsc; /**< Last decoded PLSC */
 
     explicit plsc_decoder(int debug_level = 0);
+    explicit plsc_decoder(std::vector<uint8_t>&& expected_pls, int debug_level = 0);
     ~plsc_decoder(){};
 
     /**
@@ -124,7 +135,7 @@ public:
      * \param out (pls_info_t*) Pointer to a pls_info_t structure where the
      * last decoded information will be written.
      */
-    void get_info(pls_info_t* out) const;
+    void get_info(pls_info_t* out) const { *out = d_pls_info; };
 };
 
 } // namespace dvbs2rx

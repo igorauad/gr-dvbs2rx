@@ -264,6 +264,7 @@ blocks:
 - name: dvbs2rx_plsync_cc_0
   id: dvbs2rx_plsync_cc
   parameters:
+    acm_vcm: 'True'
     affinity: ''
     alias: ''
     comment: ''
@@ -272,6 +273,9 @@ blocks:
     gold_code: gold_code
     maxoutbuf: '0'
     minoutbuf: '0'
+    multistream: 'True'
+    pls_filter_hi: '0xFFFFFFFFFFFFFFFF'
+    pls_filter_lo: '0xFFFFFFFFFFFFFFFF'
     sps: sps
   states:
     bus_sink: false

@@ -4,7 +4,8 @@ category: '[Core]/Digital Television/DVB-S2'
 
 templates:
   imports: import dvbs2rx
-  make: dvbs2rx.plsync_cc(${gold_code}, ${freq_est_period}, ${sps}, ${debug_level})
+  make: dvbs2rx.plsync_cc(${gold_code}, ${freq_est_period}, ${sps}, ${debug_level},
+                  ${acm_vcm}, ${multistream}, ${pls_filter_lo}, ${pls_filter_hi})
 
 parameters:
 - id: gold_code
@@ -23,6 +24,22 @@ parameters:
   label: Debug Level
   dtype: int
   default: 0
+- id: acm_vcm
+  label: ACM/VCM mode
+  dtype: bool
+  default: 'True'
+- id: multistream
+  label: Multi stream (MIS)
+  dtype: bool
+  default: 'True'
+- id: pls_filter_lo
+  label: PLS filter (LSB)
+  dtype: hex
+  default: '0xFFFFFFFFFFFFFFFF'
+- id: pls_filter_hi
+  label: PLS filter (MSB)
+  dtype: hex
+  default: '0xFFFFFFFFFFFFFFFF'
 
 inputs:
 - label: in

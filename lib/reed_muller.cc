@@ -7,6 +7,8 @@
 
 #include "reed_muller.h"
 #include <volk/volk.h>
+#include <algorithm>
+#include <numeric>
 
 namespace gr {
 namespace dvbs2rx {
@@ -27,6 +29,30 @@ uint64_t bit_interleave(uint32_t a, uint32_t b)
 
 reed_muller::reed_muller(euclidean_map_func_ptr p_custom_map)
     : d_euclidean_img_lut(n_plsc_codewords * PLSC_LEN), d_dot_prod_buf(n_plsc_codewords)
+{
+    d_enabled_codewords.resize(n_plsc_codewords);
+    std::iota(d_enabled_codewords.begin(),
+              d_enabled_codewords.end(),
+              0); // all codewords allowed
+    init(p_custom_map);
+}
+
+reed_muller::reed_muller(std::vector<uint8_t>&& enabled_codewords,
+                         euclidean_map_func_ptr p_custom_map)
+    : d_enabled_codewords(std::move(enabled_codewords)),
+      d_euclidean_img_lut(n_plsc_codewords * PLSC_LEN),
+      d_dot_prod_buf(n_plsc_codewords)
+{
+    auto it_max =
+        std::max_element(d_enabled_codewords.begin(), d_enabled_codewords.end());
+    if (*it_max >= n_plsc_codewords) {
+        throw std::runtime_error("Codeword indexes must be within [0, 128)");
+    }
+
+    init(p_custom_map);
+}
+
+void reed_muller::init(euclidean_map_func_ptr p_custom_map)
 {
     /* Generator matrix (see Figure 13b on the standard) */
     uint32_t G[6] = { 0x55555555, 0x33333333, 0x0f0f0f0f,
@@ -98,7 +124,7 @@ uint8_t reed_muller::decode(uint64_t hard_dec)
      * distance is already the decoded dataword due to the LUT arrangement. */
     uint64_t distance;
     uint64_t min_distance = 65;
-    for (int i = 0; i < n_plsc_codewords; i++) {
+    for (uint8_t i : d_enabled_codewords) {
         /* Hamming distance to the i-th possible codeword */
         volk_64u_popcnt(&distance, hard_dec ^ d_codeword_lut[i]);
         /* Recall that the **Hamming distance** between x and y is equivalent to
@@ -172,7 +198,7 @@ uint8_t reed_muller::decode(const float* soft_dec)
     // between the real part of the input symbols (even if they are originally
     // complex) and the real Euclidean-space s(x) of each codeword x, provided
     // that the above two assumptions hold.
-    for (uint8_t i = 0; i < n_plsc_codewords; i++) {
+    for (uint8_t i : d_enabled_codewords) {
         const float* p_euclidean_img = d_euclidean_img_lut.data() + (i * 64);
         volk_32f_x2_dot_prod_32f(&d_dot_prod_buf[i], soft_dec, p_euclidean_img, 64);
     }

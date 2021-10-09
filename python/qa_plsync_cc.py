@@ -212,6 +212,12 @@ class qa_plsync_cc(gr_unittest.TestCase):
             debug_tags=True. None otherwise.
 
         """
+        # --- PL Sync parameters ---
+        acm_vcm = True
+        multistream = True
+        pls_filter_lo = 0xFFFFFFFFFFFFFFFF
+        pls_filter_hi = 0xFFFFFFFFFFFFFFFF
+
         # --- Input ---
         self._set_test_plframe(pilots)
         in_syms = replicate_plframes(nframes, self.plframe)
@@ -232,7 +238,9 @@ class qa_plsync_cc(gr_unittest.TestCase):
         noise = analog.noise_source_c(analog.GR_GAUSSIAN, noise_std, 0)
         nadder = blocks.add_cc()
         self.plsync = plsync = plsync_cc(self.gold_code, self.freq_est_period,
-                                         self.sps, self.debug_level)
+                                         self.sps, self.debug_level, acm_vcm,
+                                         multistream, pls_filter_lo,
+                                         pls_filter_hi)
         if debug_tags:
             snk = blocks.tag_debug(gr.sizeof_gr_complex, "XFECFRAME")
             snk.set_save_all(True)
@@ -400,6 +408,10 @@ class qa_plsync_cc(gr_unittest.TestCase):
         agc_rate = 1e-2
         agc_gain = 1
         agc_ref = 1
+        acm_vcm = True
+        multistream = True
+        pls_filter_lo = 0xFFFFFFFFFFFFFFFF
+        pls_filter_hi = 0xFFFFFFFFFFFFFFFF
 
         # Constants
         bits_per_sym = 2
@@ -419,7 +431,8 @@ class qa_plsync_cc(gr_unittest.TestCase):
         agc = analog.agc_cc(agc_rate, agc_ref, agc_gain)
         agc.set_max_gain(65536)
         plsync = plsync_cc(self.gold_code, self.freq_est_period, self.sps,
-                           self.debug_level)
+                           self.debug_level, acm_vcm, multistream,
+                           pls_filter_lo, pls_filter_hi)
         snk = blocks.tag_debug(gr.sizeof_gr_complex, "SOF")
 
         # Connect source into flowgraph

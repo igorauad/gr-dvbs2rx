@@ -50,8 +50,11 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.in_file = options.in_file
         self.in_repeat = options.in_repeat
         self.modcod = options.modcod
+        self.multistream = options.multistream
         self.out_fd = options.out_fd
         self.out_file = options.out_file
+        self.pilots = options.pilots
+        self.pl_acm_vcm = options.pl_acm_vcm
         self.pl_freq_est_period = options.pl_freq_est_period
         self.rolloff = options.rolloff
         self.rrc_delay = options.rrc_delay
@@ -488,6 +491,66 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
             sink = blocks.file_sink(gr.sizeof_char, self.out_file)
         return sink
 
+    def _plsync_params(self):
+        """Get the PL Sync input parameters
+
+        Defines the PLS filters to be used on the PL Sync block.
+
+        Although the PL Sync block supports ACM/VCM, the remaining blocks of
+        the receiver pipeline do not support these modes yet. Instead, the
+        remaining blocks (e.g., BCH and LDPC decoders) must be configured for
+        the specific MODCOD and frame size of interest, so these parameters
+        must be known a priori.
+
+        Meanwhile, there is still some flexibility on the pilot and SIS/MIS
+        configuration assigned to the PL Sync block. For example, one could
+        know a priori whether the input signal contains pilots or not. In this
+        case, it is better to configure the PLS filters accordingly. Similarly,
+        it could be known a priori that the input signal is based on SIS only,
+        in which case it is better to configure "--multistream=off" instead of
+        "on" or "auto". Generally speaking, the more a priori information the
+        user provides to the PL Sync block, the better for performance.
+
+        Also, in some cases, the user may not know the specific MODCOD and
+        frame size of the underlying signal, even though these are required
+        parameters. In this scenario, it is useful to force the PL Sync block
+        into ACM/VCM mode (using option "--pl-acm-vcm") and enable the debug
+        logs with option "--debug=1" or greater. By doing so, the decoded PLSC
+        information will be printed to the console, so the user can later
+        relaunch the application with the appropriate parameters.
+
+        Returns:
+            tuple: Tuple with the parameters for the PL Sync block.
+
+        """
+
+        # Get the target CCM-mode PLS. If the pilot configuration is set to
+        # auto, allow the two PLS values corresponding to the same MODCOD and
+        # frame size, with and without pilots.
+        target_pls = list()
+        if (self.pilots == "auto"):
+            for pilots_enabled in [False, True]:
+                target_pls.append(
+                    dvbs2rx.params.dvbs2_pls(self.constellation,
+                                             self.code_rate, self.frame_size,
+                                             pilots_enabled))
+        else:
+            pilots_enabled = self.pilots == "on"
+            target_pls.append(
+                dvbs2rx.params.dvbs2_pls(self.constellation, self.code_rate,
+                                         self.frame_size, pilots_enabled))
+
+        # Convert into the corresponding filter bitmasks
+        pls_filter_lo, pls_filter_hi = dvbs2rx.params.pls_filter(*target_pls)
+
+        # SIS or MIS? When unsure, it's better to enable MIS so that dummy
+        # PLFRAMEs can be processed. Auto mode is the same as leaving MIS on.
+        multistream_enabled = self.multistream in ["auto", "on"]
+
+        return (self.gold_code, self.pl_freq_est_period, self.sps, self.debug,
+                self.pl_acm_vcm, multistream_enabled, pls_filter_lo,
+                pls_filter_hi)
+
     def connect_dvbs2rx(self, source_block, sink_block):
         """Connect the DVB-S2 Rx Pipeline
 
@@ -531,8 +594,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
 
         self.connect((analog_agc, 0), (rotator, 0))
 
-        plsync = dvbs2rx.plsync_cc(self.gold_code, self.pl_freq_est_period,
-                                   self.sps, self.debug)
+        plsync = dvbs2rx.plsync_cc(*self._plsync_params())
         self.msg_connect((plsync, 'rotator_phase_inc'), (rotator, 'cmd'))
         self.connect((plsync, 0), (ldpc_decoder, 0))
         if (self.sym_sync_in_tree):
@@ -607,6 +669,14 @@ def argument_parser():
                         choices=['normal', 'short'],
                         default='normal',
                         help="FECFRAME size")
+    parser.add_argument(
+        '-p',
+        "--pilots",
+        choices=['on', 'off', 'auto'],
+        default='auto',
+        help="Whether the expected PLFRAMEs contain pilots. Choose \"auto\" "
+        "if unsure. Otherwise, choose \"on\" or \"off\" for better performance"
+    )
     parser.add_argument('-f',
                         "--freq",
                         type=eng_float,
@@ -628,10 +698,24 @@ def argument_parser():
                         default='QPSK1/4',
                         help="Target MODCOD")
     parser.add_argument(
+        "--multistream",
+        choices=['on', 'off', 'auto'],
+        default='auto',
+        help="Enable processing of multiple input streams (MIS mode). Set to "
+        "\"auto\" if unsure about whether the input signal uses SIS or MIS. "
+        "Otherwise, choose \"on\" or \"off\" for better performance.")
+    parser.add_argument(
         "--pl-freq-est-period",
         type=int,
         default=20,
         help="Coarse frequency offset estimation period in frames ")
+    parser.add_argument(
+        "--pl-acm-vcm",
+        action='store_true',
+        default=False,
+        help="Force the PL Sync block into ACM/VCM mode in order to process "
+        "all PLFRAMEs regardless of PLS. Note this option affects the PL Sync "
+        "block only. The remaining blocks still operate in CCM mode.")
     parser.add_argument("-r",
                         "--rolloff",
                         type=eng_float,

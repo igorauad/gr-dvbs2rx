@@ -83,6 +83,12 @@ def validate(standard,
         print(fill("Choose from: {}".format(filtered_codes)))
         return False
 
+    if (constellation is not None):
+        modcod_str = constellation.lower() + code
+        if (standard == "DVB-S2" and modcod_str not in defs.dvbs2_modcods):
+            print("Invalid DVB-S2 MODCOD {}".format(modcod_str))
+            return False
+
     if (vl_snr and standard != "DVB-S2X"):
         print("VL-SNR mode is only supported by the DVB-S2X standard")
         return False
@@ -184,3 +190,66 @@ def translate(standard,
         res += (t_pilots, )
 
     return res
+
+
+def dvbs2_pls(constellation, code, frame_size, pilots):
+    """Get the physical layer signalling (PLS) for the given DVB-S2 parameters
+
+    Args:
+        constellation (str): DVB-S2 constellation.
+        code (str): Code rate.
+        frame_size (str): Frame size ("short" or "normal").
+        pilots (bool): Whether pilots are included in the PLFRAMEs.
+
+    Raises:
+        ValueError: If the parameters are not valid for DVB-S2.
+
+    Returns:
+        int: PLS value as an integer from 0 to 127.
+    """
+    valid = validate('DVB-S2',
+                     frame_size.lower(),
+                     code,
+                     constellation=constellation.upper(),
+                     rolloff=None,
+                     pilots=pilots,
+                     vl_snr=False)
+
+    if (not valid):
+        raise ValueError("Invalid DVB-S2 parameters")
+
+    modcod = defs.dvbs2_modcods[constellation.lower() + code]
+    short_frame = frame_size == 'short'
+    pls = (modcod << 2) | (short_frame << 1) | pilots
+
+    if (pls < 0 or pls >= 128):
+        raise ValueError("Unexpected PLS value: {}".format(pls))
+
+    return pls
+
+
+def pls_filter(*pls_tuple):
+    """Convert target PLSs into a u64 bitmask pair used by the PL sync block
+
+    Args:
+        pls_tuple (int): Tuple with the target PLSs.
+
+    Raises:
+        ValueError: If the input PLS is not in the valid DVB-S2 range.
+
+    Returns:
+        tuple: Tuple with the lower 64 bits and the upper 64 bits of the
+        filter bitmask, respectively.
+    """
+    u64_filter_lo = 0
+    u64_filter_hi = 0
+
+    for pls in pls_tuple:
+        if (pls < 0 or pls >= 128):
+            raise ValueError("Unexpected PLS value: {}".format(pls))
+        if (pls >= 64):
+            u64_filter_hi |= 1 << (pls - 64)
+        else:
+            u64_filter_lo |= 1 << pls
+
+    return (u64_filter_lo, u64_filter_hi)

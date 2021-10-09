@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(plsync_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(57a16e468bdb11239f4a05f256177234)                     */
+/* BINDTOOL_HEADER_FILE_HASH(8682b1a5c3545643fe4c3e9735248d43)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -41,6 +41,10 @@ void bind_plsync_cc(py::module& m)
              py::arg("freq_est_period"),
              py::arg("sps"),
              py::arg("debug_level"),
+             py::arg("acm_vcm"),
+             py::arg("multistream"),
+             py::arg("pls_filter_lo"),
+             py::arg("pls_filter_hi"),
              D(plsync_cc, make))
 
         .def(

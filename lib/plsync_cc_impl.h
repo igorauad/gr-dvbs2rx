@@ -76,6 +76,10 @@ private:
      * refers to the oversampling ratio that is adopted in the receiver
      * flowgraph prior to the matched filter. This is so that this block
      * can control the external rotator phase properly */
+    bool d_acm_vcm;                                      /**< ACM/VCM mode */
+    bool d_multistream;                                  /**< MIS mode */
+    std::array<uint8_t, n_plsc_codewords> d_pls_enabled; /** PLSs to process */
+    bool d_plsc_decoder_enabled; /**< Whether the PLSC decoder is enabled */
 
     /* State */
     bool d_locked;      /**< Whether the frame timing is locked */
@@ -93,6 +97,9 @@ private:
      * next PLFRAME (from the PLHEADER ahead, processed in advance). */
     plframe_info_t d_curr_frame_info; /**< PLFRAME under processing */
     plframe_info_t d_next_frame_info; /**< Next PLFRAME */
+
+    // Constant PLS info used in CCM/SIS mode
+    pls_info_t d_ccm_sis_pls;
 
     const pmt::pmt_t d_port_id = pmt::mp("rotator_phase_inc");
 
@@ -221,7 +228,14 @@ private:
 
 
 public:
-    plsync_cc_impl(int gold_code, int freq_est_period, float sps, int debug_level);
+    plsync_cc_impl(int gold_code,
+                   int freq_est_period,
+                   float sps,
+                   int debug_level,
+                   bool acm_vcm,
+                   bool multistream,
+                   uint64_t pls_filter_lo,
+                   uint64_t pls_filter_hi);
     ~plsync_cc_impl();
 
     // Where all the action really happens
