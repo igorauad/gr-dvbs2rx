@@ -1,5 +1,8 @@
 # GNU Radio DVB-S2 Receiver
 
+[![Formatting](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/check_formatting.yml/badge.svg)](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/check_formatting.yml)
+[![Tests](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/test.yml/badge.svg)](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/test.yml)
+
 ## Overview
 
 `gr-dvbs2rx` is a GNU Radio [out-of-tree (OOT)
