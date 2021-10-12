@@ -608,17 +608,24 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
                      (bbdeheader, 0), (sink_block, 0))
 
         # Low layer (PHY)
+
+        # Automatic gain control (AGC) stage - preceding the rotator
         analog_agc = analog.agc_cc(self.agc_rate, self.agc_ref, self.agc_gain)
         analog_agc.set_max_gain(65536)
 
+        # Rotator (frequency offset correction)
         rotator = blocks.rotator_cc(0, True)
 
         self.connect((analog_agc, 0), (rotator, 0))
 
-        plsync = dvbs2rx.plsync_cc(*self._plsync_params())
-        self.msg_connect((plsync, 'rotator_phase_inc'), (rotator, 'cmd'))
-        self.connect((plsync, 0), (ldpc_decoder, 0))
+        # Optional IQ swapping stage - preceding the AGC-rotator blocks
+        first_block = analog_agc
+        if (self.spectral_inversion):
+            iq_swap = blocks.swap_iq(1, gr.sizeof_gr_complex)
+            self.connect((iq_swap, 0), (first_block, 0))
+            first_block = iq_swap
 
+        # Symbol timing synchronizer - after the rotator
         if (self.sym_sync_impl == "in-tree"):
             symbol_sync = digital.symbol_sync_cc(
                 digital.TED_GARDNER, self.sps, self.sym_sync_loop_bw,
@@ -641,13 +648,14 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
                                                  self.rolloff)
             self.connect((rotator, 0), (rrc_filter, 0), (symbol_sync, 0))
 
+        # PL Sync - after the symbol synchronizer and before the LDPC decoder
+        plsync = dvbs2rx.plsync_cc(*self._plsync_params())
+        self.msg_connect((plsync, 'rotator_phase_inc'), (rotator, 'cmd'))
+        self.connect((plsync, 0), (ldpc_decoder, 0))
         self.connect((symbol_sync, 0), (plsync, 0))
 
-        if (self.spectral_inversion):
-            iq_swap = blocks.swap_iq(1, gr.sizeof_gr_complex)
-            self.connect((source_block, 0), (iq_swap, 0), (analog_agc, 0))
-        else:
-            self.connect((source_block, 0), (analog_agc, 0))
+        # Connect the source to the first block
+        self.connect((source_block, 0), (first_block, 0))
 
         if (self.gui):
             self.connect((symbol_sync, 0), (self.qtgui_const_sink_x_1_0, 0))
