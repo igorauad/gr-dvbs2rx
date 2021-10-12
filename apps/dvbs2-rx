@@ -740,7 +740,7 @@ def argument_parser():
     parser.add_argument(
         "--pl-freq-est-period",
         type=int,
-        default=20,
+        default=30,
         help="Coarse frequency offset estimation period in frames ")
     parser.add_argument(
         "--pl-acm-vcm",
