@@ -59,6 +59,8 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.rolloff = options.rolloff
         self.rrc_delay = options.rrc_delay
         self.rrc_nfilts = options.rrc_nfilts
+        self.rtl_idx = options.rtl_idx
+        self.rtl_serial = options.rtl_serial
         self.sink = options.sink
         self.source = options.source
         self.spectral_inversion = options.spectral_inversion
@@ -67,6 +69,8 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.sym_sync_damping = options.sym_sync_damping
         self.sym_sync_loop_bw = options.sym_sync_loop_bw
         self.sym_sync_in_tree = options.sym_sync_in_tree
+        self.usrp_addr = options.usrp_addr
+        self.usrp_antenna = options.usrp_antenna
 
         ##################################################
         # Variables
@@ -454,20 +458,38 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
             source = blocks_throttle_0
         elif (self.source == "rtl"):
             import osmosdr  # lazy import to avoid failure if source != rtl
-            rtlsdr_source = osmosdr.source(args="numchan=" + str(1) + " " + "")
-            rtlsdr_source.set_time_unknown_pps(osmosdr.time_spec_t())
-            rtlsdr_source.set_sample_rate(self.samp_rate)
-            rtlsdr_source.set_center_freq(self.freq, 0)
-            rtlsdr_source.set_freq_corr(0, 0)
-            rtlsdr_source.set_dc_offset_mode(0, 0)
-            rtlsdr_source.set_iq_balance_mode(0, 0)
-            rtlsdr_source.set_gain_mode(False, 0)
-            rtlsdr_source.set_gain(self.gain, 0)
-            rtlsdr_source.set_if_gain(20, 0)
-            rtlsdr_source.set_bb_gain(20, 0)
-            rtlsdr_source.set_antenna('', 0)
-            rtlsdr_source.set_bandwidth(0, 0)
-            source = rtlsdr_source
+            rtl_arg = self.rtl_serial if (self.rtl_serial
+                                          is not None) else str(self.rtl_idx)
+            rtlsdr = osmosdr.source(args="numchan=" + str(1) + " " +
+                                    "rtl={}".format(rtl_arg))
+            rtlsdr.set_time_unknown_pps(osmosdr.time_spec_t())
+            rtlsdr.set_sample_rate(self.samp_rate)
+            rtlsdr.set_center_freq(self.freq, 0)
+            rtlsdr.set_freq_corr(0, 0)
+            rtlsdr.set_dc_offset_mode(0, 0)
+            rtlsdr.set_iq_balance_mode(0, 0)
+            rtlsdr.set_gain_mode(False, 0)
+            rtlsdr.set_gain(self.gain, 0)
+            rtlsdr.set_if_gain(20, 0)
+            rtlsdr.set_bb_gain(20, 0)
+            rtlsdr.set_antenna('', 0)
+            rtlsdr.set_bandwidth(0, 0)
+            source = rtlsdr
+        elif (self.source == "usrp"):
+            from gnuradio import uhd
+            usrp = uhd.usrp_source(
+                ",".join((self.usrp_addr, '')),
+                uhd.stream_args(
+                    cpu_format="fc32",
+                    args='',
+                    channels=list(range(0, 1)),
+                ))
+            usrp.set_samp_rate(self.samp_rate)
+            usrp.set_time_unknown_pps(uhd.time_spec(0))
+            usrp.set_center_freq(self.freq, 0)
+            usrp.set_antenna(self.usrp_antenna, 0)
+            usrp.set_gain(self.gain, 0)
+            source = usrp
 
         if (self.gui):
             self.blocks_rms_xx_0 = blocks.rms_cf(0.0001)
@@ -564,7 +586,6 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         Args:
             source_block : The block providing IQ samples into the DVB-S2 Rx.
             sink_block : The block consuming the MPEG TS output stream.
-
 
         """
         translated_params = dvbs2rx.params.translate('DVB-S2', self.frame_size,
@@ -764,7 +785,7 @@ def argument_parser():
 
     src_group = parser.add_argument_group('Source Options')
     src_group.add_argument("--source",
-                           choices=["fd", "file", "rtl"],
+                           choices=["fd", "file", "rtl", "usrp"],
                            default="fd",
                            help="Source of the input IQ sample stream")
     src_group.add_argument("--in-fd",
@@ -793,11 +814,33 @@ def argument_parser():
                            type=str,
                            help="Output file used if sink=file")
 
-    return parser
+    rtl_group = parser.add_argument_group('RTL-SDR Options')
+    rtl_dev_group = rtl_group.add_mutually_exclusive_group()
+    rtl_dev_group.add_argument("--rtl-idx",
+                               type=int,
+                               default=0,
+                               help="RTL-SDR device index")
+    rtl_dev_group.add_argument("--rtl-serial",
+                               type=str,
+                               help="RTL-SDR serial number")
+
+    usrp_group = parser.add_argument_group('USRP Options')
+    usrp_group.add_argument("--usrp-addr", type=str, help="USRP address")
+    usrp_group.add_argument("--usrp-antenna",
+                            type=str,
+                            default="TX/RX",
+                            help="USRP antenna")
+
+    options = parser.parse_args()
+
+    if (options.source == "usrp" and options.usrp_addr is None):
+        parser.error("argument --usrp-addr is required when --source=\"usrp\"")
+
+    return options
 
 
 def main():
-    options = argument_parser().parse_args()
+    options = argument_parser()
 
     gui_mode = options.gui
     if (gui_mode):

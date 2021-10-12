@@ -54,6 +54,7 @@ class dvbs2_tx(gr.top_block):
         self.source = options.source
         self.sps = options.sps
         self.sym_rate = options.sym_rate
+        self.usrp_addr = options.usrp_addr
         self.usrp_antenna = options.usrp_antenna
 
         ##################################################
@@ -127,7 +128,7 @@ class dvbs2_tx(gr.top_block):
             sink = throttle
         elif (self.sink == "usrp"):
             sink = uhd.usrp_sink(
-                ",".join((self.out_usrp, '')),
+                ",".join((self.usrp_addr, '')),
                 uhd.stream_args(
                     cpu_format="fc32",
                     args='',
@@ -295,13 +296,13 @@ def argument_parser():
     snk_group.add_argument("--out-file",
                            type=str,
                            help="Output file used if sink=file")
-    snk_group.add_argument("--out-usrp", type=str, help="USRP address")
 
-    snk_group = parser.add_argument_group('USRP Options')
-    snk_group.add_argument("--usrp-antenna",
-                           type=str,
-                           default="TX/RX",
-                           help="USRP antenna")
+    usrp_group = parser.add_argument_group('USRP Options')
+    usrp_group.add_argument("--usrp-addr", type=str, help="USRP address")
+    usrp_group.add_argument("--usrp-antenna",
+                            type=str,
+                            default="TX/RX",
+                            help="USRP antenna")
 
     sim_group = parser.add_argument_group('Simulation Options')
     sim_group.add_argument(
@@ -313,11 +314,16 @@ def argument_parser():
         type=eng_float,
         help="Frequency offset in Hz to simulate on the output stream")
 
-    return parser
+    options = parser.parse_args()
+
+    if (options.sink == "usrp" and options.usrp_addr is None):
+        parser.error("argument --usrp-addr is required when --sink=\"usrp\"")
+
+    return options
 
 
 def main():
-    options = argument_parser().parse_args()
+    options = argument_parser()
     tb = dvbs2_tx(options)
 
     def sig_handler(sig=None, frame=None):
