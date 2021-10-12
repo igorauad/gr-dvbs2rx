@@ -67,8 +67,8 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.sps = options.sps
         self.sym_rate = options.sym_rate
         self.sym_sync_damping = options.sym_sync_damping
+        self.sym_sync_impl = options.sym_sync_impl
         self.sym_sync_loop_bw = options.sym_sync_loop_bw
-        self.sym_sync_in_tree = options.sym_sync_in_tree
         self.usrp_addr = options.usrp_addr
         self.usrp_antenna = options.usrp_antenna
 
@@ -618,7 +618,8 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         plsync = dvbs2rx.plsync_cc(*self._plsync_params())
         self.msg_connect((plsync, 'rotator_phase_inc'), (rotator, 'cmd'))
         self.connect((plsync, 0), (ldpc_decoder, 0))
-        if (self.sym_sync_in_tree):
+
+        if (self.sym_sync_impl == "in-tree"):
             symbol_sync = digital.symbol_sync_cc(
                 digital.TED_GARDNER, self.sps, self.sym_sync_loop_bw,
                 self.sym_sync_damping, 1.0, 1.5, 1,
@@ -777,11 +778,12 @@ def argument_parser():
                         type=eng_float,
                         default=eng_notation.num_to_str(float(0.0045)),
                         help="Symbol synchronizer's loop bandwidth")
-    parser.add_argument("--sym-sync-in-tree",
-                        default=False,
-                        action='store_true',
-                        help="Use the in-tree symbol synchronizer instead of "
-                        "gr-dvbs2rx's synchronizer")
+    parser.add_argument(
+        "--sym-sync-impl",
+        choices=['in-tree', 'oot'],
+        default="in-tree",
+        help="Symbol synchronizer implementation to use: GNU Radio's "
+        "in-tree block (\"in-tree\") or gr-dvbs2rx\'s block (\"oot\")")
 
     src_group = parser.add_argument_group('Source Options')
     src_group.add_argument("--source",
