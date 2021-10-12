@@ -60,6 +60,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.rrc_delay = options.rrc_delay
         self.rrc_nfilts = options.rrc_nfilts
         self.rtl_idx = options.rtl_idx
+        self.rtl_agc = options.rtl_agc
         self.rtl_serial = options.rtl_serial
         self.sink = options.sink
         self.source = options.source
@@ -468,7 +469,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
             rtlsdr.set_freq_corr(0, 0)
             rtlsdr.set_dc_offset_mode(0, 0)
             rtlsdr.set_iq_balance_mode(0, 0)
-            rtlsdr.set_gain_mode(False, 0)
+            rtlsdr.set_gain_mode(self.rtl_agc, 0)
             rtlsdr.set_gain(self.gain, 0)
             rtlsdr.set_if_gain(20, 0)
             rtlsdr.set_bb_gain(20, 0)
@@ -715,7 +716,7 @@ def argument_parser():
     parser.add_argument('-g',
                         "--gain",
                         type=float,
-                        default=40,
+                        default=0,
                         help="Receiver gain")
     parser.add_argument("--gold-code", type=intx, default=0, help="Gold code")
     parser.add_argument("--gui",
@@ -825,6 +826,11 @@ def argument_parser():
                            help="Output file used if sink=file")
 
     rtl_group = parser.add_argument_group('RTL-SDR Options')
+    rtl_group.add_argument(
+        "--rtl-agc",
+        action='store_true',
+        default=False,
+        help="Enable the RTL-SDR's tuner and demodulator AGC")
     rtl_dev_group = rtl_group.add_mutually_exclusive_group()
     rtl_dev_group.add_argument("--rtl-idx",
                                type=int,
