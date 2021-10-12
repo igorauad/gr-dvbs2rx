@@ -762,15 +762,14 @@ def argument_parser():
         help="Target maximum size for the rotator block's output buffer")
     parser.add_argument("--rrc-delay",
                         type=int,
-                        default=50,
+                        default=10,
                         help="RRC filter delay in symbol periods")
     parser.add_argument(
         "--rrc-nfilts",
         type=int,
         default=32,
-        help=
-        "Number of branches on the polyphase RRC filter if using the in-tree "
-        "symbol synchronizer")
+        help="Number of branches on the polyphase RRC filter if using the  "
+        "in-tree symbol synchronizer")
     parser.add_argument(
         "--spectral-inversion",
         action='store_true',
