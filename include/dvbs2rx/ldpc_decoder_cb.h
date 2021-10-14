@@ -52,7 +52,8 @@ public:
                      dvb_code_rate_t rate,
                      dvb_constellation_t constellation,
                      dvb_outputmode_t outputmode,
-                     dvb_infomode_t infomode);
+                     dvb_infomode_t infomode,
+                     int max_trials);
 };
 
 } // namespace dvbs2rx

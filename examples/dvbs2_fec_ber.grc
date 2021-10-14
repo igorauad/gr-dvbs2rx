@@ -400,6 +400,7 @@ blocks:
     constellation: constellation
     framesize: frame_size
     infomode: INFO_OFF
+    max_trials: '25'
     maxoutbuf: '0'
     minoutbuf: '0'
     outputmode: OM_MESSAGE
@@ -409,7 +410,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [592, 340.0]
+    coordinate: [592, 332.0]
     rotation: 180
     state: enabled
 - name: fec_ber_bf_0
@@ -566,7 +567,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [576, 468.0]
+    coordinate: [576, 476.0]
     rotation: 180
     state: true
 - name: qtgui_number_sink_0

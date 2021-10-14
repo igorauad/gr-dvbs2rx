@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(ldpc_decoder_cb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(e0d03fe691aa7fe1e74ef650116bca67)                     */
+/* BINDTOOL_HEADER_FILE_HASH(211adee7620ccc87b20f9886e2233d3c)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -45,6 +45,7 @@ void bind_ldpc_decoder_cb(py::module& m)
              py::arg("constellation"),
              py::arg("outputmode"),
              py::arg("infomode"),
+             py::arg("max_trials"),
              D(ldpc_decoder_cb, make))
 
 

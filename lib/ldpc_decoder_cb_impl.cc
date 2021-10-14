@@ -264,10 +264,11 @@ ldpc_decoder_cb::sptr ldpc_decoder_cb::make(dvb_standard_t standard,
                                             dvb_code_rate_t rate,
                                             dvb_constellation_t constellation,
                                             dvb_outputmode_t outputmode,
-                                            dvb_infomode_t infomode)
+                                            dvb_infomode_t infomode,
+                                            int max_trials)
 {
     return gnuradio::get_initial_sptr(new ldpc_decoder_cb_impl(
-        standard, framesize, rate, constellation, outputmode, infomode));
+        standard, framesize, rate, constellation, outputmode, infomode, max_trials));
 }
 
 /*
@@ -278,7 +279,8 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
                                            dvb_code_rate_t rate,
                                            dvb_constellation_t constellation,
                                            dvb_outputmode_t outputmode,
-                                           dvb_infomode_t infomode)
+                                           dvb_infomode_t infomode,
+                                           int max_trials)
     : gr::block("ldpc_decoder_cb",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(1, 1, sizeof(unsigned char)))
@@ -608,6 +610,7 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     }
     frame = 0;
     chunk = 0;
+    d_max_trials = max_trials;
     total_trials = 0;
     total_snr = 0.0;
     signal_constellation = constellation;
@@ -1011,7 +1014,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
     float sp, np, sigma, precision_sum;
     gr_complex s, e;
     const int SYMBOLS = CODE_LEN / MOD_BITS;
-    int trials = TRIALS;
+    const int trials = (d_max_trials == 0) ? DEFAULT_TRIALS : d_max_trials;
     int consumed = 0;
     int rows, offset, indexin, indexout;
     const int* mux;

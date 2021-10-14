@@ -49,6 +49,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.in_fd = options.in_fd
         self.in_file = options.in_file
         self.in_repeat = options.in_repeat
+        self.ldpc_iterations = options.ldpc_iterations
         self.modcod = options.modcod
         self.multistream = options.multistream
         self.out_fd = options.out_fd
@@ -599,7 +600,8 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         ldpc_decoder = dvbs2rx.ldpc_decoder_cb(standard, frame_size, code_rate,
                                                constellation,
                                                dvbs2rx.OM_MESSAGE,
-                                               dvbs2rx.INFO_OFF)
+                                               dvbs2rx.INFO_OFF,
+                                               self.ldpc_iterations)
         bch_decoder = dvbs2rx.bch_decoder_bb(standard, frame_size, code_rate,
                                              dvbs2rx.OM_MESSAGE)
         bbdescrambler = dvbs2rx.bbdescrambler_bb(standard, frame_size,
@@ -725,6 +727,10 @@ def argument_parser():
                         action='store_true',
                         default=False,
                         help="Launch a graphical user interface (GUI).")
+    parser.add_argument("--ldpc-iterations",
+                        type=int,
+                        default=25,
+                        help="Max number of LDPC decoding iterations")
     parser.add_argument("-m",
                         "--modcod",
                         type=str,

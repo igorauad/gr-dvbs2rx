@@ -27,6 +27,10 @@ parameters:
     dtype: enum
     options: [INFO_OFF, INFO_ON]
     option_labels: ['Off', 'On']
+-   id: max_trials
+    label: Max Iterations
+    dtype: int
+    default: 25
 
 inputs:
 -   domain: stream
@@ -46,6 +50,7 @@ templates:
                 ${constellation}
             ),
             dvbs2rx.${outputmode},
-            dvbs2rx.${infomode})
+            dvbs2rx.${infomode},
+            ${max_trials})
 
 file_format: 1

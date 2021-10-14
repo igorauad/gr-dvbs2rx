@@ -47,12 +47,12 @@ typedef SIMD<code_type, SIMD_WIDTH> simd_type;
 #include "flooding_decoder.hh"
 typedef SelfCorrectedUpdate<simd_type> update_type;
 typedef MinSumAlgorithm<simd_type, update_type> algorithm_type;
-const int TRIALS = 50;
+const int DEFAULT_TRIALS = 50;
 #else
 #include "layered_decoder.hh"
 typedef NormalUpdate<simd_type> update_type;
 typedef OffsetMinSumAlgorithm<simd_type, update_type, FACTOR> algorithm_type;
-const int TRIALS = 25;
+const int DEFAULT_TRIALS = 25;
 #endif
 
 namespace gr {
@@ -72,6 +72,7 @@ private:
     unsigned int frame;
     unsigned int chunk;
     unsigned int total_trials;
+    int d_max_trials;
     float snr;
     float precision;
     float total_snr;
@@ -134,7 +135,8 @@ public:
                          dvb_code_rate_t rate,
                          dvb_constellation_t constellation,
                          dvb_outputmode_t outputmode,
-                         dvb_infomode_t infomode);
+                         dvb_infomode_t infomode,
+                         int max_trials);
     ~ldpc_decoder_cb_impl();
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required);
