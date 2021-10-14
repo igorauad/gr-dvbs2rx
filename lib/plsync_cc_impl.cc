@@ -177,6 +177,9 @@ plsync_cc_impl::~plsync_cc_impl()
 void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_required)
 {
     if (d_locked) {
+        // The work function can process multiple PLFRAMEs in one call. Hence, the number
+        // of required input symbols depends on the output space available for the current
+        // and future frames. Let's start by the requirement for the current frame.
         if (d_payload_state == payload_state_t::searching) {
             // If the frame synchronizer is locked, and while still searching for the next
             // payload, the work function will only produce output if it processes enough
@@ -185,9 +188,9 @@ void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_req
             ninput_items_required[0] = d_next_frame_info.pls.payload_len -
                                        d_frame_sync->get_sym_count() + PLHEADER_LEN;
         } else {
-            // The block is still trying to output the buffered payload, so it won't
-            // process any further input symbols for this frame. However, note it may
-            // still process further symbols for a subsequent frame.
+            // The PL Sync block has the full payload buffered internally and is trying to
+            // complete the payload processing. Hence, it doesn't need any further input
+            // symbols for the current frame.
             ninput_items_required[0] = 0;
         }
         // If the output buffer can fit more than the remaining samples of the current
@@ -195,7 +198,7 @@ void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_req
         // proceed to the next PLFRAME. In this case, increase the input size forecast
         // assuming the subsequent frame(s) will have the same length as the current (in
         // VCM/ACM mode, this will likely be a poor forecast).
-        int n_remaining = d_next_frame_info.pls.xfecframe_len - d_idx.i_in_frame;
+        int n_remaining = d_next_frame_info.pls.xfecframe_len - (d_idx.i_slot * SLOT_LEN);
         int n_excess = noutput_items - n_remaining; // beyond the current XFECFRAME
         if (n_excess > 0) {
             int n_extra_frames =
@@ -361,40 +364,18 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     }
 }
 
-void plframe_idx_t::step(uint16_t plframe_len, bool has_pilots)
+void plframe_idx_t::step(uint16_t n_slots, bool has_pilots)
 {
-    i_in_frame++;
-    if (i_in_frame >= (plframe_len - PLHEADER_LEN)) {
-        // Already at the next PLHEADER
-        is_data_sym = false;
-        is_pilot_sym = false;
-    } else if (has_pilots) {
-        i_pilot_blk = i_in_frame / PILOT_BLK_PERIOD;
-        const int j =
-            i_in_frame - ((i_pilot_blk * PILOT_BLK_PERIOD) + PILOT_BLK_INTERVAL);
-        is_pilot_sym = (j >= 0);
-        i_in_pilot_blk = is_pilot_sym ? ((uint16_t)j) : 0;
-        const uint16_t k = (i_in_frame - (i_pilot_blk * PILOT_BLK_LEN) - i_in_pilot_blk);
-        i_in_slot = k % 90;
-        i_slot = k / 90;
-        is_data_sym = !is_pilot_sym;
-    } else {
-        i_in_slot = i_in_frame % 90;
-        i_slot = i_in_frame / 90;
-        is_data_sym = true;
-        is_pilot_sym = false;
-    }
+    i_slot += n_slots;
+    i_pilot_blk = (has_pilots) ? i_slot / SLOTS_PER_PILOT_BLK : 0;
+    i_in_payload = i_slot * SLOT_LEN + i_pilot_blk * PILOT_BLK_LEN;
 }
 
 void plframe_idx_t::reset()
 {
-    i_in_frame = 0;
-    i_in_slot = 0;
-    i_in_pilot_blk = 0;
-    i_slot = 0;
+    i_in_payload = 0;
     i_pilot_blk = 0;
-    is_pilot_sym = false;
-    is_data_sym = true;
+    i_slot = 0;
 }
 
 void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
@@ -585,30 +566,61 @@ int plsync_cc_impl::handle_payload(int noutput_items,
 
     // Output the phase-corrected and descrambled data symbols.
     int n_produced = 0;
+    uint16_t n_slots_out = noutput_items / SLOT_LEN;
+    if (frame_info.pls.has_pilots) {
+        // Process each 16-slot segment between pilot blocks at a time
+        uint16_t i_slot = 0;
+        while (i_slot < n_slots_out && d_idx.i_slot < frame_info.pls.n_slots) {
+            // Try to process as many slots as possible up to the next pilot block, when
+            // the phase correction changes. If we are already past the last pilot block,
+            // try to process as many slots as possible up to the end of the PLFRAME.
+            uint16_t max_slots_to_process =
+                (d_idx.i_pilot_blk == frame_info.pls.n_pilots)
+                    ? (frame_info.pls.n_slots - d_idx.i_slot)
+                    : (SLOTS_PER_PILOT_BLK - (d_idx.i_slot % SLOTS_PER_PILOT_BLK));
+            uint16_t slots_remaining = n_slots_out - i_slot;
+            uint16_t slots_to_process = std::min(slots_remaining, max_slots_to_process);
+            uint16_t slot_seq_len = slots_to_process * SLOT_LEN;
+            assert((noutput_items - n_produced) >= slot_seq_len);
 
-    for (int i = 0; i < noutput_items && d_idx.i_in_frame < frame_info.pls.payload_len;
-         i++) {
-        // If this PLFRAME has pilot blocks, update the phase estimate after
-        // every pilot block. Do so only if coarse-corrected, as otherwise the
-        // pilot phase estimates would be uninitialized.
-        if (d_idx.is_pilot_sym && frame_info.coarse_corrected &&
-            d_idx.i_in_pilot_blk == (PILOT_BLK_LEN - 1)) {
-            float pilot_phase = d_freq_sync->get_pilot_phase(d_idx.i_pilot_blk);
-            d_phase_corr = gr_expj(-pilot_phase);
+            // Pointer to the next sequence of slots
+            const gr_complex* p_slot_seq = p_descrambled_payload + d_idx.i_in_payload;
+
+            // Correct the phase based on the estimate from the most recent (preceding)
+            // pilot block. Over the first 16 slots, correct based on the PLHEADER phase
+            // estimate. Also, apply such phase corrections only if coarse-corrected, as
+            // otherwise the pilot phase estimates are uninitialized.
+            if (frame_info.coarse_corrected && d_idx.i_pilot_blk > 0) {
+                float pilot_phase = d_freq_sync->get_pilot_phase(d_idx.i_pilot_blk - 1);
+                d_phase_corr = gr_expj(-pilot_phase);
+            }
+
+            // De-rotate the slot sequence
+            volk_32fc_s32fc_multiply_32fc(
+                out + n_produced, p_slot_seq, d_phase_corr, slot_seq_len);
+            n_produced += slot_seq_len;
+
+            d_idx.step(slots_to_process, frame_info.pls.has_pilots);
+            i_slot += slots_to_process;
         }
+    } else {
+        // Process as many slots as possible in one go
+        uint16_t max_slots_to_process = frame_info.pls.n_slots - d_idx.i_slot;
+        uint16_t slots_to_process = std::min(n_slots_out, max_slots_to_process);
+        uint16_t slot_seq_len = slots_to_process * SLOT_LEN;
 
-        // Output
-        if (d_idx.is_data_sym) {
-            out[n_produced] = d_phase_corr * p_descrambled_payload[d_idx.i_in_frame];
-            n_produced++;
-        }
+        // Pointer to the next sequence of slots
+        const gr_complex* p_slot_seq = p_descrambled_payload + d_idx.i_in_payload;
 
-        /* Update the frame indexes */
-        d_idx.step(frame_info.pls.plframe_len, frame_info.pls.has_pilots);
+        // De-rotate the slot sequence based on the PLHEADER phase estimate
+        volk_32fc_s32fc_multiply_32fc(out, p_slot_seq, d_phase_corr, slot_seq_len);
+        n_produced += slot_seq_len;
+
+        d_idx.step(slots_to_process, frame_info.pls.has_pilots);
     }
 
     // Finalize
-    if (d_idx.i_in_frame == frame_info.pls.payload_len) {
+    if (d_idx.i_slot == frame_info.pls.n_slots) {
         d_idx.reset();
         d_payload_state = payload_state_t::searching;
     }

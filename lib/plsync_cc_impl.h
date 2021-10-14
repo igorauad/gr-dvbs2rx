@@ -36,13 +36,9 @@ struct rot_ctrl_t {
 
 /** @brief Index tracking for various segments of a PLFRAME */
 struct plframe_idx_t {
-    uint16_t i_in_frame = 0;     /** Symbol index in PLFRAME */
-    uint16_t i_in_slot = 0;      /** Symbol index in data slot */
-    uint16_t i_in_pilot_blk = 0; /** Symbol index in pilot block */
-    uint16_t i_slot = 0;         /** Slot index */
-    uint16_t i_pilot_blk = 0;    /** pilot block index */
-    bool is_pilot_sym = false;   /** Current symbol is a pilot (non-plheader) symbol */
-    bool is_data_sym = true;     /** Current symbol is a data symbol */
+    uint16_t i_in_payload = 0; /** Symbol index in PLFRAME payload */
+    uint16_t i_pilot_blk = 0;  /** Pilot block index */
+    uint16_t i_slot = 0;       /** Slot index */
     void step(uint16_t plframe_len, bool has_pilots);
     void reset();
 };

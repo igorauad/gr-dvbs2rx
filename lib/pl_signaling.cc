@@ -25,36 +25,36 @@ void pls_info_t::parse(uint8_t dec_plsc)
     /* Number of bits per constellation symbol and PLFRAME slots */
     if (modcod >= 1 && modcod <= 11) {
         n_mod = 2;
-        S = 360;
+        n_slots = 360;
     } else if (modcod >= 12 && modcod <= 17) {
         n_mod = 3;
-        S = 240;
+        n_slots = 240;
     } else if (modcod >= 18 && modcod <= 23) {
         n_mod = 4;
-        S = 180;
+        n_slots = 180;
     } else if (modcod >= 24 && modcod <= 28) {
         n_mod = 5;
-        S = 144;
+        n_slots = 144;
     } else {
         n_mod = 0;
-        S = 36; // dummy frame
+        n_slots = 36; // dummy frame
     }
 
     /* For short FECFRAMEs, S is 4 times lower */
     if (short_fecframe && !dummy_frame)
-        S >>= 2;
+        n_slots >>= 2;
 
     /* Number of pilot blocks */
-    n_pilots = (has_pilots) ? ((S - 1) >> 4) : 0;
+    n_pilots = (has_pilots) ? ((n_slots - 1) >> 4) : 0;
 
     /* PLFRAME length (header + data + pilots) */
-    plframe_len = ((S + 1) * 90) + (36 * n_pilots);
+    plframe_len = ((n_slots + 1) * 90) + (36 * n_pilots);
 
     /* Payload length (data + pilots) */
     payload_len = plframe_len - 90;
 
     /* XFECFRAME length */
-    xfecframe_len = S * 90;
+    xfecframe_len = n_slots * 90;
 }
 
 void pls_info_t::parse(uint8_t _modcod, bool _short_fecframe, bool _has_pilots)
@@ -162,7 +162,7 @@ void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
     if (d_debug_level > 1) {
         printf("Decoded PLSC: {n_mod: %1u, S: %3u, PLFRAME length: %u}\n",
                d_pls_info.n_mod,
-               d_pls_info.S,
+               d_pls_info.n_slots,
                d_pls_info.plframe_len);
     }
 }

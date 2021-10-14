@@ -57,7 +57,7 @@ struct DVBS2RX_API pls_info_t {
     bool has_pilots = false;     /**< Whether the PLFRAME has pilot blocks */
     bool dummy_frame = false;    /**< Whether the PLFRAME is a dummy frame */
     uint8_t n_mod = 0;           /**< Bits per constellation symbol */
-    uint16_t S = 0;              /**< Number of slots */
+    uint16_t n_slots = 0;        /**< Number of slots */
     uint16_t plframe_len = 0;    /**< PLFRAME length */
     uint16_t payload_len = 0;    /**< Payload length */
     uint16_t xfecframe_len = 0;  /**< XFECFRAME length */
