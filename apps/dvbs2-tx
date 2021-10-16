@@ -38,7 +38,6 @@ class dvbs2_tx(gr.top_block):
         self.frame_size = options.frame_size
         self.freq = options.freq
         self.freq_offset = options.freq_offset
-        self.gain = options.gain
         self.gold_code = options.gold_code
         self.in_fd = options.in_fd
         self.in_file = options.in_file
@@ -56,6 +55,7 @@ class dvbs2_tx(gr.top_block):
         self.sym_rate = options.sym_rate
         self.usrp_addr = options.usrp_addr
         self.usrp_antenna = options.usrp_antenna
+        self.usrp_gain = options.usrp_gain
 
         ##################################################
         # Variables
@@ -140,7 +140,7 @@ class dvbs2_tx(gr.top_block):
             sink.set_time_unknown_pps(uhd.time_spec(0))
             sink.set_center_freq(self.freq, 0)
             sink.set_antenna(self.usrp_antenna, 0)
-            sink.set_gain(self.gain, 0)
+            sink.set_gain(self.usrp_gain, 0)
 
         # Simulation options
         # 1) Noise
@@ -230,11 +230,6 @@ def argument_parser():
                         type=eng_float,
                         default=eng_notation.num_to_str(float(1e9)),
                         help="Carrier or intermediate frequency in Hz")
-    parser.add_argument("-g",
-                        "--gain",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(0)),
-                        help="Tx gain in dB")
     parser.add_argument("--gold-code", type=intx, default=0, help="Gold code")
     parser.add_argument("-m",
                         "--modcod",
@@ -303,6 +298,10 @@ def argument_parser():
                             type=str,
                             default="TX/RX",
                             help="USRP antenna")
+    usrp_group.add_argument("--usrp-gain",
+                            type=float,
+                            default=0,
+                            help="USRP Tx gain")
 
     sim_group = parser.add_argument_group('Simulation Options')
     sim_group.add_argument(
