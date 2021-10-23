@@ -379,7 +379,8 @@ class qa_plsync_cc(gr_unittest.TestCase):
         x_up = upfirdn([1], x_syms, sps)
 
         # Open-loop flowgraph (with damping=0) where tags are placed after
-        # every two symbols on the upsampled sequence fed to the synchronizer
+        # every two symbols (i.e., 2*sps=4 samples) on the upsampled sequence
+        # fed to the synchronizer
         self._set_up_flowgraph(x_up, sps, damping=0, tag_period=2 * sps)
         self.tb.run()
 
@@ -388,13 +389,18 @@ class qa_plsync_cc(gr_unittest.TestCase):
 
         # The synchronizer should preserve the tags after every two
         # symbols/interpolants. The only exception is the first tag. Since the
-        # synchronizer skips the first sps samples on startup, the first
-        # interpolant is x_syms[1] (the second symbol), not x_syms[0]. Hence,
-        # the tag originally at x_up[0] is moved to out_syms[0]. Next, the
-        # second interpolant is x_syms[2], which is on x_up[4], the second
-        # tagged index on x_up. Hence, the second tag comes already in
-        # out_syms[1] (after a single symbol interval). After that, all tags
-        # should come spaced by two symbol intervals.
+        # synchronizer skips the first sps samples on startup, the first output
+        # interpolant is equal to x_syms[1] (the second input symbol), not
+        # x_syms[0]. Nevertheless, since the input tags always propagate
+        # through the closest output interpolant, even though the symbol at
+        # x_up[0] (or x_syms[0]) is not produced on the output, its tag still
+        # propagates out through the first output interpolant out_syms[0]
+        # (representing x_syms[1]). In other words, we expect a tag at index 0.
+        # Next, the second output interpolant is equal to x_syms[2] (the third
+        # input symbol), which is located on the upsampled input sequence at
+        # x_up[4], i.e., the second tagged index on x_up. Hence, the second tag
+        # comes already in out_syms[1] (after a single symbol interval). After
+        # that, all tags should come spaced by two symbol intervals.
         self.assertAlmostEqual(out_syms[0], x_syms[1])
         self.assertAlmostEqual(out_syms[1], x_syms[2])
         expected_offsets = np.arange(1, (nsyms - 1), 2)

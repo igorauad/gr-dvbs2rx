@@ -11,6 +11,8 @@
 namespace gr {
 namespace dvbs2rx {
 
+constexpr unsigned HISTORY = 2;
+
 bool greater_than_or_equal(const uint64_t& value, const uint64_t& element)
 {
     return element >= value;
@@ -40,10 +42,11 @@ symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
       d_nominal_step(1.0 / sps),
       d_cnt(1.0 - d_nominal_step), // modulo-1 counter (always ">= 0" and "< 1")
       d_mu(0),
-      d_offset(2), // Start at "n=2" so that the first iteration can read index "n=1"
-                   // required for the interpolant computation. Also, note "n=0" is the
-                   // history index (last sample from the previous batch), so "n=1" is
-                   // actually the first new input sample.
+      d_offset(
+          HISTORY), // With history=2, start at "n=2" so that the first iteration can read
+                    // index "n=1" required for the interpolant computation. Also, note
+                    // "n=0" is the history index (last sample from the previous batch),
+                    // so "n=1" is actually the first new input sample.
       d_init(false),
       d_last_xi(0)
 {
@@ -92,10 +95,10 @@ symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
     d_K1 = Kp_K0_K1 / (Kp * K0);
     d_K2 = Kp_K0_K2 / (Kp * K0);
 
-    // The interpolant is computed based on the n-th sample and the sample at index "n-1",
-    // where "n-1" is the basepoint index. Make sure the basepoint index is always
-    // available as history if necessary.
-    set_history(2);
+    // The k-th interpolant is computed based on the n-th sample and the sample at index
+    // "n-1", where "n-1" is the k-th basepoint index m_k. Make sure the basepoint index
+    // is always available as history if necessary.
+    set_history(HISTORY);
 
     // The work function has to move tags from arbitrary sample instants to output
     // symbols/interpolants. Handle this propagation internally instead of letting the
@@ -114,7 +117,7 @@ symbol_sync_cc_impl::~symbol_sync_cc_impl() {}
 void symbol_sync_cc_impl::forecast(int noutput_items,
                                    gr_vector_int& ninput_items_required)
 {
-    ninput_items_required[0] = (d_sps * noutput_items) + history() - 1;
+    ninput_items_required[0] = (d_sps * noutput_items) + HISTORY - 1;
 }
 
 std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
@@ -162,10 +165,12 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
         // tags. Since the incoming tag offsets are oblivious to this block's history
         // (e.g., tag offset 0 is really the first input sample), make sure to store the
         // strobe indexes after substracting the history. Also, consider the strobe index
-        // to be the index after the basepoint index. If we wanted to be more accurate, we
-        // could use the basepoint index m_k if "d_mu < 0.5" and m_k + 1 otherwise.
-        // However, it's better to avoid any unnecessary computations in this loop.
-        d_strobe_idx[k] = n - 1; // same as "m_k + 1 - (history() - 1)"
+        // to be the basepoint index, following the definition on Michael Rice's book. If
+        // we wanted to define the strobe index as the closest sample index relative to
+        // the output interpolant, we could set it equal to the basepoint index m_k
+        // whenever "d_mu < 0.5" and m_k + 1 otherwise. However, it's better to avoid any
+        // unnecessary computations in this loop.
+        d_strobe_idx[k] = m_k - (HISTORY - 1);
 
         // Zero-crossing interpolant
         gr_complex x_zc = d_mu * in[n - d_midpoint] + (1 - d_mu) * in[m_k - d_midpoint];
@@ -180,11 +185,12 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
         d_vi += (d_K2 * e);       // Integral
         float pi_out = vp + d_vi; // PI Output
 
-        // NOTE: the PI output is "vp + vi" on a strobe index (when e != 0), and simply
-        // "vi" on the other indexes (when e = 0). Hence, the counter step briefly changes
-        // to "(1/L + vp + vi)" on a strobe index and then changes back to "(1/L + vi)" on
-        // the remaining indexes. Both counter steps must be taken into account when
-        // calculating how many iterations until the counter underflows again.
+        // NOTE: the PI output is "vp + vi" on a strobe index (when a new interpolant is
+        // computed and the TED error is evaluated), and simply "vi" on the other indexes
+        // (when e = 0). Hence, the counter step briefly changes to "(1/L + vp + vi)" on a
+        // strobe index and then changes back to "(1/L + vi)" on the remaining indexes.
+        // Both counter steps must be taken into account when calculating how many
+        // iterations until the counter underflows again.
         float W1 = d_nominal_step + pi_out;
         float W2 = d_nominal_step + d_vi;
         assert(W1 > 0);
@@ -217,9 +223,15 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
     }
 
     // Next time, start after jumping indexes. For example, if the last sample here is
-    // "n=4095" and "jump=2", start at index n=2 on the next batch. The rationale is that
-    // n=2 is the second sample after the buffer history of one sample (saved at n=0).
-    d_offset = jump;
+    // "n=4095" and "jump=2", ordinarily, neglecting the block history, the next loop
+    // iteration would need to start the processing at index "n = jump - 1" on the next
+    // batch (i.e., "n=1", the second sample index). However, since the input buffer holds
+    // the sample history used by the interpolator, the second input sample is not on
+    // index "jump - 1". Instead, it is at "jump - 1 + history - 1", where "history - 1"
+    // represents the actual number of history samples available on the input buffer. For
+    // instance, with a history of one sample (i.e., when history=2), in[0] holds the
+    // history sample, and the second new input sample is available at in[2].
+    d_offset = (jump - 1) + (HISTORY - 1);
     assert(d_offset >= 0);
 
     return std::make_pair(n, k);
@@ -258,9 +270,10 @@ int symbol_sync_cc_impl::general_work(int noutput_items,
     }
 
     // Tell runtime how many input items we consumed.
-    consume_each(n);
-    // NOTE: if we stop at, say, n=7, it means we consumed n+1=8 samples. However, the
-    // first sample n=0 is the history, so the total of consumed samples is only n.
+    consume_each(n + 1 - (HISTORY - 1));
+    // NOTE: if we stop at, say, n=7, it means we consumed n+1=8 samples. However, with
+    // history=2, the first sample n=0 is the history from the previous input buffer
+    // batch, so the total of consumed samples is only n.
 
     // Tell runtime system how many output items we produced.
     return k;
