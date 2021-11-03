@@ -19,13 +19,14 @@ class DVBS2RX_API symbol_sync_cc_impl : public symbol_sync_cc
 private:
     int d_sps;            /**< Samples per symbol (oversampling ratio) */
     int d_midpoint;       /**< Midpoint index between interpolants */
+    unsigned d_history;   /**< History of samples in the input buffer */
     float d_K1;           /**< PI filter's proportional constant */
     float d_K2;           /**< PI filter's integrator constant */
     float d_vi;           /**< Last integrator value */
     float d_nominal_step; /**< Nominal mod-1 counter step (equal to "1/d_sps") */
     float d_cnt;          /**< Modulo-1 counter */
     float d_mu;           /**< Fractional symbol timing offset estimate */
-    int d_offset;         /**< Samples to jump on the next batch */
+    int d_jump;           /**< Samples to jump until the next strobe */
     bool d_init;          /**< Whether the loop is initialized (after the first work) */
     gr_complex d_last_xi; /**< Last output interpolant */
     std::vector<int> d_strobe_idx; /**< Indexes of the output interpolants */
