@@ -93,7 +93,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: int(rrc_delay*sps) + 1
+    value: int(2*rrc_delay*sps) + 1
   states:
     bus_sink: false
     bus_source: false
@@ -1044,7 +1044,7 @@ blocks:
     label: RRC filter delay in symbol periods
     short_id: ''
     type: intx
-    value: '50'
+    value: '25'
   states:
     bus_sink: false
     bus_source: false

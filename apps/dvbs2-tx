@@ -63,7 +63,7 @@ class dvbs2_tx(gr.top_block):
         code_rate = self.modcod.upper().replace("8PSK", "").replace("QPSK", "")
         self.code_rate = code_rate
         self.samp_rate = self.sym_rate * self.sps
-        self.n_rrc_taps = int(self.rrc_delay * self.sps) + 1
+        self.n_rrc_taps = int(2 * self.rrc_delay * self.sps) + 1
         self.constellation = self.modcod.replace(code_rate, "")
 
         ##################################################

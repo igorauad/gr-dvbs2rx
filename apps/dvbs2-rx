@@ -84,7 +84,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.plheader_len = 90
         self.plframe_len = 33282
         self.pilot_len = int((360 - 1) / 16) * 36
-        self.n_rrc_taps = int(self.rrc_delay * self.sps) + 1
+        self.n_rrc_taps = int(2 * self.rrc_delay * self.sps) + 1
         self.n_poly_rrc_taps = ((self.n_rrc_taps - 1) * self.rrc_nfilts) + 1
         self.constellation = self.modcod.replace(code_rate, "")
 
