@@ -20,7 +20,6 @@ from gnuradio import analog
 from gnuradio import blocks
 from gnuradio import digital
 from gnuradio import eng_notation
-from gnuradio import filter
 from gnuradio import gr
 from gnuradio import qtgui
 from gnuradio.eng_arg import eng_float, intx
@@ -86,6 +85,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.plframe_len = 33282
         self.pilot_len = int((360 - 1) / 16) * 36
         self.n_rrc_taps = int(self.rrc_delay * self.sps) + 1
+        self.n_poly_rrc_taps = ((self.n_rrc_taps - 1) * self.rrc_nfilts) + 1
         self.constellation = self.modcod.replace(code_rate, "")
 
         if (self.gui):
@@ -641,18 +641,14 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
                 firdes.root_raised_cosine(self.rrc_nfilts,
                                           self.samp_rate * self.rrc_nfilts,
                                           self.sym_rate, self.rolloff,
-                                          self.n_rrc_taps * self.rrc_nfilts))
-            self.connect((rotator, 0), (symbol_sync, 0))
+                                          self.n_poly_rrc_taps))
         else:
-            rrc_filter = filter.fir_filter_ccf(
-                1,
-                firdes.root_raised_cosine(1, self.sps, 1.0, self.rolloff,
-                                          self.n_rrc_taps))
             symbol_sync = dvbs2rx.symbol_sync_cc(self.sps,
                                                  self.sym_sync_loop_bw,
                                                  self.sym_sync_damping,
-                                                 self.rolloff)
-            self.connect((rotator, 0), (rrc_filter, 0), (symbol_sync, 0))
+                                                 self.rolloff, self.rrc_delay,
+                                                 self.rrc_nfilts)
+        self.connect((rotator, 0), (symbol_sync, 0))
 
         # PL Sync - after the symbol synchronizer and before the LDPC decoder
         plsync = dvbs2rx.plsync_cc(*self._plsync_params())
@@ -764,12 +760,12 @@ def argument_parser():
         help="Target maximum size for the rotator block's output buffer")
     parser.add_argument("--rrc-delay",
                         type=int,
-                        default=10,
+                        default=5,
                         help="RRC filter delay in symbol periods")
     parser.add_argument(
         "--rrc-nfilts",
         type=int,
-        default=32,
+        default=128,
         help="Number of branches on the polyphase RRC filter if using the  "
         "in-tree symbol synchronizer")
     parser.add_argument(

@@ -57,18 +57,6 @@ blocks:
     coordinate: [184, 340.0]
     rotation: 0
     state: true
-- name: n_rrc_taps
-  id: variable
-  parameters:
-    comment: ''
-    value: int(rrc_delay*sps) + 1
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [464, 340.0]
-    rotation: 0
-    state: enabled
 - name: pilot_len
   id: variable
   parameters:
@@ -78,7 +66,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [648, 340.0]
+    coordinate: [560, 340.0]
     rotation: 0
     state: true
 - name: plframe_len
@@ -90,7 +78,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [552, 340.0]
+    coordinate: [464, 340.0]
     rotation: 0
     state: true
 - name: plheader_len
@@ -102,7 +90,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [728, 340.0]
+    coordinate: [640, 340.0]
     rotation: 0
     state: true
 - name: samp_rate
@@ -1054,7 +1042,7 @@ blocks:
     label: number of branches on the polyphase RRC filter
     short_id: ''
     type: intx
-    value: '32'
+    value: '128'
   states:
     bus_sink: false
     bus_source: false

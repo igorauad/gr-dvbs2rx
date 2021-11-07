@@ -636,7 +636,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [8, 124.0]
+    coordinate: [8, 108.0]
     rotation: 0
     state: true
 - name: in_file
@@ -653,7 +653,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [752, 132.0]
+    coordinate: [776, 132.0]
     rotation: 0
     state: true
 - name: qtgui_const_sink_x_0
@@ -1049,7 +1049,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [88, 132.0]
+    coordinate: [112, 132.0]
     rotation: 0
     state: true
 - name: rrc_nfilts
@@ -1061,12 +1061,12 @@ blocks:
     label: number of branches on the polyphase RRC filter
     short_id: ''
     type: intx
-    value: '32'
+    value: '128'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [248, 132.0]
+    coordinate: [272, 132.0]
     rotation: 0
     state: true
 - name: sym_sync_damping
@@ -1083,7 +1083,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [584, 132.0]
+    coordinate: [608, 132.0]
     rotation: 0
     state: true
 - name: sym_sync_loop_bw
@@ -1100,7 +1100,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [416, 132.0]
+    coordinate: [440, 132.0]
     rotation: 0
     state: true
 - name: virtual_sink_1_0

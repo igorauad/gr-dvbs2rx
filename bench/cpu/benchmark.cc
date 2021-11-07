@@ -143,13 +143,16 @@ static void BM_symbol_sync(benchmark::State& state)
     float loop_bw = 0.01;
     float damping_factor = 1.0;
     float rolloff = 0.2;
+    int rrc_delay = 5;
+    int n_subfilt = 128;
 
     int ninput_items = 1025;
     int noutput_items = 512;
     volk::vector<gr_complex> in_buf(ninput_items);
     volk::vector<gr_complex> out_buf(noutput_items);
 
-    gr::dvbs2rx::symbol_sync_cc_impl symbol_sync(sps, loop_bw, damping_factor, rolloff);
+    gr::dvbs2rx::symbol_sync_cc_impl symbol_sync(
+        sps, loop_bw, damping_factor, rolloff, rrc_delay, n_subfilt);
 
     // Run the loop once before the benchmarking loop so that the initialization routine
     // (with an std::vector resize call) does not disturb the benchmarking results

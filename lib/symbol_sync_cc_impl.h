@@ -10,6 +10,7 @@
 
 #include <gnuradio/gr_complex.h>
 #include <dvbs2rx/symbol_sync_cc.h>
+#include <volk/volk_alloc.hh>
 
 namespace gr {
 namespace dvbs2rx {
@@ -31,8 +32,19 @@ private:
     gr_complex d_last_xi; /**< Last output interpolant */
     std::vector<int> d_strobe_idx; /**< Indexes of the output interpolants */
 
+    // Polyphase RRC filter
+    std::vector<volk::vector<float>> d_rrc_subfilters; /** Vector of RRC subfilters */
+    size_t d_n_subfilt;     /** Number of subfilters in the polyphase RRC filter bank */
+    size_t d_subfilt_len;   /** Number of taps in each RRC subfilter */
+    size_t d_subfilt_delay; /** RRC subfilter delay */
+
 public:
-    symbol_sync_cc_impl(float sps, float loop_bw, float damping_factor, float rolloff);
+    symbol_sync_cc_impl(float sps,
+                        float loop_bw,
+                        float damping_factor,
+                        float rolloff,
+                        int rrc_delay,
+                        int n_subfilt);
     ~symbol_sync_cc_impl();
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required);

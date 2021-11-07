@@ -37,6 +37,8 @@ class qa_plsync_cc(gr_unittest.TestCase):
                           loop_bw=0.01,
                           damping=1.0,
                           rolloff=0.2,
+                          rrc_delay=5,
+                          n_subfilt=128,
                           tag_period=None):
         """Set up the flowgraph
 
@@ -55,7 +57,8 @@ class qa_plsync_cc(gr_unittest.TestCase):
 
         """
         src = blocks.vector_source_c(tuple(in_stream))
-        symbol_sync = symbol_sync_cc(sps, loop_bw, damping, rolloff)
+        symbol_sync = symbol_sync_cc(sps, loop_bw, damping, rolloff, rrc_delay,
+                                     n_subfilt)
         self.sink = blocks.vector_sink_c()
 
         if (tag_period is not None):

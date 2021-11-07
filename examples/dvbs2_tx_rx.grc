@@ -1104,7 +1104,7 @@ blocks:
     label: number of branches on the polyphase RRC filter
     short_id: ''
     type: intx
-    value: '32'
+    value: '128'
   states:
     bus_sink: false
     bus_source: false

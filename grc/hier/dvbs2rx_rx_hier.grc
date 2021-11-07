@@ -56,18 +56,6 @@ blocks:
     coordinate: [192, 292.0]
     rotation: 0
     state: true
-- name: n_rrc_taps
-  id: variable
-  parameters:
-    comment: ''
-    value: int(rrc_delay*sps) + 1
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [472, 292.0]
-    rotation: 0
-    state: enabled
 - name: samp_rate
   id: variable
   parameters:
@@ -282,7 +270,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [968, 452.0]
+    coordinate: [792, 452.0]
     rotation: 0
     state: true
 - name: dvbs2rx_symbol_sync_cc_0
@@ -295,13 +283,15 @@ blocks:
     loop_bw: sym_sync_loop_bw
     maxoutbuf: '0'
     minoutbuf: '0'
+    n_subfilt: rrc_nfilts
     rolloff: rolloff
+    rrc_delay: rrc_delay
     sps: sps
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [736, 452.0]
+    coordinate: [520, 476.0]
     rotation: 0
     state: enabled
 - name: frame_size
@@ -388,7 +378,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [968, 404.0]
+    coordinate: [792, 404.0]
     rotation: 0
     state: true
 - name: pad_sink_1_0
@@ -406,7 +396,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1176, 420.0]
+    coordinate: [1112, 420.0]
     rotation: 0
     state: true
 - name: pad_sink_2
@@ -499,29 +489,6 @@ blocks:
     coordinate: [600, 4.0]
     rotation: 0
     state: true
-- name: root_raised_cosine_filter_0
-  id: root_raised_cosine_filter
-  parameters:
-    affinity: ''
-    alias: ''
-    alpha: rolloff
-    comment: ''
-    decim: '1'
-    gain: '1'
-    interp: '1'
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    ntaps: n_rrc_taps
-    samp_rate: sps
-    sym_rate: '1.0'
-    type: fir_filter_ccf
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [496, 460.0]
-    rotation: 0
-    state: enabled
 - name: rrc_delay
   id: parameter
   parameters:
@@ -548,7 +515,7 @@ blocks:
     label: Polyphase RRC branches
     short_id: ''
     type: intx
-    value: '32'
+    value: '128'
   states:
     bus_sink: false
     bus_source: false
@@ -628,8 +595,8 @@ blocks:
 connections:
 - [analog_agc_xx_0, '0', blocks_rotator_cc_0_0_0, '0']
 - [analog_agc_xx_0, '0', pad_sink_2_0, '0']
+- [blocks_rotator_cc_0_0_0, '0', dvbs2rx_symbol_sync_cc_0, '0']
 - [blocks_rotator_cc_0_0_0, '0', pad_sink_2, '0']
-- [blocks_rotator_cc_0_0_0, '0', root_raised_cosine_filter_0, '0']
 - [dvbs2rx_bbdeheader_bb_0, '0', pad_sink_0, '0']
 - [dvbs2rx_bbdescrambler_bb_0, '0', dvbs2rx_bbdeheader_bb_0, '0']
 - [dvbs2rx_bch_decoder_bb_0, '0', dvbs2rx_bbdescrambler_bb_0, '0']
@@ -640,7 +607,6 @@ connections:
 - [dvbs2rx_symbol_sync_cc_0, '0', dvbs2rx_plsync_cc_0, '0']
 - [dvbs2rx_symbol_sync_cc_0, '0', pad_sink_1, '0']
 - [pad_source_0, '0', analog_agc_xx_0, '0']
-- [root_raised_cosine_filter_0, '0', dvbs2rx_symbol_sync_cc_0, '0']
 
 metadata:
   file_format: 1
