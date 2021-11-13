@@ -19,9 +19,11 @@ except ImportError:
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
     try:
-        from dvbs2rx import bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL, C1_4
+        from dvbs2rx import (bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL,
+                             C1_4)
     except ImportError:
-        from python import bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL, C1_4
+        from python import (bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL,
+                            C1_4)
 
 DVBS2_GEN_POLY = '111010101'  # x^8 + x^7 + x^6 + x^4 + x^2 +1
 BBHEADER_NO_CRC_FMT = "!BBHHBH"  # BBHEADER format excluding the CRC field
@@ -133,13 +135,14 @@ def gen_bbheader(kbch, syncd, dfl=None):
     return bbheader_no_crc + crc8(bbheader_no_crc)
 
 
-def gen_bbframe_stream(kbch, n_frames, up_stream):
+def gen_bbframe_stream(kbch, n_frames, up_stream, syncd=0):
     """Generate stream of unscrambled BBFRAMEs
 
     Args:
         kbch (int): BCH input (uncoded) message length in bits.
         n_frames (int): Number of BBFRAMEs to generate.
         up_stream (bytes): Stream of UPs to fill in the DATAFIELDs.
+        syncd (int): Starting SYNCD value.
 
     Returns:
         bytes: Generated stream of BBFRAMEs.
@@ -154,7 +157,6 @@ def gen_bbframe_stream(kbch, n_frames, up_stream):
 
     # BBFRAME stream:
     stream = bytearray()
-    syncd = 0
     offset = 0
     for i in range(n_frames):
         # Fill the BBHEADER
@@ -406,6 +408,30 @@ class qa_bbdeheader_bb(gr_unittest.TestCase):
         expected_out = list(up_stream)
         observed_out = self.sink.data()
         self.assertListEqual(expected_out, observed_out)
+
+    def test_non_byte_aligned_syncd(self):
+        """Test processing of a BBFRAME carrying a byte-misaligned SYNCD"""
+        # Parameters
+        kbch = 16008  # QPSK 1/4 with normal fecframe
+        n_bbframes = 10  # Number of BBFRAMEs to generate
+        self._set_stream_len_params(kbch, n_bbframes)
+
+        # Generate the stream of UPs
+        up_stream = gen_up_stream(self.n_ups)
+
+        # Start the first BBFRAME with an unsupported non-byte-aligned SYNCD
+        # value, namely a SYNCD that is not a multiple of 8.
+        bbframe_stream = gen_bbframe_stream(kbch,
+                                            n_bbframes,
+                                            up_stream,
+                                            syncd=5)
+
+        # Run the flowgraph
+        self._set_up_flowgraph(bbframe_stream)
+        self.tb.run()
+
+        # The first BBFRAME (with the unsupported SYNCD) should be discarded
+        self._assert_up_stream(up_stream, n_discarded_bbframes=1)
 
 
 if __name__ == '__main__':

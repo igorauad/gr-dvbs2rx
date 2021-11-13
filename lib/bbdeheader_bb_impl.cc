@@ -424,6 +424,13 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
             continue;
         }
 
+        if (h->syncd % 8 != 0) {
+            synched = FALSE;
+            printf("Baseband header unsupported (syncd not byte-aligned).\n");
+            in += max_dfl;
+            continue;
+        }
+
         // Skip the initial SYNCD bits of the DATAFIELD if re-synchronizing
         if (synched == FALSE) {
             printf("Baseband header resynchronizing.\n");
