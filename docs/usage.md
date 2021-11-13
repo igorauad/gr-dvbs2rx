@@ -40,8 +40,8 @@ dvbs2-tx --source file --in-file example.ts | \
 ```
 
 When using file descriptors, it is also possible to configure which descriptors
-take the input and output. In **Example 1**, one problem is that the output from
-`dvbs2-rx` is completely redirected to the null device, including the receiver
+take the input and output. One problem in **Example 1**is that the output from
+`dvbs2-rx` is entirely redirected to the null device, including the receiver
 logs. As an alternative, the MPEG TS output can be fed into a separate file
 descriptor instead of the regular stdout (descriptor 1), as follows:
 
@@ -85,8 +85,8 @@ Where option `--out-usrp` specifies the identifier of the destination USRP.
 
 Both the `dvbs2-tx` and `dvbs2-rx` applications provide a range of configurable
 DVB-S2 parameters. For instance, the previous Tx-Rx loopback example can be
-adapted to test a different MODCOD, FEC frame size, roloff factor, symbol rate,
-and pilot configuration:
+adapted to test a different MODCOD, FEC frame size, roll-off factor, symbol
+rate, and pilot configuration:
 
 **Example 6:**
 ```
@@ -171,10 +171,10 @@ and forwards these packets towards the loopback interface with address
 Besides, this example uses noteworthy descriptor redirection options, which are
 meant to ensure only the MPEG TS output is fed into `tsp` and not the receiver
 logs. At first, the TS output is fed into descriptor 3 through option `-out-fd
-3`. However, descriptor 3 is later redirected to stdout through option `3>&1`.
-At the same time, the original stdout (where receiver logs are printed) is
-redirected to stderr using `1>&2`. In the end, only the TS output is piped into
-`tsp`, and the logs are preserved on the console (via stderr).
+3`. However, descriptor three is later redirected to stdout through option
+`3>&1`. At the same time, the original stdout (where receiver logs are printed)
+is redirected to stderr using `1>&2`. In the end, only the TS output is piped
+into `tsp`, and the logs are preserved on the console (via stderr).
 
 Lastly, another useful application from the TSDuck toolkit is the `tsdump` tool,
 which dumps all the incoming TS packets into the console in real-time. You can
