@@ -36,7 +36,8 @@ private:
     unsigned int nbch;
     unsigned int bch_code;
     unsigned int output_mode;
-    unsigned int frame;
+    uint64_t d_frame_cnt;
+    uint64_t d_frame_error_cnt;
     typedef CODE::GaloisField<16, 0b10000000000101101, uint16_t> GF_NORMAL;
     typedef CODE::GaloisField<15, 0b1000000000101101, uint16_t> GF_MEDIUM;
     typedef CODE::GaloisField<14, 0b100000000101011, uint16_t> GF_SHORT;

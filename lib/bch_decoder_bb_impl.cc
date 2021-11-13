@@ -55,7 +55,9 @@ bch_decoder_bb_impl::bch_decoder_bb_impl(dvb_standard_t standard,
                                          dvb_outputmode_t outputmode)
     : gr::block("bch_decoder_bb",
                 gr::io_signature::make(1, 1, sizeof(unsigned char)),
-                gr::io_signature::make(1, 1, sizeof(unsigned char)))
+                gr::io_signature::make(1, 1, sizeof(unsigned char))),
+      d_frame_cnt(0),
+      d_frame_error_cnt(0)
 {
     if (framesize == FECFRAME_NORMAL) {
         switch (rate) {
@@ -382,7 +384,6 @@ bch_decoder_bb_impl::bch_decoder_bb_impl(dvb_standard_t standard,
             break;
         }
     }
-    frame = 0;
     instance_n = new GF_NORMAL();
     instance_m = new GF_MEDIUM();
     instance_s = new GF_SHORT();
@@ -469,16 +470,16 @@ int bch_decoder_bb_impl::general_work(int noutput_items,
             corrections = (*decode_m_12)(code, parity, 0, 0, kbch);
             break;
         }
-        if (corrections > 0 || corrections == -1) {
-            if (corrections != -1) {
-                printf("frame = %d, BCH decoder number of corrections = %d\n",
-                       frame,
-                       corrections);
-            } else {
-                printf("frame = %d, BCH decoder too many bit errors.\n", frame);
-            }
+        if (corrections > 0) {
+            printf(
+                "frame = %lu, BCH decoder corrections = %d\n", d_frame_cnt, corrections);
+        } else if (corrections == -1) {
+            d_frame_error_cnt++;
+            printf("frame = %lu, BCH decoder too many bit errors (FER = %g)\n",
+                   d_frame_cnt,
+                   (double)d_frame_error_cnt / (d_frame_cnt + 1));
         }
-        frame++;
+        d_frame_cnt++;
         for (unsigned int j = 0; j < kbch; j++) {
             *out++ = CODE::get_be_bit(code, j);
         }

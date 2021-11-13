@@ -1236,13 +1236,13 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
         }
         if (count < 0) {
             total_trials += trials;
-            printf("frame = %d, snr = %.2f, LDPC decoder failed at converging to a code "
-                   "word.\n",
+            printf("frame = %d, snr = %.2f, trials = %d (max)\n",
                    chunk * SIZEOF_SIMD,
-                   snr);
+                   snr,
+                   trials);
         } else {
             total_trials += (trials - count);
-            printf("frame = %d, snr = %.2f, max trials = %d\n",
+            printf("frame = %d, snr = %.2f, trials = %d\n",
                    chunk * SIZEOF_SIMD,
                    snr,
                    trials - count);
@@ -1383,7 +1383,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             precision_sum += FACTOR / (sigma * sigma);
             total_snr += snr;
             if (info_mode) {
-                printf("frame = %d, snr = %.2f, average max trials = %d, average snr = "
+                printf("frame = %d, snr = %.2f, average trials = %d, average snr = "
                        "%.2f\n",
                        frame,
                        snr,

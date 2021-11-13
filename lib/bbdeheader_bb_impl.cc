@@ -47,7 +47,9 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
                                        dvb_code_rate_t rate)
     : gr::block("bbdeheader_bb",
                 gr::io_signature::make(1, 1, sizeof(unsigned char)),
-                gr::io_signature::make(1, 1, sizeof(unsigned char)))
+                gr::io_signature::make(1, 1, sizeof(unsigned char))),
+      d_packet_cnt(0),
+      d_error_cnt(0)
 {
     if (framesize == FECFRAME_NORMAL) {
         switch (rate) {
@@ -480,8 +482,10 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
                         } else {
                             *tei |= TRANSPORT_ERROR_INDICATOR;
                         }
+                        d_error_cnt++;
                     }
                     count = 0;
+                    d_packet_cnt++;
                     df_remaining -= 8;
                     if (df_remaining == 0) {
                         distance = (TRANSPORT_PACKET_LENGTH - 1) * 8;
@@ -564,7 +568,9 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
     }
 
     if (errors != 0) {
-        printf("TS packet crc errors = %d\n", errors);
+        printf("TS packet crc errors = %d (PER = %g)\n",
+               errors,
+               (double)d_error_cnt / d_packet_cnt);
     }
 
     // Tell runtime system how many input items we consumed on

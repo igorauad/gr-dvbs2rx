@@ -58,6 +58,8 @@ private:
     unsigned int distance;
     unsigned int spanning;
     unsigned int index;
+    uint64_t d_packet_cnt; /**< total packets received */
+    uint64_t d_error_cnt;  /**< total packets with bit errors */
     FrameFormat m_format[1];
     unsigned char crc_tab[256];
     unsigned char packet[188];
