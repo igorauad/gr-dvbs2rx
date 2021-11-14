@@ -28,22 +28,16 @@ bool greater_than_or_equal(const uint64_t& value, const uint64_t& element)
     return element >= value;
 }
 
-// Linear interpolator
-#if INTERPOLATOR == 1
-constexpr unsigned interp_hist = 1; // accesses m_k = n - 1
 
-gr_complex interp(const gr_complex* in, int m_k, float mu)
+gr_complex linear_interpolator::operator()(const gr_complex* in, int m_k, float mu) const
 {
     assert(m_k >= 0);
     // Linear interpolation from Eq. 8.61
     return mu * in[m_k + 1] + (1 - mu) * in[m_k];
 }
 
-// Quadratic interpolator
-#elif INTERPOLATOR == 2
-constexpr unsigned interp_hist = 3; // accesses m_k - 2 = n - 3
-
-gr_complex interp(const gr_complex* in, int m_k, float mu)
+gr_complex
+quadratic_interpolator::operator()(const gr_complex* in, int m_k, float mu) const
 {
     assert((m_k - 2) >= 0);
     // Farrow coefficients from Table 8.4.1
@@ -60,11 +54,8 @@ gr_complex interp(const gr_complex* in, int m_k, float mu)
     return (((mu * v2) + v1) * mu) + v0;
 }
 
-// Cubic interpolator
-#elif INTERPOLATOR == 3
-constexpr unsigned interp_hist = 3; // accesses m_k - 2 = n - 3
 
-gr_complex interp(const gr_complex* in, int m_k, float mu)
+gr_complex cubic_interpolator::operator()(const gr_complex* in, int m_k, float mu) const
 {
     assert((m_k - 2) >= 0);
     // Farrow coefficients from Table 8.4.2
@@ -83,18 +74,20 @@ gr_complex interp(const gr_complex* in, int m_k, float mu)
     return (((((mu * v3) + v2) * mu) + v1) * mu) + v0;
 }
 
-// Polyphase interpolator
-#elif INTERPOLATOR == 4
-void init_poly_rrc(std::vector<volk::vector<float>>& rrc_subfilters,
-                   float sps,
-                   float rolloff,
-                   int rrc_delay,
-                   size_t n_subfilt)
+static int calc_rrc_subfilt_len(float sps, int rrc_delay, size_t n_subfilt)
 {
-    // Clear the previous design, if any
-    if (rrc_subfilters.size() > 0)
-        rrc_subfilters.clear();
+    return std::ceil(((2 * n_subfilt * sps * rrc_delay) + 1) / n_subfilt);
+}
 
+polyphase_interpolator::polyphase_interpolator(float sps,
+                                               float rolloff,
+                                               int rrc_delay,
+                                               size_t n_subfilt)
+    : base_interpolator(calc_rrc_subfilt_len(sps, rrc_delay, n_subfilt) - 1),
+      d_n_subfilt(n_subfilt),
+      d_subfilt_len(calc_rrc_subfilt_len(sps, rrc_delay, n_subfilt)),
+      d_subfilt_delay((d_subfilt_len - 1) / 2)
+{
     // Design an RRC filter with an oversampling factor of "n_subfilt * sps"
     float poly_sps = n_subfilt * sps;
     size_t n_poly_rrc_taps = (2 * poly_sps * rrc_delay) + 1;
@@ -117,44 +110,47 @@ void init_poly_rrc(std::vector<volk::vector<float>>& rrc_subfilters,
         for (size_t j = 0; j < subfilt_len; j++) {
             subfilt[j] = rrc_taps[i + (j * n_subfilt)];
         }
-        rrc_subfilters.emplace_back(std::move(subfilt));
+        d_rrc_subfilters.emplace_back(std::move(subfilt));
     }
-    assert(rrc_subfilters.size() == n_subfilt);
 
     // Flip all subfilters to facilitate the convolution computation
     for (size_t i = 0; i < n_subfilt; i++) {
-        std::reverse(rrc_subfilters[i].begin(), rrc_subfilters[i].end());
+        std::reverse(d_rrc_subfilters[i].begin(), d_rrc_subfilters[i].end());
     }
+
+    // Sanity checks
+    assert(d_rrc_subfilters.size() == d_n_subfilt);
+    assert(std::all_of(d_rrc_subfilters.begin(),
+                       d_rrc_subfilters.end(),
+                       [&](const volk::vector<float>& subfilt) {
+                           return subfilt.size() == d_subfilt_len;
+                       }));
+    assert(d_subfilt_len % 2 == 1); // odd length (even-symmetric around the peak)
 }
 
-gr_complex interp(const gr_complex* in,
-                  int m_k,
-                  float mu,
-                  const std::vector<volk::vector<float>>& rrc_subfilters,
-                  size_t n_subfilt,
-                  size_t subfilt_len)
+gr_complex
+polyphase_interpolator::operator()(const gr_complex* in, int m_k, float mu) const
 {
-    int idx_subfilt = (int)std::floor(n_subfilt * mu);
-    const volk::vector<float>& subfilt = rrc_subfilters[idx_subfilt];
-    assert((m_k + 2 - subfilt_len) >= 0);
+    int idx_subfilt = (int)std::floor(d_n_subfilt * mu);
+    const volk::vector<float>& subfilt = d_rrc_subfilters[idx_subfilt];
+    assert((m_k + 2 - d_subfilt_len) >= 0);
     gr_complex result;
     volk_32fc_32f_dot_prod_32fc(
-        &result, &in[m_k + 2 - subfilt_len], subfilt.data(), subfilt_len);
+        &result, &in[m_k + 2 - d_subfilt_len], subfilt.data(), d_subfilt_len);
     return result;
 }
-#else
-#error "Unsupported interpolator"
-#endif
+
 
 symbol_sync_cc::sptr symbol_sync_cc::make(float sps,
                                           float loop_bw,
                                           float damping_factor,
                                           float rolloff,
                                           int rrc_delay,
-                                          int n_subfilt)
+                                          int n_subfilt,
+                                          int interp_method)
 {
     return gnuradio::make_block_sptr<symbol_sync_cc_impl>(
-        sps, loop_bw, damping_factor, rolloff, rrc_delay, n_subfilt);
+        sps, loop_bw, damping_factor, rolloff, rrc_delay, n_subfilt, interp_method);
 }
 
 
@@ -166,7 +162,8 @@ symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
                                          float damping_factor,
                                          float rolloff,
                                          int rrc_delay,
-                                         int n_subfilt)
+                                         int n_subfilt,
+                                         int interp_method)
     : gr::block("symbol_sync_cc",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(1, 1, sizeof(gr_complex))),
@@ -179,9 +176,8 @@ symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
       d_jump(d_sps),
       d_init(false),
       d_last_xi(0),
-      d_n_subfilt(n_subfilt),
-      d_subfilt_len(std::ceil(((2 * n_subfilt * sps * rrc_delay) + 1) / n_subfilt)),
-      d_subfilt_delay((d_subfilt_len - 1) / 2)
+      d_interp_method(interp_method),
+      d_poly_interp(sps, rolloff, rrc_delay, n_subfilt)
 {
     if ((ceilf(sps) != sps) || (floorf(sps) != sps) || (static_cast<int>(sps) % 2 != 0) ||
         (sps < 2.0)) {
@@ -228,22 +224,28 @@ symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
     d_K1 = Kp_K0_K1 / (Kp * K0);
     d_K2 = Kp_K0_K2 / (Kp * K0);
 
-#if INTERPOLATOR == 4
-    // Polyphase realization of the RRC matched filter
-    init_poly_rrc(d_rrc_subfilters, sps, rolloff, rrc_delay, n_subfilt);
-    assert(d_rrc_subfilters.size() == d_n_subfilt);
-    assert(d_rrc_subfilters[0].size() == d_subfilt_len);
-    assert(d_subfilt_len % 2 == 1); // odd length (even-symmetric around the peak)
-    unsigned interp_hist = d_rrc_subfilters[0].size() - 1;
-#endif
-
     // The k-th interpolant is computed based on the n-th sample and some preceding
     // samples, including the k-th basepoint index "n-1". Make sure these samples are
     // available as input history if necessary. Also, since the GTED considers the
     // zero-crossing interpolant between the current and previous output symbols, make
     // sure the zero-crossing sample located "d_midpoint" indexes before the basepoint
     // index is also within the input buffer's history.
-    d_history = interp_hist + d_midpoint;
+    switch (interp_method) {
+    case 0:
+        d_history = d_poly_interp.history() + d_midpoint;
+        break;
+    case 1:
+        d_history = d_lin_interp.history() + d_midpoint;
+        break;
+    case 2:
+        d_history = d_qua_interp.history() + d_midpoint;
+        break;
+    case 3:
+        d_history = d_cub_interp.history() + d_midpoint;
+        break;
+    default:
+        throw std::runtime_error("Invalid interpolation method (choose from 0 to 3)");
+    }
     set_history(d_history + 1); // GR basic block's history is actually history + 1
 
     // The work function has to move tags from arbitrary sample instants to output
@@ -266,10 +268,12 @@ void symbol_sync_cc_impl::forecast(int noutput_items,
     ninput_items_required[0] = (d_sps * noutput_items) + d_history;
 }
 
+template <typename Interpolator>
 std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
                                               gr_complex* out,
                                               int ninput_items,
-                                              int noutput_items)
+                                              int noutput_items,
+                                              const Interpolator& interp)
 {
     if (noutput_items > static_cast<int>(d_strobe_idx.size()))
         d_strobe_idx.resize(noutput_items);
@@ -323,19 +327,10 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
         // better to avoid any unnecessary computations in this loop.
 
         // Output interpolant
-#if INTERPOLATOR == 4
-        out[k] = interp(in, m_k, d_mu, d_rrc_subfilters, d_n_subfilt, d_subfilt_len);
-#else
         out[k] = interp(in, m_k, d_mu);
-#endif
 
         // Zero-crossing interpolant
-#if INTERPOLATOR == 4
-        gr_complex x_zc = interp(
-            in, m_k - d_midpoint, d_mu, d_rrc_subfilters, d_n_subfilt, d_subfilt_len);
-#else
         gr_complex x_zc = interp(in, m_k - d_midpoint, d_mu);
-#endif
 
         // Error detected by the Gardner TED (purely non-data-aided)
         float e = x_zc.real() * (d_last_xi.real() - out[k].real()) +
@@ -388,6 +383,29 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
     return std::make_pair(n, k);
 }
 
+std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
+                                              gr_complex* out,
+                                              int ninput_items,
+                                              int noutput_items)
+{
+    switch (d_interp_method) {
+    case 0:
+        return loop(in, out, ninput_items, noutput_items, d_poly_interp);
+        break;
+    case 1:
+        return loop(in, out, ninput_items, noutput_items, d_lin_interp);
+        break;
+    case 2:
+        return loop(in, out, ninput_items, noutput_items, d_qua_interp);
+        break;
+    case 3:
+        return loop(in, out, ninput_items, noutput_items, d_cub_interp);
+        break;
+    default:
+        throw std::runtime_error("Invalid interpolation method (choose from 0 to 3)");
+    }
+}
+
 int symbol_sync_cc_impl::general_work(int noutput_items,
                                       gr_vector_int& ninput_items,
                                       gr_vector_const_void_star& input_items,
@@ -409,30 +427,25 @@ int symbol_sync_cc_impl::general_work(int noutput_items,
     const uint64_t n_written = nitems_written(output_port);
     std::vector<tag_t> tags;
     get_tags_in_range(tags, input_port, n_read, n_read + n);
+    // The incoming tag offsets are oblivious to this block's history. For instance,
+    // tag offset 0 refers to the first new input sample. In contrast, the strobe
+    // indexes saved on vector "d_strobe_idx" are offset by the input buffer history.
+    // Hence, account for the buffer history on the target strobe index.
+    //
+    // When using the polyphase interpolator, consider also the subfilter delay. The
+    // interpolator processes samples "n - N + 1" to "n" (inclusive), where N is the
+    // subfilter length. However, the RRC subfilter has a peak in its central point when
+    // mu < 0.5 and at the center point minus one (a shorter delay) for mu > 0.5. Thus,
+    // the output interpolant is more strongly influenced by either sample "n - D", where
+    // "D" is the subfilter delay (from d_subfilt_delay), or sample "n - D + 1". In terms
+    // of the basepoint index, the interpolant is more strongly influenced by the sample
+    // at "m_k + 1 - D" for mu < 0.5, and "m_k + 2 - D" for mu > 0.5. Again, as for the
+    // other interpolation methods, assume the case of mu < 0.5 for simplicity.
+    unsigned int strobe_offset = (d_interp_method == 0)
+                                     ? (d_history + d_poly_interp.get_subfilt_delay() - 1)
+                                     : d_history;
     for (auto& tag : tags) {
-        // Define the target strobe index for this tag
-        //
-        // The incoming tag offsets are oblivious to this block's history. For instance,
-        // tag offset 0 refers to the first new input sample. In contrast, the strobe
-        // indexes saved on vector "d_strobe_idx" are offset by the input buffer history.
-        // Hence, account for the buffer history on the target strobe index.
-        //
-        // When using the polyphase interpolator, consider also the subfilter delay. The
-        // interpolation processes samples "n - N + 1" to "n" (inclusive), where N is the
-        // subfilter length. However, the subfilter has a peak in its center point for mu
-        // < 0.5, and at the center point minus one (a shorter delay) for mu > 0.5. Thus,
-        // the output interpolant is more strongly influenced by either the sample "n - D"
-        // (for mu < 0.5), where "D" is the filter delay (from d_subfilt_delay), or the
-        // sample at index "n - D + 1" (for mu > 0.5). In terms of the basepoint index,
-        // the interpolant is more strongly influenced by the sample at "m_k + 1 - D" for
-        // mu < 0.5, and "m_k + 2 - D" for mu > 0.5. Again, as for the other interpolation
-        // methods, assume the case of mu < 0.5 for simplicity.
-#if INTERPOLATOR == 4
-        uint64_t target_strobe_idx =
-            tag.offset - n_read + d_history + d_subfilt_delay - 1;
-#else
-        uint64_t target_strobe_idx = tag.offset - n_read + d_history;
-#endif
+        uint64_t target_strobe_idx = tag.offset - n_read + strobe_offset;
         // Find the first strobe index past or equal the target
         const auto last = d_strobe_idx.begin() + k;
         const auto it = std::upper_bound(

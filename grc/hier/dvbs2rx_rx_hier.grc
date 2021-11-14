@@ -280,6 +280,7 @@ blocks:
     alias: ''
     comment: ''
     damping_factor: sym_sync_damping
+    interp_method: '0'
     loop_bw: sym_sync_loop_bw
     maxoutbuf: '0'
     minoutbuf: '0'

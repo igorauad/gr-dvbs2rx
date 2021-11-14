@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(symbol_sync_cc.h)                                          */
-/* BINDTOOL_HEADER_FILE_HASH(4aae209a4aabb3bae4f4d78e39e10e0b)                     */
+/* BINDTOOL_HEADER_FILE_HASH(66ddcf2f34a8d58a4597459e91769c51)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -42,7 +42,8 @@ void bind_symbol_sync_cc(py::module& m)
              py::arg("loop_bw"),
              py::arg("damping_factor"),
              py::arg("rolloff"),
-             py::arg("rrc_delay"),
-             py::arg("n_subfilt"),
+             py::arg("rrc_delay") = 5,
+             py::arg("n_subfilt") = 128,
+             py::arg("interp_method") = 0,
              D(symbol_sync_cc, make));
 }

@@ -4,7 +4,7 @@ category: '[Core]/Digital Television/DVB-S2'
 
 templates:
   imports: import dvbs2rx
-  make: dvbs2rx.symbol_sync_cc(${sps}, ${loop_bw}, ${damping_factor}, ${rolloff}, ${rrc_delay}, ${n_subfilt})
+  make: dvbs2rx.symbol_sync_cc(${sps}, ${loop_bw}, ${damping_factor}, ${rolloff}, ${rrc_delay}, ${n_subfilt}, ${interp_method})
 
 parameters:
 - id: sps
@@ -27,10 +27,18 @@ parameters:
   label: RRC Filter Delay
   dtype: int
   default: 5
+  hide: ${'none' if interp_method == 0 else 'all'}
 - id: n_subfilt
   label: Polyphase Subfilters
   dtype: int
   default: 128
+  hide: ${'none' if interp_method == 0 else 'all'}
+- id: interp_method
+  label: Interpolation Method
+  dtype: enum
+  options: [0, 1, 2, 3]
+  option_labels: ["Polyphase", "Linear", "Quadratic", "Cubic"]
+  default: 0
 
 inputs:
 - label: in

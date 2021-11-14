@@ -56,9 +56,11 @@ class qa_plsync_cc(gr_unittest.TestCase):
             tag_offset (int): Tag period in samples. Disabled when None.
 
         """
+        interp_method = 1  # test with the linear interpolator for simplicity
+        # TODO: test all other interpolation methods
         src = blocks.vector_source_c(tuple(in_stream))
         symbol_sync = symbol_sync_cc(sps, loop_bw, damping, rolloff, rrc_delay,
-                                     n_subfilt)
+                                     n_subfilt, interp_method)
         self.sink = blocks.vector_sink_c()
 
         if (tag_period is not None):
