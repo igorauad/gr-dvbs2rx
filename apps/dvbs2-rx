@@ -643,11 +643,10 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
                                           self.sym_rate, self.rolloff,
                                           self.n_poly_rrc_taps))
         else:
-            symbol_sync = dvbs2rx.symbol_sync_cc(self.sps,
-                                                 self.sym_sync_loop_bw,
-                                                 self.sym_sync_damping,
-                                                 self.rolloff, self.rrc_delay,
-                                                 self.rrc_nfilts)
+            interp_method = 0  # polyphase interpolator
+            symbol_sync = dvbs2rx.symbol_sync_cc(
+                self.sps, self.sym_sync_loop_bw, self.sym_sync_damping,
+                self.rolloff, self.rrc_delay, self.rrc_nfilts, interp_method)
         self.connect((rotator, 0), (symbol_sync, 0))
 
         # PL Sync - after the symbol synchronizer and before the LDPC decoder
@@ -794,7 +793,7 @@ def argument_parser():
     parser.add_argument(
         "--sym-sync-impl",
         choices=['in-tree', 'oot'],
-        default="in-tree",
+        default="oot",
         help="Symbol synchronizer implementation to use: GNU Radio's "
         "in-tree block (\"in-tree\") or gr-dvbs2rx\'s block (\"oot\")")
 
@@ -863,6 +862,12 @@ def argument_parser():
 
     if (options.source == "usrp" and options.usrp_addr is None):
         parser.error("argument --usrp-addr is required when --source=\"usrp\"")
+
+    if (options.sym_sync_impl == "oot"
+            and not (options.sps.is_integer() and int(options.sps) % 2 == 0)):
+        parser.error(
+            "the OOT symbol synchronizer only supports even and integer "
+            "oversampling ratios. Choose --sym-sync-impl=in-tree otherwise.")
 
     return options
 
