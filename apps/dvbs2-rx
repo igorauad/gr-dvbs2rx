@@ -9,6 +9,7 @@
 # Full DVB-S2 receiver. Processes input IQ samples and outputs MPEG TS packets.
 
 import ctypes
+import os
 import signal
 import sys
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -703,6 +704,24 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.wait()
         event.accept()
 
+    def setStyleSheetFromFile(self, theme):
+        try:
+            prefixes = [gr.prefix(), "/usr/local", "/usr"]
+            found = False
+            for prefix in prefixes:
+                filename = os.path.join(prefix, "share", "gnuradio", "themes",
+                                        theme)
+                if os.path.exists(filename):
+                    found = True
+                    break
+            if (not found):
+                print("Failed to locate theme {}".format(theme))
+                return
+            with open(filename) as ss:
+                self.setStyleSheet(ss.read())
+        except Exception as e:
+            print(e, file=sys.stderr)
+
 
 def argument_parser():
     description = 'DVB-S2 receiver'
@@ -857,6 +876,10 @@ def argument_parser():
                            action='store_true',
                            default=False,
                            help="Enable all available GUI widgets.")
+    gui_group.add_argument("--gui-dark",
+                           action='store_true',
+                           default=False,
+                           help="Launch GUI in dark mode.")
 
     src_group = parser.add_argument_group('Source Options')
     src_group.add_argument("--source",
@@ -955,6 +978,8 @@ def main():
 
     tb.start()
     if (gui_mode):
+        if (options.gui_dark):
+            tb.setStyleSheetFromFile("dark.qss")
         tb.show()
     else:
         tb.wait()
