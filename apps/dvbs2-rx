@@ -60,7 +60,7 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.rolloff = options.rolloff
         self.rot_max_buf = options.rot_max_buf
         self.rrc_delay = options.rrc_delay
-        self.rrc_nfilts = options.rrc_nfilts
+        self.sym_sync_rrc_nfilts = options.sym_sync_rrc_nfilts
         self.rtl_agc = options.rtl_agc
         self.rtl_gain = options.rtl_gain
         self.rtl_idx = options.rtl_idx
@@ -87,7 +87,8 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
         self.plframe_len = 33282
         self.pilot_len = int((360 - 1) / 16) * 36
         self.n_rrc_taps = int(2 * self.rrc_delay * self.sps) + 1
-        self.n_poly_rrc_taps = ((self.n_rrc_taps - 1) * self.rrc_nfilts) + 1
+        self.n_poly_rrc_taps = (
+            (self.n_rrc_taps - 1) * self.sym_sync_rrc_nfilts) + 1
         self.constellation = self.modcod.replace(code_rate, "")
 
         if (self.gui):
@@ -658,16 +659,19 @@ class dvbs2_rx(gr.top_block, Qt.QWidget):
                 digital.TED_GARDNER, self.sps, self.sym_sync_loop_bw,
                 self.sym_sync_damping, 1.0, 1.5, 1,
                 digital.constellation_bpsk().base(), digital.IR_PFB_MF,
-                self.rrc_nfilts,
-                firdes.root_raised_cosine(self.rrc_nfilts,
-                                          self.samp_rate * self.rrc_nfilts,
-                                          self.sym_rate, self.rolloff,
-                                          self.n_poly_rrc_taps))
+                self.sym_sync_rrc_nfilts,
+                firdes.root_raised_cosine(
+                    self.sym_sync_rrc_nfilts,
+                    self.samp_rate * self.sym_sync_rrc_nfilts, self.sym_rate,
+                    self.rolloff, self.n_poly_rrc_taps))
         else:
             interp_method = 0  # polyphase interpolator
-            symbol_sync = dvbs2rx.symbol_sync_cc(
-                self.sps, self.sym_sync_loop_bw, self.sym_sync_damping,
-                self.rolloff, self.rrc_delay, self.rrc_nfilts, interp_method)
+            symbol_sync = dvbs2rx.symbol_sync_cc(self.sps,
+                                                 self.sym_sync_loop_bw,
+                                                 self.sym_sync_damping,
+                                                 self.rolloff, self.rrc_delay,
+                                                 self.sym_sync_rrc_nfilts,
+                                                 interp_method)
         self.connect((rotator, 0), (symbol_sync, 0))
 
         # PL Sync - after the symbol synchronizer and before the LDPC decoder
@@ -705,96 +709,16 @@ def argument_parser():
     parser = ArgumentParser(prog="dvbs2-rx",
                             description=description,
                             formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--agc-gain",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(1)),
-                        help="AGC gain")
-    parser.add_argument("--agc-rate",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(1e-5)),
-                        help="AGC update rate")
-    parser.add_argument("--agc-ref",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(1)),
-                        help="AGC's reference value")
     parser.add_argument("-d",
                         "--debug",
                         type=int,
                         default=0,
                         help="Debugging level")
-    parser.add_argument("--frame-size",
-                        type=str,
-                        choices=['normal', 'short'],
-                        default='normal',
-                        help="FECFRAME size")
-    parser.add_argument(
-        '-p',
-        "--pilots",
-        choices=['on', 'off', 'auto'],
-        default='auto',
-        help="Whether the expected PLFRAMEs contain pilots. Choose \"auto\" "
-        "if unsure. Otherwise, choose \"on\" or \"off\" for better performance"
-    )
     parser.add_argument('-f',
                         "--freq",
                         type=eng_float,
                         default=eng_notation.num_to_str(float(1e9)),
                         help="Carrier or intermediate frequency in Hz")
-    parser.add_argument("--gold-code", type=intx, default=0, help="Gold code")
-    parser.add_argument("--ldpc-iterations",
-                        type=int,
-                        default=25,
-                        help="Max number of LDPC decoding iterations")
-    parser.add_argument("-m",
-                        "--modcod",
-                        type=str,
-                        default='QPSK1/4',
-                        help="Target MODCOD")
-    parser.add_argument(
-        "--multistream",
-        choices=['on', 'off', 'auto'],
-        default='auto',
-        help="Enable processing of multiple input streams (MIS mode). Set to "
-        "\"auto\" if unsure about whether the input signal uses SIS or MIS. "
-        "Otherwise, choose \"on\" or \"off\" for better performance.")
-    parser.add_argument(
-        "--pl-freq-est-period",
-        type=int,
-        default=30,
-        help="Coarse frequency offset estimation period in frames ")
-    parser.add_argument(
-        "--pl-acm-vcm",
-        action='store_true',
-        default=False,
-        help="Force the PL Sync block into ACM/VCM mode in order to process "
-        "all PLFRAMEs regardless of PLS. Note this option affects the PL Sync "
-        "block only. The remaining blocks still operate in CCM mode.")
-    parser.add_argument("-r",
-                        "--rolloff",
-                        type=eng_float,
-                        choices=[0.35, 0.25, 0.2],
-                        default=eng_notation.num_to_str(float(0.2)),
-                        help="Rolloff factor")
-    parser.add_argument(
-        "--rot-max-buf",
-        default=None,
-        type=int,
-        help="Target maximum size for the rotator block's output buffer")
-    parser.add_argument("--rrc-delay",
-                        type=int,
-                        default=5,
-                        help="RRC filter delay in symbol periods")
-    parser.add_argument(
-        "--rrc-nfilts",
-        type=int,
-        default=128,
-        help="Number of branches on the polyphase RRC filter if using the  "
-        "in-tree symbol synchronizer")
-    parser.add_argument(
-        "--spectral-inversion",
-        action='store_true',
-        default=False,
-        help="Whether the input is spectrally inverted (LO freq. > RF freq.)")
     parser.add_argument("-o",
                         "--sps",
                         type=eng_float,
@@ -805,20 +729,114 @@ def argument_parser():
                         type=eng_float,
                         default=eng_notation.num_to_str(float(1000000)),
                         help="Symbol rate in bauds")
-    parser.add_argument("--sym-sync-damping",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(1.0)),
-                        help="Symbol synchronizer's damping factor")
-    parser.add_argument("--sym-sync-loop-bw",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(0.0045)),
-                        help="Symbol synchronizer's loop bandwidth")
     parser.add_argument(
+        "--spectral-inversion",
+        action='store_true',
+        default=False,
+        help="Whether the input is spectrally inverted (LO freq. > RF freq.)")
+
+    dvb_group = parser.add_argument_group('DVB-S2 Options')
+    dvb_group.add_argument("--frame-size",
+                           type=str,
+                           choices=['normal', 'short'],
+                           default='normal',
+                           help="FECFRAME size")
+    dvb_group.add_argument("--gold-code",
+                           type=intx,
+                           default=0,
+                           help="Gold code")
+    dvb_group.add_argument("-m",
+                           "--modcod",
+                           type=str,
+                           default='QPSK1/4',
+                           help="Target MODCOD")
+    dvb_group.add_argument(
+        "--multistream",
+        choices=['on', 'off', 'auto'],
+        default='auto',
+        help="Enable processing of multiple input streams (MIS mode). Set to "
+        "\"auto\" if unsure about whether the input signal uses SIS or MIS. "
+        "Otherwise, choose \"on\" or \"off\" for better performance.")
+    dvb_group.add_argument(
+        '-p',
+        "--pilots",
+        choices=['on', 'off', 'auto'],
+        default='auto',
+        help="Whether the expected PLFRAMEs contain pilots. Choose \"auto\" "
+        "if unsure. Otherwise, choose \"on\" or \"off\" for better performance"
+    )
+    dvb_group.add_argument(
+        "--pl-acm-vcm",
+        action='store_true',
+        default=False,
+        help="Force the PL Sync block into ACM/VCM mode in order to process "
+        "all PLFRAMEs regardless of PLS. Note this option affects the PL Sync "
+        "block only. The remaining blocks still operate in CCM mode.")
+    dvb_group.add_argument("-r",
+                           "--rolloff",
+                           type=eng_float,
+                           choices=[0.35, 0.25, 0.2],
+                           default=eng_notation.num_to_str(float(0.2)),
+                           help="Rolloff factor")
+    dvb_group.add_argument("--rrc-delay",
+                           type=int,
+                           default=5,
+                           help="RRC matched filter delay in symbol periods")
+
+    agc_group = parser.add_argument_group('AGC Options')
+    agc_group.add_argument("--agc-gain",
+                           type=eng_float,
+                           default=eng_notation.num_to_str(float(1)),
+                           help="AGC gain")
+    agc_group.add_argument("--agc-rate",
+                           type=eng_float,
+                           default=eng_notation.num_to_str(float(1e-5)),
+                           help="AGC update rate")
+    agc_group.add_argument("--agc-ref",
+                           type=eng_float,
+                           default=eng_notation.num_to_str(float(1)),
+                           help="AGC's reference value")
+
+    carrier_sync_group = parser.add_argument_group(
+        'Carrier Synchronization Options')
+    carrier_sync_group.add_argument(
+        "--pl-freq-est-period",
+        type=int,
+        default=30,
+        help="Coarse frequency offset estimation period in frames ")
+    carrier_sync_group.add_argument(
+        "--rot-max-buf",
+        default=None,
+        type=int,
+        help="Target maximum size for the rotator block's output buffer")
+
+    fec_group = parser.add_argument_group('FEC Options')
+    fec_group.add_argument("--ldpc-iterations",
+                           type=int,
+                           default=25,
+                           help="Max number of LDPC decoding iterations")
+
+    sym_sync_group = parser.add_argument_group('Symbol Synchronizer Options')
+    sym_sync_group.add_argument("--sym-sync-damping",
+                                type=eng_float,
+                                default=eng_notation.num_to_str(float(1.0)),
+                                help="Symbol synchronizer's damping factor")
+    sym_sync_group.add_argument("--sym-sync-loop-bw",
+                                type=eng_float,
+                                default=eng_notation.num_to_str(float(0.0045)),
+                                help="Symbol synchronizer's loop bandwidth")
+    sym_sync_group.add_argument(
         "--sym-sync-impl",
         choices=['in-tree', 'oot'],
         default="oot",
         help="Symbol synchronizer implementation to use: GNU Radio's "
         "in-tree block (\"in-tree\") or gr-dvbs2rx\'s block (\"oot\")")
+    sym_sync_group.add_argument(
+        "--sym-sync-rrc-nfilts",
+        type=int,
+        default=128,
+        help="Number of subfilters on the symbol synchronizer\'s "
+        "polyphase RRC interpolator")
 
     gui_group = parser.add_argument_group('GUI Options')
     gui_group.add_argument("--gui",
