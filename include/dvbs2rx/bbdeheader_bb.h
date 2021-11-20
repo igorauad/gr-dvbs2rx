@@ -50,6 +50,18 @@ public:
      */
     static sptr
     make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate);
+
+    /*!
+     * \brief Get count of MPEG TS packets extracted from BBFRAMEs.
+     * \return uint64_t MPEG TS packet count.
+     */
+    virtual uint64_t get_packet_count() = 0;
+
+    /*!
+     * \brief Get count of corrupt MPEG TS packets extracted from BBFRAMEs.
+     * \return uint64_t Corrupt packet count.
+     */
+    virtual uint64_t get_error_count() = 0;
 };
 
 } // namespace dvbs2rx

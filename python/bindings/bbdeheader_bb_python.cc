@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(bbdeheader_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(5f52a0db35bfb44b36c44f9554ed54fa)                     */
+/* BINDTOOL_HEADER_FILE_HASH(7dc0fc23c7f2dcb1c104e66f91d52bac)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -42,6 +42,13 @@ void bind_bbdeheader_bb(py::module& m)
              py::arg("rate"),
              D(bbdeheader_bb, make))
 
+        .def("get_packet_count",
+             &bbdeheader_bb::get_packet_count,
+             D(bbdeheader_bb, get_packet_count))
+
+        .def("get_error_count",
+             &bbdeheader_bb::get_error_count,
+             D(bbdeheader_bb, get_error_count))
 
         ;
 }

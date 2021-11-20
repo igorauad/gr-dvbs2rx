@@ -85,8 +85,13 @@ private:
     payload_state_t d_payload_state; /**< Payload processing state machine */
     rot_ctrl_t d_rot_ctrl;           /**< Upstream rotator control */
     plframe_idx_t d_idx;             /**< PLFRAME index state */
-    uint64_t d_sof_cnt;              /**< Count of detected SOFs */
     gr_complex d_phase_corr;         /**< Phase correction */
+
+    /* Frame counts */
+    uint64_t d_sof_cnt;      /**< Total detected SOFs (including false-positives) */
+    uint64_t d_frame_cnt;    /**< Accepted/processed PLFRAMEs */
+    uint64_t d_rejected_cnt; /**< Rejected PLFRAMEs */
+    uint64_t d_dummy_cnt;    /**< Dummy PLFRAMEs */
 
     /* Cache structures used to hold frame metadata/information from the current
      * PLFRAME (whose payload may be under processing if locked) and from the
@@ -254,6 +259,17 @@ public:
      * @return (float) Cumulative frequency offset.
      */
     float get_freq_offset() { return d_rot_ctrl.next.freq; }
+
+    /* Other externally readable stats */
+    bool get_coarse_freq_corr_state() { return d_freq_sync->is_coarse_corrected(); }
+    bool get_locked() { return d_locked; }
+    uint64_t get_frame_count() { return d_frame_cnt; }
+    uint64_t get_rejected_count() { return d_rejected_cnt; }
+    uint64_t get_dummy_count() { return d_dummy_cnt; }
+    std::chrono::system_clock::time_point get_lock_time()
+    {
+        return d_frame_sync->get_lock_time();
+    };
 };
 
 } // namespace dvbs2rx

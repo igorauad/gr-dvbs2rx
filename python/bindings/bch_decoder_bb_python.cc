@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(bch_decoder_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(8eb0e6b8d53b4e01df6462c78386269e)                     */
+/* BINDTOOL_HEADER_FILE_HASH(ffe5f84ef89117dcae2092b4805a6fdc)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -45,6 +45,13 @@ void bind_bch_decoder_bb(py::module& m)
              py::arg("outputmode"),
              D(bch_decoder_bb, make))
 
+        .def("get_frame_count",
+             &bch_decoder_bb::get_frame_count,
+             D(bch_decoder_bb, get_frame_count))
+
+        .def("get_error_count",
+             &bch_decoder_bb::get_error_count,
+             D(bch_decoder_bb, get_error_count))
 
         ;
 }

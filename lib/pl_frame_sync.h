@@ -13,6 +13,7 @@
 #include "pl_defs.h"
 #include <gnuradio/gr_complex.h>
 #include <dvbs2rx/api.h>
+#include <chrono>
 
 /* correlator lengths, based on the number of differentials that we know in
  * advance (25 for SOF and only 32 for PLSC) */
@@ -135,6 +136,7 @@ private:
     frame_sync_state_t d_state; /**< Frame timing recovery state */
     uint32_t d_frame_len;       /**< Current PLFRAME length */
     uint8_t d_unlock_cnt;       /**< Count of consecutive frame detection failures */
+    std::chrono::system_clock::time_point d_lock_time; /**< Frame lock timestamp */
 
     delay_line<gr_complex> d_plsc_delay_buf; /**< Buffer used as delay line */
     delay_line<gr_complex> d_sof_buf;        /**< SOF correlator buffer */
@@ -285,6 +287,14 @@ public:
      * \return (float) Last evaluated timing metric.
      */
     float get_timing_metric() const { return d_timing_metric; }
+
+    /**
+     * @brief Get the frame lock timestamp
+     *
+     * @return std::chrono::system_clock::time_point Timestamp in UTC time corresponding
+     * to when the frame synchronizer locked the frame timing. Valid only when locked.
+     */
+    std::chrono::system_clock::time_point get_lock_time() { return d_lock_time; }
 };
 
 } // namespace dvbs2rx

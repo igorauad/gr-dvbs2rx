@@ -5,6 +5,7 @@
   - [Experimenting with Parameters](#experimenting-with-parameters)
   - [Graphical User Interface](#graphical-user-interface)
   - [Processing the MPEG Transport Stream](#processing-the-mpeg-transport-stream)
+  - [Receiver Monitoring](#receiver-monitoring)
 
 
 ## Input and Output Options
@@ -129,6 +130,7 @@ command:
 A graphical user interface (GUI) is available on the receiver application. You
 can optionally enable it by running with the option `--gui`, as follows:
 
+**Example 7:**
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --gui
 ```
@@ -148,7 +150,7 @@ A recommended application to handle the MPEG TS layer is the `tsp` tool from the
 [TSDuck](https://tsduck.io) toolkit. The following example demonstrates how you
 can pipe the `dvbs2-rx` into `tsp`.
 
-**Example 7**:
+**Example 8**:
 ```
 cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | \
   tsp -P mpe --pid 32 --udp-forward --local-address 127.0.0.1 -O drop
@@ -180,13 +182,47 @@ Lastly, another useful application from the TSDuck toolkit is the `tsdump` tool,
 which dumps all the incoming TS packets into the console in real-time. You can
 use it as follows:
 
-**Example 8**:
+**Example 9**:
 ```
 cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsdump --no-pager --headers-only
 ```
 
 Please refer to TSDuck's [user
 guide](https://tsduck.io/download/docs/tsduck.pdf) for further information.
+
+## Receiver Monitoring
+
+While the DVB-S2 receiver is running, it is often helpful to observe the
+underlying low-level performance metrics and statistics. For example, metrics
+such as the frequency offset estimated at the physical layer, the frame
+synchronization lock status, the average number of LDPC correction iterations,
+the MPEG TS packet counts, and so on. The receiver application can provide such
+metrics either through periodic logs printed to the console or on-demand via
+HTTP requests. In both cases, it returns the information in JSON format.
+
+The example below illustrates the case of a receiver launching a monitoring
+server (option `--mon-server`) for on-demand access via HTTP requests:
+
+**Example 10:**
+```
+dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --mon-server
+```
+
+In this case, you can probe the receiver at any time by sending a request to it
+via port 9004 (configurable through option `--mon-port`). For example, using the
+following command:
+
+```
+curl -s http://localhost:9004 | python3 -m json.tool
+```
+
+Alternatively, you may want to print the performance metrics continuously to the
+console. To do so, run with option `--log-stats`, as follows:
+
+**Example 11:**
+```
+dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --log-stats
+```
 
 ---
 Prev: [Installation](installation.md)

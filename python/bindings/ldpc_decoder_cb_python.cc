@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(ldpc_decoder_cb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(211adee7620ccc87b20f9886e2233d3c)                     */
+/* BINDTOOL_HEADER_FILE_HASH(53fd17d376a4d10eee23102ea1cbb709)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -48,6 +48,11 @@ void bind_ldpc_decoder_cb(py::module& m)
              py::arg("max_trials"),
              D(ldpc_decoder_cb, make))
 
+        .def("get_snr", &ldpc_decoder_cb::get_snr, D(ldpc_decoder_cb, get_snr))
+
+        .def("get_average_trials",
+             &ldpc_decoder_cb::get_average_trials,
+             D(ldpc_decoder_cb, get_average_trials))
 
         ;
 }

@@ -54,6 +54,18 @@ public:
                      dvb_outputmode_t outputmode,
                      dvb_infomode_t infomode,
                      int max_trials);
+
+    /*!
+     * \brief Get the measured SNR.
+     * \return float Measured SNR.
+     */
+    virtual float get_snr() = 0;
+
+    /*!
+     * \brief Get the average number of LDPC decoding iterations per frame.
+     * \return unsigned int Average decoding interations.
+     */
+    virtual unsigned int get_average_trials() = 0;
 };
 
 } // namespace dvbs2rx

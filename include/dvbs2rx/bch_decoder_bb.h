@@ -51,6 +51,18 @@ public:
                      dvb_framesize_t framesize,
                      dvb_code_rate_t rate,
                      dvb_outputmode_t outputmode);
+
+    /*!
+     * \brief Get count of processed FECFRAMEs.
+     * \return uint64_t FECFRAME count.
+     */
+    virtual uint64_t get_frame_count() = 0;
+
+    /*!
+     * \brief Get count of FECFRAMEs output with residual uncorrected errors.
+     * \return uint64_t FECFRAME error count.
+     */
+    virtual uint64_t get_error_count() = 0;
 };
 
 } // namespace dvbs2rx

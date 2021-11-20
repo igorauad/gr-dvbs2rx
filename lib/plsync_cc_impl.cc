@@ -59,8 +59,11 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
       d_locked(false),
       d_closed_loop(false),
       d_payload_state(payload_state_t::searching),
+      d_phase_corr(0.0),
       d_sof_cnt(0),
-      d_phase_corr(0.0)
+      d_frame_cnt(0),
+      d_rejected_cnt(0),
+      d_dummy_cnt(0)
 {
     // Validate the PLS filters based on their population counts (Hamming weights)
     //
@@ -728,19 +731,23 @@ int plsync_cc_impl::general_work(int noutput_items,
                 if (!d_pls_enabled[d_curr_frame_info.pls.plsc]) {
                     if (d_debug_level > 1)
                         printf("PLFRAME rejected (PLS=%u)\n", d_curr_frame_info.pls.plsc);
+                    d_rejected_cnt++;
                     continue;
                 }
 
                 // If the PLFRAME between the present and the past SOFs is a dummy frame,
                 // it doesn't produce any output. Skip it and keep going until the next.
-                if (d_curr_frame_info.pls.dummy_frame)
+                if (d_curr_frame_info.pls.dummy_frame) {
+                    d_dummy_cnt++;
                     continue;
+                }
 
                 // The payload can only be processed if the expected XFECFRAME output fits
                 // in the output buffer. Hence, unlike the PLHEADER, it may not be
                 // processed right away. Mark the processing as pending for now and don't
                 // consume any more input samples until this payload is handled.
                 d_payload_state = payload_state_t::pending;
+                d_frame_cnt++;
 
                 // If running in ACM/VCM mode, tag the beginning of the XFECFRAME to
                 // follow in the output. Include the MODCOD and the FECFRAME length so

@@ -25,3 +25,21 @@ static const char* __doc_gr_dvbs2rx_plsync_cc_make = R"doc()doc";
 
 
 static const char* __doc_gr_dvbs2rx_plsync_cc_get_freq_offset = R"doc()doc";
+
+
+static const char* __doc_gr_dvbs2rx_plsync_cc_get_coarse_freq_corr_state = R"doc()doc";
+
+
+static const char* __doc_gr_dvbs2rx_plsync_cc_get_locked = R"doc()doc";
+
+
+static const char* __doc_gr_dvbs2rx_plsync_cc_get_frame_count = R"doc()doc";
+
+
+static const char* __doc_gr_dvbs2rx_plsync_cc_get_rejected_count = R"doc()doc";
+
+
+static const char* __doc_gr_dvbs2rx_plsync_cc_get_dummy_count = R"doc()doc";
+
+
+static const char* __doc_gr_dvbs2rx_plsync_cc_get_lock_time = R"doc()doc";

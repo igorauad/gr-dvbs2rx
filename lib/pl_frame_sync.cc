@@ -181,6 +181,7 @@ bool frame_sync::step(const gr_complex& in)
             }
         } else if (d_state == frame_sync_state_t::found && d_sym_cnt == d_frame_len) {
             d_state = frame_sync_state_t::locked;
+            d_lock_time = std::chrono::system_clock::now();
             if (d_debug_level > 0) {
                 printf("Frame sync: PLFRAME lock acquired\n");
             }

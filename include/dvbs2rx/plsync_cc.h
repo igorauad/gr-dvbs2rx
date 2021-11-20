@@ -80,10 +80,47 @@ public:
                      uint64_t pls_filter_hi);
 
     /*!
-     * \brief Get current frequency offset estimate
-     * \return (float) Frequency offset
+     * \brief Get the current frequency offset estimate.
+     * \return (float) Frequency offset.
      */
     virtual float get_freq_offset() = 0;
+
+    /*!
+     * \brief Get the coarse frequency offset correction state.
+     * \return (bool) True when the frequency offset is coarsely corrected.
+     */
+    virtual bool get_coarse_freq_corr_state() = 0;
+
+    /*!
+     * \brief Get the current lock status.
+     * \return (bool) True when the frame synchronizer is locked.
+     */
+    virtual bool get_locked() = 0;
+
+    /*!
+     * \brief Get the current count of processed PLFRAMEs.
+     * \return (uint64_t) Processed frame count.
+     */
+    virtual uint64_t get_frame_count() = 0;
+
+    /*!
+     * \brief Get the current count of rejected PLFRAMEs.
+     * \return (uint64_t) Rejected frame count.
+     */
+    virtual uint64_t get_rejected_count() = 0;
+
+    /*!
+     * \brief Get the current count of received dummy PLFRAMEs.
+     * \return (uint64_t) Dummy frame count.
+     */
+    virtual uint64_t get_dummy_count() = 0;
+
+    /*!
+     * \brief Get the timestamp of the last frame synchronization lock.
+     * \return (std::chrono::system_clock::time_point) Last frame lock timestamp in UTC.
+     * \note The timestamp is only valid after the first frame lock.
+     */
+    virtual std::chrono::system_clock::time_point get_lock_time() = 0;
 };
 
 } // namespace dvbs2rx

@@ -14,9 +14,10 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(plsync_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(8682b1a5c3545643fe4c3e9735248d43)                     */
+/* BINDTOOL_HEADER_FILE_HASH(eee2eb5c6a1d36a628bc194b652a1698)                     */
 /***********************************************************************************/
 
+#include <pybind11/chrono.h>
 #include <pybind11/complex.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -49,6 +50,24 @@ void bind_plsync_cc(py::module& m)
 
         .def(
             "get_freq_offset", &plsync_cc::get_freq_offset, D(plsync_cc, get_freq_offset))
+
+        .def("get_coarse_freq_corr_state",
+             &plsync_cc::get_coarse_freq_corr_state,
+             D(plsync_cc, get_coarse_freq_corr_state))
+
+        .def("get_locked", &plsync_cc::get_locked, D(plsync_cc, get_locked))
+
+        .def(
+            "get_frame_count", &plsync_cc::get_frame_count, D(plsync_cc, get_frame_count))
+
+        .def("get_rejected_count",
+             &plsync_cc::get_rejected_count,
+             D(plsync_cc, get_rejected_count))
+
+        .def(
+            "get_dummy_count", &plsync_cc::get_dummy_count, D(plsync_cc, get_dummy_count))
+
+        .def("get_lock_time", &plsync_cc::get_lock_time, D(plsync_cc, get_lock_time))
 
         ;
 }

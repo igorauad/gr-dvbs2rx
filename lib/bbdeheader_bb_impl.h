@@ -79,6 +79,9 @@ public:
                      gr_vector_int& ninput_items,
                      gr_vector_const_void_star& input_items,
                      gr_vector_void_star& output_items);
+
+    uint64_t get_packet_count() { return d_packet_cnt; }
+    uint64_t get_error_count() { return d_error_cnt; }
 };
 
 } // namespace dvbs2rx

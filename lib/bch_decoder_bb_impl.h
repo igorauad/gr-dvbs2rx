@@ -70,6 +70,9 @@ public:
                      gr_vector_int& ninput_items,
                      gr_vector_const_void_star& input_items,
                      gr_vector_void_star& output_items);
+
+    uint64_t get_frame_count() { return d_frame_cnt; }
+    uint64_t get_error_count() { return d_frame_error_cnt; }
 };
 
 } // namespace dvbs2rx
