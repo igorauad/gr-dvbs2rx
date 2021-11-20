@@ -159,7 +159,7 @@ class dvbs2_tx(gr.top_block):
         # 2) Frequency offset
         if (self.freq_offset is not None):
             rotator_cc_0_0 = blocks.rotator_cc(
-                -2 * pi * (self.freq_offset / self.samp_rate), False)
+                2 * pi * (self.freq_offset / self.samp_rate), False)
             self.connect((rotator_cc_0_0, 0), (sink, 0))
             sink = rotator_cc_0_0  # new first block on the sink pipeline
 
