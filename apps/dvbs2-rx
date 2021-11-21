@@ -4,9 +4,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0
 #
-# DVB-S2 Rx
-#
-# Full DVB-S2 receiver. Processes input IQ samples and outputs MPEG TS packets.
+# DVB-S2 Receiver
 
 import ctypes
 import json

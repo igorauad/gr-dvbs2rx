@@ -1,6 +1,8 @@
 /* -*- c++ -*- */
 /*
- * Copyright (c) 2019-2021 Igor Freire
+ * Copyright (c) 2021 Igor Freire.
+ *
+ * This file is part of gr-dvbs2rx.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */

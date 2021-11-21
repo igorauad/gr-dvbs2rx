@@ -4,10 +4,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0
 #
-# GNU Radio Python Flow Graph
-# Title: DVB-S2 Transmitter
-# Description: DVB-S2 Loopback Tx/Rx Simulation
-# GNU Radio version: v3.10.0.0git-279-g0b3dc1b1
+# DVB-S2 Transmitter
 
 import signal
 import sys
