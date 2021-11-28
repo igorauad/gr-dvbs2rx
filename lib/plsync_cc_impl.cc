@@ -510,7 +510,7 @@ void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
 int plsync_cc_impl::handle_payload(int noutput_items,
                                    gr_complex* out,
                                    const gr_complex* p_payload,
-                                   const plframe_info_t& frame_info,
+                                   plframe_info_t& frame_info,
                                    const plframe_info_t& next_frame_info)
 {
     const gr_complex* p_descrambled_payload = d_pl_descrambler->get_payload();
@@ -548,18 +548,17 @@ int plsync_cc_impl::handle_payload(int noutput_items,
                     frame_info.coarse_foffset);
             }
         }
+        frame_info.fine_foffset = new_fine_est ? d_freq_sync->get_fine_foffset() : 0;
 
         // If there is a new fine frequency offset estimate, update the external rotator
         if (new_fine_est) {
-            // NOTE: Since we always process the payload in between two SOFs,
-            // we've already processed SOF n+1 at this point while we are
-            // processing the n-th payload. Hence, we must schedule the
-            // frequency update for SOF n+2. For that, we use the
-            // next_frame_info, which holds the absolute index where SOF n+1
-            // starts and the length of PLFRAME n+1.
+            // Since we always process the payload in between two SOFs, we've already
+            // processed SOF n+1 at this point. Hence, schedule the frequency update for
+            // SOF n+2. For that, use the next_frame_info, which holds the absolute index
+            // where SOF n+1 starts and the length of PLFRAME n+1.
             control_rotator_freq(next_frame_info.abs_sof_idx,
                                  next_frame_info.pls.plframe_len,
-                                 d_freq_sync->get_fine_foffset(),
+                                 frame_info.fine_foffset,
                                  true /* reference is the previous frame */);
         }
 
@@ -568,6 +567,35 @@ int plsync_cc_impl::handle_payload(int noutput_items,
         // straight to the next step, which requires space in the output buffer.
         d_payload_state = payload_state_t::partial;
     }
+
+    // Feed-forward fine frequency correction
+    //
+    // As indicated above, this payload's fine frequency offset estimate adjusts the
+    // external rotator at the start of PLFRAME n+2. This closed-loop control mechanism is
+    // essential for frequency tracking, as it ensures the residual frequency offset is
+    // always small. For instance, if the frequency offset changes linearly by 1e-3 in the
+    // course of 10 frames, then updating the rotator on every frame with a 1e-4
+    // adjustment ensures the residual frequency offset remains in the order of 1e-4 per
+    // frame. Namely, the residual remains small enough to be estimated by the fine
+    // frequency offset estimator. Ultimately, the frequency synchronizer does not lose
+    // its coarse-corrected state even if the true frequency offset changes widely.
+    //
+    // On the other hand, the correction delay of two frames can be unbearable if the true
+    // frequency offset is changing rapidly. The residual frequency offset disturbing the
+    // current frame could be high enough to yield rapid phase changes that would
+    // significantly impair the detection. Hence, it is better not to wait until the
+    // external rotator's correction takes effect on frame n+2. Instead, it is better to
+    // de-rotate the current frame immediately.
+    //
+    // Using this approach, note there are effectively two frequency correction layers:
+    // the external and the internal. The two correction layers can coexist seamlessly.
+    // The external correction continuously tracks the frequency offset in closed-loop
+    // despite the two-frame delay. Meanwhile, the internal layer applies a feed-forward
+    // correction (i.e., in open-loop) focusing on the residual frequency offset remaining
+    // from the external (delayed) correction over this frame only.
+    const float phase_inc =
+        frame_info.coarse_corrected ? (2.0 * GR_M_PI * frame_info.fine_foffset) : 0;
+    gr_complex expj_phase_inc = gr_expj(-phase_inc);
 
     // Output the phase-corrected and descrambled data symbols.
     int n_produced = 0;
@@ -591,18 +619,29 @@ int plsync_cc_impl::handle_payload(int noutput_items,
             // Pointer to the next sequence of slots
             const gr_complex* p_slot_seq = p_descrambled_payload + d_idx.i_in_payload;
 
-            // Correct the phase based on the estimate from the most recent (preceding)
-            // pilot block. Over the first 16 slots, correct based on the PLHEADER phase
-            // estimate. Also, apply such phase corrections only if coarse-corrected, as
-            // otherwise the pilot phase estimates are uninitialized.
-            if (frame_info.coarse_corrected && d_idx.i_pilot_blk > 0) {
+            // Reset the rotator phase whenever a new 16-slot sequence starts. Set it
+            // equal to the phase estimate obtained from the most recent (preceding)
+            // 36-symbol pilot block. Skip the very first 16-slot sequence, given it is
+            // preceded by the PLHEADER instead of a pilot block. Also, do so only if
+            // coarse-corrected, as otherwise the pilot phase estimates are uninitialized.
+            //
+            // NOTE: there is always an interation where the current slot (d_idx.i_slot)
+            // is the starting slot of a 16-slot sequence due to the limit imposed by the
+            // "max_slots_to_process" variable. Hence, the conditional below is guaranteed
+            // to be hit for every 16-slot sequence.
+            if (frame_info.coarse_corrected && d_idx.i_pilot_blk > 0 &&
+                (d_idx.i_slot % SLOTS_PER_PILOT_BLK) == 0) {
                 float pilot_phase = d_freq_sync->get_pilot_phase(d_idx.i_pilot_blk - 1);
                 d_phase_corr = gr_expj(-pilot_phase);
             }
 
             // De-rotate the slot sequence
-            volk_32fc_s32fc_multiply_32fc(
-                out + n_produced, p_slot_seq, d_phase_corr, slot_seq_len);
+            volk_32fc_s32fc_x2_rotator_32fc(out + n_produced,
+                                            p_slot_seq,
+                                            expj_phase_inc,
+                                            &d_phase_corr,
+                                            slot_seq_len);
+
             n_produced += slot_seq_len;
 
             d_idx.step(slots_to_process, frame_info.pls.has_pilots);
@@ -617,8 +656,9 @@ int plsync_cc_impl::handle_payload(int noutput_items,
         // Pointer to the next sequence of slots
         const gr_complex* p_slot_seq = p_descrambled_payload + d_idx.i_in_payload;
 
-        // De-rotate the slot sequence based on the PLHEADER phase estimate
-        volk_32fc_s32fc_multiply_32fc(out, p_slot_seq, d_phase_corr, slot_seq_len);
+        // De-rotate the slot sequence
+        volk_32fc_s32fc_x2_rotator_32fc(
+            out, p_slot_seq, expj_phase_inc, &d_phase_corr, slot_seq_len);
         n_produced += slot_seq_len;
 
         d_idx.step(slots_to_process, frame_info.pls.has_pilots);

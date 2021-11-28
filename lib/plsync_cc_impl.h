@@ -52,6 +52,7 @@ struct plframe_info_t {
     pls_info_t pls;
     bool coarse_corrected = false;
     double coarse_foffset = 0;
+    double fine_foffset = 0;
     uint64_t abs_sof_idx = 0;
     plframe_info_t() : plheader(PLHEADER_LEN){};
 };
@@ -226,7 +227,7 @@ private:
     int handle_payload(int noutput_items,
                        gr_complex* out,
                        const gr_complex* p_payload,
-                       const plframe_info_t& frame_info,
+                       plframe_info_t& frame_info,
                        const plframe_info_t& next_frame_info);
 
 
