@@ -9,14 +9,13 @@
 module](https://wiki.gnuradio.org/index.php/OutOfTreeModules) with full DVB-S2
 transmitter and receiver implementations for software-defined radio (SDR).
 
-For the receiver side, this project includes a shared library with all the
-essential signal processing blocks to process a stream of input IQ samples and
-recover an MPEG transport stream (TS) on the output. The processing blocks
-include, for instance, the physical layer (PL) synchronization stages (frame
-timing, symbol timing, carrier frequency, and phase recovery), forward error
-correction (FEC) blocks, and baseband frame (BBFRAME) processing. These blocks
-are wired together within the `dvbs2-rx` application and in the example GNU
-Radio flowgraphs.
+For the receiver side, this project includes a shared library with the essential
+signal processing blocks to process a stream of input IQ samples and recover an
+MPEG transport stream (TS) on the output. The processing blocks include the
+physical layer (PL) synchronization stages (frame timing, symbol timing, carrier
+frequency, and phase recovery), forward error correction (FEC) blocks, and
+baseband frame (BBFRAME) processing. These blocks are wired together in the
+`dvbs2-rx` application and within the example GNU Radio flowgraphs.
 
 Additionally, the project provides the `dvbs2-tx` transmitter application. While
 this OOT module focuses on the Rx signal processing blocks, the Tx blocks are
@@ -35,10 +34,10 @@ This repository is a fork of drmpeg's
 [gr-dvbs2rx](http://github.com/drmpeg/gr-dvbs2rx) project, including the BCH
 decoder from [aicodix/code](https://github.com/aicodix/code/) and the
 SIMD-accelerated LDPC decoder from
-[xdsopl/LDPC](https://github.com/xdsopl/LDPC). In particular, this project
-extends `drmpeg/gr-dvbs2rx` primarily by adding the physical layer blocks
-required for a fully-fledged receiver and by adding the flexible `dvbs2-tx` and
-`dvbs2-rx` applications.
+[xdsopl/LDPC](https://github.com/xdsopl/LDPC). In particular, this fork extends
+`drmpeg/gr-dvbs2rx` primarily by adding the physical layer blocks required for a
+fully-fledged receiver, as well as the flexible `dvbs2-tx` and `dvbs2-rx`
+applications.
 
 This project is licensed under GPLv3, and it was developed primarily for
 non-commercial research, experimentation, and educational purposes. Please feel
