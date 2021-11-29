@@ -936,7 +936,7 @@ def argument_parser():
                                 help="Symbol synchronizer's damping factor")
     sym_sync_group.add_argument("--sym-sync-loop-bw",
                                 type=eng_float,
-                                default=eng_notation.num_to_str(float(0.0045)),
+                                default=eng_notation.num_to_str(1e-3),
                                 help="Symbol synchronizer's loop bandwidth")
     sym_sync_group.add_argument(
         "--sym-sync-impl",
