@@ -112,9 +112,7 @@ dvbs2-rx \
 > application detects the presence of pilots automatically. Nevertheless, you
 > can also configure the Rx application with extra a priori information for
 > better performance. For example, you can tell the Rx app that the received
-> stream assuredly contains pilot symbols by appending option `--pilots=on`.
-> Similarly, if the input stream assuredly consists of a single input stream
-> (SIS), you can inform the Rx application through option `--multistream=off`.
+> stream assuredly contains pilot symbols by appending option `--pilots on`.
 
 The Tx application also supports noise and frequency offset simulation. For
 instance, you can repeat the above experiment on a 10 dB SNR scenario with a 100

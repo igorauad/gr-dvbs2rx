@@ -866,7 +866,7 @@ def argument_parser():
     dvb_group.add_argument(
         "--multistream",
         choices=['on', 'off', 'auto'],
-        default='auto',
+        default='off',
         help="Enable processing of multiple input streams (MIS mode). Set to "
         "\"auto\" if unsure about whether the input signal uses SIS or MIS. "
         "Otherwise, choose \"on\" or \"off\" for better performance.")
