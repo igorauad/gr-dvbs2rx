@@ -23,16 +23,16 @@ cat example.ts | dvbs2-tx | dvbs2-rx > /dev/null
 Note the Tx reads the MPEG transport stream (TS) file (`example.ts`) from its
 standard input (stdin) and transmits the corresponding IQ stream. Meanwhile, the
 Rx reads the IQ stream fed into its stdin and outputs the decoded MPEG TS stream
-directly into its standard output (stdout). Finally, the Rx output is redirected
-to the null device.
+directly into its standard output (stdout). Finally, the Rx output goes to the
+null device.
 
 > NOTE: If you don't have an MPEG TS file to test, you can download an [example
-> TS file](http://www.w6rz.net/thefuryclip.ts)
+> TS file](http://www.w6rz.net/thefuryclip.ts).
 
-Nevertheless, both the Tx and Rx applications offer flexible source and sink
-options, which can be modified using the `--source` and `--sink` command-line
-switches. For example, instead of using file descriptors, as in **Example 1**,
-one can specify source and sink files directly, as follows:
+The Tx and Rx applications offer flexible source and sink options, which can be
+modified using the `--source` and `--sink` command-line switches. For example,
+instead of using file descriptors, as in **Example 1**, you can specify source
+and sink files directly, as follows:
 
 **Example 2:**
 ```
@@ -41,7 +41,7 @@ dvbs2-tx --source file --in-file example.ts | \
 ```
 
 When using file descriptors, it is also possible to configure which descriptors
-take the input and output. One problem in **Example 1**is that the output from
+take the input and output. One problem in **Example 1** is that the output from
 `dvbs2-rx` is entirely redirected to the null device, including the receiver
 logs. As an alternative, the MPEG TS output can be fed into a separate file
 descriptor instead of the regular stdout (descriptor 1), as follows:
@@ -57,7 +57,7 @@ Hence, this command is equivalent to that of **Example 2**, since `--out-file`
 regulates the file for the TS output only, excluding the receiver logs.
 
 Next, if you are running an SDR interface, you can run a command like the
-following:
+following for the receiver:
 
 **Example 4:**
 ```
@@ -68,7 +68,7 @@ Where:
 
 - Option `--source` configures the application to read IQ samples from an
   RTL-SDR interface.
-- Option `--freq` determines the RTL-SDR tuner frequency.
+- Option `--freq` determines the RTL-SDR's tuner frequency.
 - Option `--sym-rate` specifies the symbol rate (also known as baud rate) in
   symbols per second (or bauds).
 
@@ -133,20 +133,25 @@ can optionally enable it by running with the option `--gui`, as follows:
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --gui
 ```
 
+Furthermore, you can run the GUI in dark mode with option `--gui-dark` or extend
+the content of the GUI by enabling the optional plots. See the help menu for the
+list of optional GUI metrics. Alternatively, enable all of them using option
+`--gui-all`.
+
 Note, however, that the GUI increases the CPU utilization. Hence, if you are
-looking for a lightweight execution, consider running with the GUI off.
+looking for a lightweight execution, consider running without the GUI.
 
 ## Processing the MPEG Transport Stream
 
 The MPEG Transport Stream layer is beyond the scope of this project. For
 example, the DVB-S2 Rx application only aims to output the MPEG TS stream for an
-external application that accepts it via stdin, instead of handling the MPEG
-stream itself. Likewise, the Tx application takes a fully-formatted TS stream on
-its input and does not modify the TS stream at all.
+external application instead of handling the MPEG stream itself. Likewise, the
+Tx application takes a fully-formatted TS stream on its input and does not
+modify the TS stream at all.
 
 A recommended application to handle the MPEG TS layer is the `tsp` tool from the
 [TSDuck](https://tsduck.io) toolkit. The following example demonstrates how you
-can pipe the `dvbs2-rx` into `tsp`.
+can pipe the output from `dvbs2-rx` into `tsp`.
 
 **Example 8**:
 ```
@@ -168,13 +173,13 @@ Subsequently, the `mpe` plugin unpacks the UDP/IP packets within the MPE layer
 and forwards these packets towards the loopback interface with address
 `127.0.0.1`.
 
-Besides, this example uses noteworthy descriptor redirection options, which are
-meant to ensure only the MPEG TS output is fed into `tsp` and not the receiver
-logs. At first, the TS output is fed into descriptor 3 through option `-out-fd
-3`. However, descriptor three is later redirected to stdout through option
-`3>&1`. At the same time, the original stdout (where receiver logs are printed)
-is redirected to stderr using `1>&2`. In the end, only the TS output is piped
-into `tsp`, and the logs are preserved on the console (via stderr).
+Besides, this example uses noteworthy descriptor redirection options, which
+ensure only the MPEG TS output is fed into `tsp` and not the receiver logs. At
+first, the TS output is fed into descriptor 3 through option `-out-fd 3`.
+However, descriptor three is later redirected to stdout through option `3>&1`.
+At the same time, the original stdout (containing the receiver logs) goes to
+stderr using `1>&2`. In the end, only the TS output is piped into `tsp`, and the
+logs are preserved on the console via stderr.
 
 Lastly, another useful application from the TSDuck toolkit is the `tsdump` tool,
 which dumps all the incoming TS packets into the console in real-time. You can
@@ -199,7 +204,7 @@ metrics either through periodic logs printed to the console or on-demand via
 HTTP requests. In both cases, it returns the information in JSON format.
 
 The example below illustrates the case of a receiver launching a monitoring
-server (option `--mon-server`) for on-demand access via HTTP requests:
+server for on-demand access via HTTP requests:
 
 **Example 10:**
 ```
