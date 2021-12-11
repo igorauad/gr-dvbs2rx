@@ -400,7 +400,7 @@ void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
     /* Coarse frequency offset estimation
      *
      * The frequency synchronizer offers two coarse estimation options: based on the SOF
-     * only or based on the entire PLHEADER. The PLHEADER version requires the expected
+     * only and based on the entire PLHEADER. The PLHEADER version requires the expected
      * PLHEADER symbols, which, in turn, requires accurate decoding of the PLSC
      * beforehand. This is a chicken-and-egg situation, because an accurate coarse
      * frequency offset estimation is typically required to decode the PLSC well.
@@ -415,31 +415,52 @@ void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
      *   range (i.e., to enter the "coarse-corrected" state).
      *
      * - Once in coarse-corrected state, assume the PLSC decoding is now sufficiently
-     *   accurate and start estimating the coarse frequency offset based on the entire
-     *   PLHEADER. At this point, the PLHEADER phase should rotate by up to roughly 0.2
-     *   degrees in 90 symbols at maximum. Hence, the residual frequency offset should be
-     *   harmless as far as the PLSC decoding is concerned. Meanwhile, it's really
-     *   important to continue to estimate the coarse frequency offset well enough. If the
-     *   coarse estimate ever falls out of the fine estimation range, the synchronizer
-     *   will leave the coarse-corrected state, and it will need some time to recover this
-     *   state, which is highly undesirable. This is the main motivation for using the
-     *   full PLHEADER for the coarse estimation at this point. By using the full
-     *   PLHEADER, the estimates will be based on more data points, namely based on more
-     *   extensive averaging, which is helpful to avoid eventual noisy estimates that
-     *   could bring the synchronizer out of the coarse-corrected state.
+     *   accurate, such that it is possible to tell the true PLHEADER symbols on each
+     *   frame with good confidence. Hence, start estimating the coarse frequency offset
+     *   based on the entire PLHEADER. At this point, the PLHEADER phase should rotate by
+     *   no more than roughly 0.2 degrees in the course of 90 symbols. Hence, the residual
+     *   frequency offset should be harmless to the PLSC decoding.
      *
-     * Due to the above strategy, the coarse estimation is called either here, before the
-     * PLSC decoding, or later, after PLSC decoding. It's called right away if not
-     * coarse-corrected yet, in which case the coarse estimation is based on the SOF
-     * symbols only. The advantage of this choice is that the subsequent PLHEADER
-     * derotation can already benefit from the coarse estimate, if applicable (see the
-     * notes there). On the other hand, if already coarse-corrected, wait to call the
-     * coarse estimation only after PLSC decoding, as it's necessary to know the exact
-     * PLSC embedded on the incoming PLHEADER.
+     * This strategy determines whether or not to use the full PLHEADER for the
+     * estimation. The next question is when to execute the estimation, before or after
+     * the PLSC decoding. The order is important because the PLSC decoding step can use
+     * the frequency offset estimate to derotate the PLHEADER symbols before attempting to
+     * decode the underlying PLS code (see the open-loop operation there).
+     *
+     * Naturally, the coarse frequency offset estimation is called right away (before PLSC
+     * decoding) when based on the SOF symbols only. The advantage of this choice is that
+     * the subsequent PLSC decoding step can already benefit from the coarse frequency
+     * offset estimate when running in open loop (again, to derotate the PLHEADER). In
+     * contrast, the coarse estimation is called after PLSC decoding when based on the
+     * full PLHEADER, since it needs the PLSC information.
+     *
+     * Besides, when the PLSC decoder is disabled (i.e., when the PLSC is known a priori),
+     * the coarse frequency offset estimation can always use the full PLHEADER. In this
+     * case, even if the estimate is poor (e.g., before locking the frame timing), it does
+     * not compromise the PLSC decoding, since there is no decoding. Also, in this
+     * scenario, there is no question as to whether the estimation should be called before
+     * or after the PLSC decoding, because, again, there is no decoding.
+     *
+     * Finally, it's important to understand the motivation for using the full PLHEADER in
+     * the coarse frequency offset estimation. If it has the risk of corrupting the
+     * estimation due to an erroneously decoded PLSC, why bother about it? The reason is
+     * that it achieves significantly superior performance. By using the full PLHEADER,
+     * the estimates are based on more data points, namely more extensive averaging, which
+     * is helpful to avoid eventual noisy estimates. This is particularly useful because
+     * the coarse estimation continues even after entering the coarse-corrected state, as
+     * a way to periodically verify the residual frequency offset is low enough to be
+     * captured by the fine frequency offset estimator. In this process, it is crucial to
+     * avoid noisy coarse estimates that could bring the synchronizer out of the
+     * coarse-corrected state, as it takes long to recover this state (depending on the
+     * freq_sync.period parameter), and the receiver cannot operate reliably before that.
+     * Namely, a noisy estimate exceeding the fine estimation range would easily lead to
+     * the loss of a few frames until a better estimate is obtained.
      **/
     const bool was_coarse_corrected = frame_info.coarse_corrected; // last state
+    const bool est_coarse_with_full_plheader =
+        was_coarse_corrected || !d_plsc_decoder_enabled;
     bool new_coarse_est;
-    if (!was_coarse_corrected) {
+    if (!est_coarse_with_full_plheader) {
         new_coarse_est = d_freq_sync->estimate_coarse(p_plheader, false /* SOF only */);
         frame_info.coarse_corrected = d_freq_sync->is_coarse_corrected();
     }
@@ -467,10 +488,10 @@ void plsync_cc_impl::handle_plheader(uint64_t abs_sof_idx,
         frame_info.pls = d_ccm_sis_pls;
     }
 
-
     // As mentioned earlier, estimate the coarse frequency offset here (after the PLSC
-    // decoding) if the frequency synchronizer was already coarse-corrected before
-    if (was_coarse_corrected) {
+    // decoding) if the frequency synchronizer was already coarse-corrected before or if
+    // the PLSC decoder is disabled (when the PLS is known a priori).
+    if (est_coarse_with_full_plheader) {
         new_coarse_est = d_freq_sync->estimate_coarse(
             p_plheader, true /* full PLHEADER */, frame_info.pls.plsc);
         frame_info.coarse_corrected = d_freq_sync->is_coarse_corrected();

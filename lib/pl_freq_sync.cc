@@ -436,12 +436,14 @@ void freq_sync::derotate_plheader(const gr_complex* in, bool open_loop)
 
     /* Phase correction:
      *
-     * This function is designed to derotate a PLHEADER before the PLSC
-     * decoding, meaning that, at this point, the PLSC has not been decoded yet.
-     * Hence, our best bet is to estimate the phase based only on the SOF
-     * symbols, which are known a priori. Besides, note that we cannot simply
-     * rely on the MODCOD info of the previous frame, since VCM could be used
-     * and, as a result, the current frame may have a distinct MODCOD.
+     * This function is designed to derotate a PLHEADER before the PLSC decoding, meaning
+     * that, at this point, the PLSC has not been decoded yet. Hence, our best bet is to
+     * estimate the phase based only on the SOF symbols, which are known a priori.
+     * Besides, note that we cannot simply rely on the MODCOD info of the previous frame,
+     * since VCM could be used and, as a result, the current frame may have a distinct
+     * MODCOD. Also, when the PLSC is known a priori (when we are able to estimate the
+     * full PLHEADER phase), this function is not called at all, so it does not make sense
+     * to consider this scenario here.
      */
     const gr_complex* p_plheader = (open_loop) ? pp_plheader.data() : in;
     const float plheader_phase = estimate_sof_phase(p_plheader);
