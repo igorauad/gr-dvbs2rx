@@ -39,14 +39,14 @@
 
   - A handy tool to use in conjunction with this project's transmitter/receiver
     is the `tsp` tool provided by the [TSDuck](https://tsduck.io) toolkit. Refer
-    to more info in the [running section](docs/running.md).
+    to more info in the [usage section](usage.md).
 
 - The current receiver implementation supports signal-to-noise ratios (SNRs) as
   low as 2 dB in pilot mode. Lower SNRs are yet to be supported.
   - The current performance bottleneck lies in the PL synchronization
     algorithms.
-  - For example, the following configuration works (see the [usage
-    guide](usage.md)):
+  - For example, the following configuration works (see the
+    [usage guide](usage.md)):
 
 ```
 dvbs2-tx \
