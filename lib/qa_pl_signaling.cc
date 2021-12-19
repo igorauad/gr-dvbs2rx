@@ -46,7 +46,7 @@ BOOST_DATA_TEST_CASE(test_plsc_decode,
     // because "0 + scrambler = scrambler"). Add the last SOF symbol in the
     // beginning to allow for differential (non-coherent) decoding.
     std::vector<gr_complex> in_symbols(PLSC_LEN + 1);
-    in_symbols[0] = (-SQRT2_2 + SQRT2_2i);      // last SOF symbol
+    in_symbols[0] = {-SQRT2_2, + SQRT2_2};      // last SOF symbol
     gr_complex* p_plsc = in_symbols.data() + 1; // where the PLSC starts
     map_bpsk(plsc_scrambler, p_plsc, PLSC_LEN);
 
