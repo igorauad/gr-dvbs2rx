@@ -98,7 +98,7 @@ BOOST_DATA_TEST_CASE(test_cdeque_vs_ring_buffer_ccw, bdata::make({ 1, 10, 100 })
     cdeque<int> q(len, n_reps);
 
     // Ordinary ring buffer
-    int ring_buffer[len] = {};
+    std::vector<int> ring_buffer(len);
     unsigned int i_tail = 0;
     unsigned int i_head = len - 1;
 
@@ -126,7 +126,7 @@ BOOST_DATA_TEST_CASE(test_cdeque_vs_ring_buffer_cw, bdata::make({ 1, 10, 100 }),
     cdeque<int> q(len, n_reps);
 
     // Ordinary ring buffer
-    int ring_buffer[len] = {};
+    std::vector<int> ring_buffer(len);
     unsigned int i_tail = 0;
     unsigned int i_head = len - 1;
 
