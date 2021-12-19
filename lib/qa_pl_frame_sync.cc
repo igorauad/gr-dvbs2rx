@@ -61,7 +61,7 @@ BOOST_FIXTURE_TEST_CASE(test_sof_correlator_taps, F)
         // cross-correlator taps should have the conjugate of that:
         gr_complex conj_diff = mod_sof[i + 1] * conj(mod_sof[i]);
         // Round the real and imaginary parts to avoid rounding errors:
-        expected_taps[i] = round(real(conj_diff)) + 1j * round(imag(conj_diff));
+        expected_taps[i] = { round(real(conj_diff)), round(imag(conj_diff)) };
     }
     // Fold the sequence
     std::reverse(expected_taps.begin(), expected_taps.end());
@@ -89,7 +89,7 @@ BOOST_FIXTURE_TEST_CASE(test_plsc_correlator_taps, F)
         gr_complex conj_diff =
             mod_plsc_scrambler[(2 * i) + 1] * conj(mod_plsc_scrambler[2 * i]);
         // Round the real and imaginary parts to avoid rounding errors:
-        expected_taps[i] = round(real(conj_diff)) + 1j * round(imag(conj_diff));
+        expected_taps[i] = { round(real(conj_diff)), round(imag(conj_diff)) };
     }
     // Fold the sequence
     std::reverse(expected_taps.begin(), expected_taps.end());

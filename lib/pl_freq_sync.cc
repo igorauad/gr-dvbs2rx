@@ -85,8 +85,8 @@ freq_sync::freq_sync(unsigned int period, int debug_level)
 
     /* Initialize the complex conjugate of unmodulated pilots. This is used to
      * "remove" the modulation of pilot blocks. */
-    for (int i = 0; i < PILOT_BLK_LEN; i++)
-        unmod_pilots[i] = (+SQRT2_2 - SQRT2_2i);
+    for (auto& pilot : unmod_pilots)
+        pilot = { +SQRT2_2, -SQRT2_2 };
 }
 
 bool freq_sync::estimate_coarse(const gr_complex* in, bool full, uint8_t plsc)
