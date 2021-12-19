@@ -13,9 +13,8 @@
 
 #include "bch_decoder_bb_impl.h"
 #include <gnuradio/io_signature.h>
-#include <stdio.h>
+#include <gnuradio/logger.h>
 #include <functional>
-
 // BCH Code
 #define BCH_CODE_N8 0
 #define BCH_CODE_N10 1
@@ -460,13 +459,19 @@ int bch_decoder_bb_impl::general_work(int noutput_items,
             break;
         }
         if (corrections > 0) {
-            printf(
-                "frame = %lu, BCH decoder corrections = %d\n", d_frame_cnt, corrections);
+            GR_LOG_WARN(d_logger,
+                        (boost::format(
+                                       "frame = %lu, BCH decoder corrections = %d\n") %
+                         d_frame_cnt % corrections)
+                            .str());
         } else if (corrections == -1) {
             d_frame_error_cnt++;
-            printf("frame = %lu, BCH decoder too many bit errors (FER = %g)\n",
-                   d_frame_cnt,
-                   (double)d_frame_error_cnt / (d_frame_cnt + 1));
+            GR_LOG_WARN(
+                d_logger,
+                (boost::format(
+                     "frame = %lu, BCH decoder too many bit errors (FER = %g)\n") %
+                 d_frame_cnt % ((double)d_frame_error_cnt / (d_frame_cnt + 1)))
+                    .str());
         }
         d_frame_cnt++;
         for (unsigned int j = 0; j < kbch; j++) {
