@@ -13,9 +13,9 @@
 
 #include "ldpc_decoder_cb_impl.h"
 #include <gnuradio/io_signature.h>
-#include <stdio.h>
+#include <gnuradio/logger.h>
+#include <boost/format.hpp>
 #include <cmath>
-#include <iostream>
 
 constexpr int DVB_S2_TABLE_B1::DEG[];
 constexpr int DVB_S2_TABLE_B1::LEN[];
@@ -1225,16 +1225,16 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
         }
         if (count < 0) {
             total_trials += trials;
-            printf("frame = %d, snr = %.2f, trials = %d (max)\n",
-                   chunk * SIZEOF_SIMD,
-                   snr,
-                   trials);
+            GR_LOG_INFO(d_logger,
+                        (boost::format("frame = %d, snr = %.2f, trials = %d (max)\n") %
+                         (chunk * SIZEOF_SIMD) % snr % trials)
+                            .str());
         } else {
             total_trials += (trials - count);
-            printf("frame = %d, snr = %.2f, trials = %d\n",
-                   chunk * SIZEOF_SIMD,
-                   snr,
-                   trials - count);
+            GR_LOG_INFO(d_logger,
+                        (boost::format("frame = %d, snr = %.2f, trials = %d\n") %
+                         (chunk * SIZEOF_SIMD) % snr % (trials - count))
+                            .str());
         }
         chunk++;
         precision_sum = 0;
@@ -1372,12 +1372,12 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             precision_sum += FACTOR / (sigma * sigma);
             total_snr += snr;
             if (info_mode) {
-                printf("frame = %d, snr = %.2f, average trials = %d, average snr = "
-                       "%.2f\n",
-                       frame,
-                       snr,
-                       total_trials / chunk,
-                       total_snr / (frame + 1));
+                GR_LOG_INFO(d_logger,
+                            (boost::format("frame = %d, snr = %.2f, average trials = %d, "
+                                           "average snr = %.2f\n") %
+                             frame % snr % (total_trials / chunk) %
+                             (total_snr / (frame + 1)))
+                                .str());
             }
             insnr += frame_size / MOD_BITS;
             frame++;
