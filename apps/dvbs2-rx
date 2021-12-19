@@ -58,6 +58,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.multistream = options.multistream
         self.out_fd = options.out_fd
         self.out_file = options.out_file
+        self.out_stream = options.out_stream
         self.pilots = options.pilots
         self.pl_acm_vcm = options.pl_acm_vcm
         self.pl_freq_est_period = options.pl_freq_est_period
@@ -635,8 +636,12 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                                                  code_rate)
         bbdeheader = dvbs2rx.bbdeheader_bb(standard, frame_size, code_rate)
 
-        self.connect((ldpc_decoder, 0), (bch_decoder, 0), (bbdescrambler, 0),
-                     (bbdeheader, 0), (sink_block, 0))
+        self.connect((ldpc_decoder, 0), (bch_decoder, 0), (bbdescrambler, 0))
+
+        if (self.out_stream == "bb"):
+            self.connect((bbdescrambler, 0), (sink_block, 0))
+        else:
+            self.connect((bbdescrambler, 0), (bbdeheader, 0), (sink_block, 0))
 
         # Low layer (PHY)
 
@@ -1027,6 +1032,11 @@ def argument_parser():
     snk_group.add_argument("--out-file",
                            type=str,
                            help="Output file used if sink=file")
+    snk_group.add_argument("--out-stream",
+                           type=str,
+                           choices=["ts", "bb"],
+                           default="ts",
+                           help="Output stream: MPEG TS (\"ts\") or descrambled BBFRAMEs (\"bb\")")
 
     rtl_group = parser.add_argument_group('RTL-SDR Options')
     rtl_group.add_argument(
