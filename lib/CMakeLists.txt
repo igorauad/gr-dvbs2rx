@@ -34,7 +34,7 @@ if(NOT dvbs2rx_sources)
 endif(NOT dvbs2rx_sources)
 
 add_library(gnuradio-dvbs2rx SHARED ${dvbs2rx_sources})
-target_link_libraries(gnuradio-dvbs2rx gnuradio::gnuradio-runtime gnuradio-filter)
+target_link_libraries(gnuradio-dvbs2rx gnuradio::gnuradio-runtime gnuradio::gnuradio-filter)
 target_include_directories(gnuradio-dvbs2rx
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
     PUBLIC $<INSTALL_INTERFACE:include>
