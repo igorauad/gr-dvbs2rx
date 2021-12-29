@@ -68,11 +68,6 @@ private:
     unsigned int rowaddr0;
     unsigned int rowaddr1;
     unsigned int rowaddr2;
-    unsigned int rowaddr3;
-    unsigned int rowaddr4;
-    unsigned int rowaddr5;
-    unsigned int rowaddr6;
-    unsigned int rowaddr7;
     LDPCInterface* ldpc;
     Modulation<gr_complex, int8_t>* mod;
     LDPCDecoder<simd_type, algorithm_type> decode;

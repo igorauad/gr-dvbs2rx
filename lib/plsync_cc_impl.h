@@ -76,7 +76,6 @@ private:
      * flowgraph prior to the matched filter. This is so that this block
      * can control the external rotator phase properly */
     bool d_acm_vcm;                                      /**< ACM/VCM mode */
-    bool d_multistream;                                  /**< MIS mode */
     std::array<uint8_t, n_plsc_codewords> d_pls_enabled; /** PLSs to process */
     bool d_plsc_decoder_enabled; /**< Whether the PLSC decoder is enabled */
 
