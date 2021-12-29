@@ -459,19 +459,15 @@ int bch_decoder_bb_impl::general_work(int noutput_items,
             break;
         }
         if (corrections > 0) {
-            GR_LOG_WARN(d_logger,
-                        (boost::format(
-                                       "frame = %lu, BCH decoder corrections = %d\n") %
-                         d_frame_cnt % corrections)
-                            .str());
+            GR_LOG_INFO(d_logger,
+                        boost::format("frame = %lu, BCH decoder corrections = %d") %
+                            d_frame_cnt % corrections);
         } else if (corrections == -1) {
             d_frame_error_cnt++;
-            GR_LOG_WARN(
+            GR_LOG_INFO(
                 d_logger,
-                (boost::format(
-                     "frame = %lu, BCH decoder too many bit errors (FER = %g)\n") %
-                 d_frame_cnt % ((double)d_frame_error_cnt / (d_frame_cnt + 1)))
-                    .str());
+                boost::format("frame = %lu, BCH decoder too many bit errors (FER = %g)") %
+                    d_frame_cnt % ((double)d_frame_error_cnt / (d_frame_cnt + 1)));
         }
         d_frame_cnt++;
         for (unsigned int j = 0; j < kbch; j++) {
