@@ -120,6 +120,11 @@ find_package(Doxygen)
 ########################################################################
 
 find_package(pybind11 REQUIRED)
+if ((CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND
+    (PYBIND11_VERSION VERSION_LESS_EQUAL "2.4.3"))
+    add_definitions(-fsized-deallocation)
+endif()
+
 execute_process(
     COMMAND "${PYTHON_EXECUTABLE}" -c
     "try:\n import numpy\n import os\n inc_path = numpy.get_include()\n if os.path.exists(os.path.join(inc_path, 'numpy', 'arrayobject.h')):\n  print(inc_path, end='')\nexcept:\n pass"
