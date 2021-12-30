@@ -8,7 +8,6 @@
 
 import ctypes
 import json
-import logging
 import os
 import signal
 import sys
@@ -729,12 +728,12 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                     found = True
                     break
             if (not found):
-                logging.error("Failed to locate theme {}".format(theme))
+                gr.log.error("Failed to locate theme {}".format(theme))
                 return
             with open(filename) as ss:
                 self.setStyleSheet(ss.read())
         except Exception as e:
-            logging.error(e)
+            gr.log.error(str(e))
 
     def get_stats(self):
         """Get relevant statistics from the receiver blocks"""
@@ -792,7 +791,7 @@ class MonitoringServer(BaseHTTPRequestHandler):
     top_block = None  # trick to access the top block object
 
     def log_message(self, format, *args):
-        logging.info("%s - %s" % (self.address_string(), format % args))
+        gr.log.info("%s - %s" % (self.address_string(), format % args))
 
     def _set_headers(self):
         self.send_response(200)
@@ -818,7 +817,7 @@ def monitoring_server(top_block, port):
 def monitoring_loop(top_block, period=1):
     """Log the receiver stats dictionary periodically"""
     while (True):
-        logging.info(top_block.get_stats())
+        gr.log.info(str(top_block.get_stats()))
         time.sleep(period)
 
 
@@ -1085,11 +1084,7 @@ def argument_parser():
 def main():
     options = argument_parser()
 
-    logging.basicConfig(level=logging.INFO,
-                        filename=options.log_file,
-                        format='%(asctime)s %(levelname)-s %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-    logging.info("Starting DVB-S2 Rx")
+    gr.log.info("Starting DVB-S2 Rx")
 
     gui_mode = options.gui
     if (gui_mode):
@@ -1098,7 +1093,7 @@ def main():
                 x11 = ctypes.cdll.LoadLibrary('libX11.so')
                 x11.XInitThreads()
             except:
-                logging.warning("Warning: failed to XInitThreads()")
+                gr.log.warning("Warning: failed to XInitThreads()")
 
         if StrictVersion("4.5.0") <= StrictVersion(
                 Qt.qVersion()) < StrictVersion("5.0.0"):
@@ -1145,7 +1140,7 @@ def main():
         timer.timeout.connect(lambda: None)
         qapp.exec_()
 
-    logging.info("Stopping DVB-S2 Rx")
+    gr.log.info("Stopping DVB-S2 Rx")
 
 
 if __name__ == '__main__':
