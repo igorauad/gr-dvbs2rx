@@ -97,14 +97,14 @@ void map_plsc_codeword_to_bpsk(float* dest_ptr, uint64_t codeword)
 };
 
 plsc_decoder::plsc_decoder(int debug_level)
-    : d_debug_level(debug_level),
+    : pl_submodule("plsc_decoder", debug_level),
       d_reed_muller_decoder(&map_plsc_codeword_to_bpsk),
       d_soft_dec_buf(PLSC_LEN)
 {
 }
 
 plsc_decoder::plsc_decoder(std::vector<uint8_t>&& expected_pls, int debug_level)
-    : d_debug_level(debug_level),
+    : pl_submodule("plsc_decoder", debug_level),
       d_reed_muller_decoder(std::move(expected_pls), &map_plsc_codeword_to_bpsk),
       d_soft_dec_buf(PLSC_LEN)
 {
@@ -144,8 +144,8 @@ void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
         /* Descramble */
         uint64_t rx_plsc = rx_scrambled_plsc ^ plsc_scrambler;
 
-        if (d_debug_level > 4)
-            printf("%s: descrambled PLSC: 0x%016lX\n", __func__, rx_plsc);
+        GR_LOG_DEBUG_LEVEL(
+            5, d_logger, boost::format("Descrambled PLSC: 0x%016lX\n") % rx_plsc);
 
         /* Decode the descrambled hard decisions */
         d_plsc = d_reed_muller_decoder.decode(rx_plsc);
@@ -154,19 +154,16 @@ void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
     // Parse the PLSC
     d_pls_info.parse(d_plsc);
 
-
-    if (d_debug_level > 0) {
-        printf("Decoded PLSC: {MODCOD: %2u, Short FECFRAME: %1u, Pilots: %1u}\n",
-               d_pls_info.modcod,
-               d_pls_info.short_fecframe,
-               d_pls_info.has_pilots);
-    }
-    if (d_debug_level > 1) {
-        printf("Decoded PLSC: {n_mod: %1u, S: %3u, PLFRAME length: %u}\n",
-               d_pls_info.n_mod,
-               d_pls_info.n_slots,
-               d_pls_info.plframe_len);
-    }
+    GR_LOG_DEBUG_LEVEL(
+        1,
+        d_logger,
+        boost::format("Decoded PLSC: {MODCOD: %2u, Short FECFRAME: %1u, Pilots: %1u}") %
+            d_pls_info.modcod % d_pls_info.short_fecframe % d_pls_info.has_pilots);
+    GR_LOG_DEBUG_LEVEL(
+        2,
+        d_logger,
+        boost::format("Decoded PLSC: {n_mod: %1u, S: %3u, PLFRAME length: %u}") %
+            d_pls_info.n_mod % d_pls_info.n_slots % d_pls_info.plframe_len);
 }
 
 } // namespace dvbs2rx

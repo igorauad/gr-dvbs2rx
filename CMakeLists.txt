@@ -141,6 +141,15 @@ option(BENCHMARK "Enable benchmarking" OFF)
 message(STATUS "Benchmarking ${BENCHMARK}")
 
 ########################################################################
+# Other build options/definitions
+########################################################################
+option(DEBUG_LOGS "Enable low-level debug logs" ON)
+message(STATUS "Low-level debug logs ${DEBUG_LOGS}")
+if (DEBUG_LOGS)
+  add_definitions(-DDEBUG_LOGS)
+endif()
+
+########################################################################
 # Create uninstall target
 ########################################################################
 configure_file(

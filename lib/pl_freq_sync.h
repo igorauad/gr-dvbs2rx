@@ -10,6 +10,7 @@
 #ifndef INCLUDED_DVBS2RX_PL_FREQ_SYNC_H
 #define INCLUDED_DVBS2RX_PL_FREQ_SYNC_H
 
+#include "pl_submodule.h"
 #include <gnuradio/gr_complex.h>
 #include <dvbs2rx/api.h>
 #include <volk/volk_alloc.hh>
@@ -80,11 +81,10 @@ namespace dvbs2rx {
  * independently through the `get_coarse_foffset()` and `get_fine_foffset()` methods.
  *
  */
-class DVBS2RX_API freq_sync
+class DVBS2RX_API freq_sync : public pl_submodule
 {
 private:
     /* Parameters */
-    int debug_level;     /**< debug level */
     unsigned int period; /**< estimation periodicity in frames */
 
     /* Coarse frequency offset estimation state */

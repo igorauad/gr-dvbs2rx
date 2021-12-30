@@ -9,6 +9,7 @@
 
 #include "pl_frame_sync.h"
 #include "util.h"
+#include <boost/format.hpp>
 #include <algorithm>
 #include <cassert>
 
@@ -16,7 +17,7 @@ namespace gr {
 namespace dvbs2rx {
 
 frame_sync::frame_sync(int debug_level, uint8_t unlock_thresh)
-    : d_debug_level(debug_level),
+    : pl_submodule("frame_sync", debug_level),
       d_unlock_thresh(unlock_thresh),
       d_sym_cnt(0),
       d_last_in(0),
@@ -170,69 +171,57 @@ bool frame_sync::step(const gr_complex& in)
     const bool peak_expected = locked;
 
     /* Useful log separator */
-    if (d_debug_level > 1 && (is_peak || peak_expected)) {
-        printf("--\n");
-    }
+    GR_LOG_DEBUG_LEVEL_IF(2, (is_peak || peak_expected), d_logger, "--");
 
     /* State machine */
     if (is_peak) {
         if (d_state == frame_sync_state_t::searching) {
             d_state = frame_sync_state_t::found;
-            if (d_debug_level > 0) {
-                printf("Frame sync: PLFRAME found\n");
-            }
+            GR_LOG_DEBUG_LEVEL(1, d_logger, "PLFRAME found");
         } else if (d_state == frame_sync_state_t::found && d_sym_cnt == d_frame_len) {
             d_state = frame_sync_state_t::locked;
             d_lock_time = std::chrono::system_clock::now();
-            if (d_debug_level > 0) {
-                printf("Frame sync: PLFRAME lock acquired\n");
-            }
+            GR_LOG_DEBUG_LEVEL(1, d_logger, "PLFRAME lock acquired");
         }
         d_sof_interval = d_sym_cnt;
         d_unlock_cnt = 0; // reset the unlock count just in case it was non-zero
-        if (d_debug_level > 1) {
-            printf("Frame sync: {Peak after: %u, "
-                   "Timing Metric: %f, "
-                   "Locked: %u}\r\n",
-                   d_sof_interval,
-                   d_timing_metric,
-                   (d_state == frame_sync_state_t::locked));
-        }
+        GR_LOG_DEBUG_LEVEL(2,
+                           d_logger,
+                           boost::format("{Peak after: %u, "
+                                         "Timing Metric: %f, "
+                                         "Locked: %u}") %
+                               d_sof_interval % d_timing_metric %
+                               (d_state == frame_sync_state_t::locked));
     } else if (peak_expected) {
         // Unlock only if the timing metric fails to exceed the threshold for
         // `d_unlock_thresh` consecutive frames. It's important to avoid
         // unlocking prematurely when running under high noise.
         d_unlock_cnt++;
-        if (d_debug_level > 1) {
-            printf("Frame sync: Insufficient timing metric: %f (occurrence %u/%u)\n",
-                   d_timing_metric,
-                   d_unlock_cnt,
-                   d_unlock_thresh);
-        }
+        GR_LOG_DEBUG_LEVEL(
+            2,
+            d_logger,
+            boost::format("Insufficient timing metric: %f (occurrence %u/%u)") %
+                d_timing_metric % d_unlock_cnt % d_unlock_thresh);
+
         if (d_unlock_cnt == d_unlock_thresh) {
             d_state = frame_sync_state_t::searching;
             d_unlock_cnt = 0;
-            if (d_debug_level > 0) {
-                printf("Frame sync: PLFRAME lock lost\n");
-            }
+            GR_LOG_DEBUG_LEVEL(1, d_logger, "PLFRAME lock lost");
         }
     }
 
     /* Further debugging logs and symbol count reset */
     if (is_peak || peak_expected) {
-        if (d_debug_level > 2) {
-            printf("Frame sync: {Sym: %u, SOF: %+.1f %+.1fj, PLSC: %+.1f "
-                   "%+.1fj}\r\n",
-                   d_sym_cnt,
-                   sof_corr.real(),
-                   sof_corr.imag(),
-                   plsc_corr.real(),
-                   plsc_corr.imag());
-        }
+        GR_LOG_DEBUG_LEVEL(3,
+                           d_logger,
+                           boost::format("{Sym: %u, SOF: %+.1f %+.1fj, PLSC: %+.1f "
+                                         "%+.1fj}") %
+                               d_sym_cnt % sof_corr.real() % sof_corr.imag() %
+                               plsc_corr.real() % plsc_corr.imag());
         if (d_debug_level > 3) {
-            dump_complex_vec(d_sof_buf, "Frame sync: SOF buffer");
-            dump_complex_vec(d_plsc_e_buf, "Frame sync: PLSC even buffer");
-            dump_complex_vec(d_plsc_o_buf, "Frame sync: PLSC odd buffer");
+            dump_complex_vec(d_sof_buf, "SOF buffer");
+            dump_complex_vec(d_plsc_e_buf, "PLSC even buffer");
+            dump_complex_vec(d_plsc_o_buf, "PLSC odd buffer");
         }
         d_sym_cnt = 0; // prepare to index the data symbols
     }

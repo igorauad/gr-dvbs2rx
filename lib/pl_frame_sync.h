@@ -13,6 +13,7 @@
 #include "cdeque.h"
 #include "delay_line.h"
 #include "pl_defs.h"
+#include "pl_submodule.h"
 #include <gnuradio/gr_complex.h>
 #include <dvbs2rx/api.h>
 #include <chrono>
@@ -123,11 +124,10 @@ enum class frame_sync_state_t {
  * this point, it takes at least two more PLHEADERs to recover the lock, as the
  * state machine needs to go over the "found" and "locked" states again.
  */
-class DVBS2RX_API frame_sync
+class DVBS2RX_API frame_sync : public pl_submodule
 {
 private:
     /* Parameters */
-    int d_debug_level;       /**< Debug level */
     uint8_t d_unlock_thresh; /**< Number of frame detection failures before unlocking */
 
     /* State */

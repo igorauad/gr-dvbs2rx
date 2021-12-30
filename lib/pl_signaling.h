@@ -10,6 +10,7 @@
 #ifndef INCLUDED_DVBS2RX_PLSC_H
 #define INCLUDED_DVBS2RX_PLSC_H
 
+#include "pl_submodule.h"
 #include "reed_muller.h"
 #include <gnuradio/gr_complex.h>
 #include <dvbs2rx/api.h>
@@ -84,10 +85,9 @@ struct DVBS2RX_API pls_info_t {
  * PLS code. Implements the pi/2 BPSK demapping, the PLSC descrambling, and the
  * parsing of the PLSC information.
  */
-class DVBS2RX_API plsc_decoder
+class DVBS2RX_API plsc_decoder : public pl_submodule
 {
 private:
-    int d_debug_level;                  /**< Debug level */
     reed_muller d_reed_muller_decoder;  /**< Reed-Muller decoder */
     volk::vector<float> d_soft_dec_buf; /**< Soft decisions buffer */
     pls_info_t d_pls_info;              /**< PL signaling information */

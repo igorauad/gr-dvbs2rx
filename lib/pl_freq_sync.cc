@@ -14,13 +14,14 @@
 #include "util.h"
 #include <gnuradio/expj.h>
 #include <gnuradio/math.h>
+#include <boost/format.hpp>
 #include <cassert>
 
 namespace gr {
 namespace dvbs2rx {
 
 freq_sync::freq_sync(unsigned int period, int debug_level)
-    : debug_level(debug_level),
+    : pl_submodule("freq_sync", debug_level),
       period(period),
       coarse_foffset(0.0),
       i_frame(0),
@@ -186,18 +187,18 @@ bool freq_sync::estimate_coarse(const gr_complex* in, bool full, uint8_t plsc)
      * offset falls within the fine correction range */
     coarse_corrected = abs(coarse_foffset) < fine_foffset_corr_range;
 
-    if (debug_level > 1) {
-        printf("Frequency offset estimation:\n");
-        if (debug_level > 3) {
-            dump_complex_vec(in, N, "In Symbols");
-            dump_complex_vec(pilot_mod_rm, N, "Mod rm");
-            dump_complex_vec(pilot_corr, L + 1, "Autocorr");
-            dump_real_vec(angle_corr, L + 1, "Corr Angle");
-            dump_real_vec(angle_diff, L, "Angle diff");
-        }
-        printf("- Coarse frequency offset: %g\n", coarse_foffset);
-        printf("- Coarse corrected: %u\n", coarse_corrected);
+    GR_LOG_DEBUG_LEVEL(2, d_logger, "Frequency offset estimation:");
+    if (d_debug_level > 3) {
+        dump_complex_vec(in, N, "In Symbols");
+        dump_complex_vec(pilot_mod_rm, N, "Mod rm");
+        dump_complex_vec(pilot_corr, L + 1, "Autocorr");
+        dump_real_vec(angle_corr, L + 1, "Corr Angle");
+        dump_real_vec(angle_diff, L, "Angle diff");
     }
+    GR_LOG_DEBUG_LEVEL(
+        2, d_logger, boost::format("- Coarse frequency offset: %g") % coarse_foffset);
+    GR_LOG_DEBUG_LEVEL(
+        2, d_logger, boost::format("- Coarse corrected: %u") % coarse_corrected);
 
     /* Reset autocorrelation accumulator */
     std::fill(pilot_corr.begin(), pilot_corr.end(), 0);
@@ -256,7 +257,7 @@ float freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
         avg_phase += 2 * M_PI;
     /* TODO find a branchless way of computing this - maybe with fmod */
 
-    if (debug_level > 4) {
+    if (d_debug_level > 4) {
         std::string label = "Pilot block " + std::to_string(i_blk);
         dump_complex_vec(in, PILOT_BLK_LEN, label.c_str());
     }
@@ -311,10 +312,10 @@ void freq_sync::estimate_fine_pilot_mode(const gr_complex* p_plheader,
     fine_foffset = sum_diff / (2.0 * GR_M_PI * PILOT_BLK_PERIOD * n_pilot_blks);
     fine_est_ready = true;
 
-    if (debug_level > 1)
-        printf("- Fine frequency offset: %g\n", fine_foffset);
+    GR_LOG_DEBUG_LEVEL(
+        2, d_logger, boost::format("- Fine frequency offset: %g") % fine_foffset);
 
-    if (debug_level > 3) {
+    if (d_debug_level > 3) {
         dump_real_vec(angle_pilot.data(), n_pilot_blks + 1, "Pilot angles");
         dump_real_vec(angle_diff_f.data(), n_pilot_blks, "Pilot angle diff");
     }
@@ -361,8 +362,8 @@ bool freq_sync::estimate_fine_pilotless_mode(float curr_plheader_phase,
     fine_foffset = delta_phase / (2.0 * GR_M_PI * curr_plframe_len);
     fine_est_ready = true;
 
-    if (debug_level > 1)
-        printf("- Fine frequency offset: %g\n", fine_foffset);
+    GR_LOG_DEBUG_LEVEL(
+        2, d_logger, boost::format("- Fine frequency offset: %g") % fine_foffset);
 
     return true;
 }
@@ -448,8 +449,7 @@ void freq_sync::derotate_plheader(const gr_complex* in, bool open_loop)
     const gr_complex* p_plheader = (open_loop) ? pp_plheader.data() : in;
     const float plheader_phase = estimate_sof_phase(p_plheader);
 
-    if (debug_level > 2)
-        printf("PLHEADER phase: %g\n", plheader_phase);
+    GR_LOG_DEBUG_LEVEL(3, d_logger, boost::format("PLHEADER phase: %g") % plheader_phase);
 
     gr_complex phase_correction = gr_expj(-plheader_phase);
     volk_32fc_s32fc_multiply_32fc(

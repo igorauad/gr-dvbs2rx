@@ -274,21 +274,20 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
         d_closed_loop = true;
 
         if (abs(error) > tolerance) // sanity check
-            printf("Warning: rot_phase_inc tag offset error is too high: %d\n", error);
+            GR_LOG_WARN(d_logger,
+                        boost::format("rot_phase_inc tag offset error is too high: %d") %
+                            error);
 
-        if (d_debug_level > 2) {
-            printf("[Rotator ctrl] "
-                   "Phase inc tag: %f\t"
-                   "Offset: %lu\t"
-                   "Expected: %lu\t"
-                   "Error: %3d\t"
-                   "Delay: %3d\n",
-                   current_phase_inc,
-                   tags[j].offset,
-                   abs_sof_idx,
-                   error,
-                   d_rot_ctrl.tag_delay);
-        }
+        GR_LOG_DEBUG_LEVEL(3,
+                           d_logger,
+                           boost::format("[Rotator ctrl] "
+                                         "Phase inc tag: %f\t"
+                                         "Offset: %lu\t"
+                                         "Expected: %lu\t"
+                                         "Error: %3d\t"
+                                         "Delay: %3d") %
+                               current_phase_inc % tags[j].offset % abs_sof_idx % error %
+                               d_rot_ctrl.tag_delay);
     }
 }
 
@@ -354,19 +353,17 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     msg = pmt::dict_add(msg, offset_key, pmt::from_uint64(d_rot_ctrl.next.idx));
     message_port_pub(d_port_id, msg);
 
-    if (d_debug_level > 1) {
-        printf("- Cumulative frequency offset: %g \n", d_rot_ctrl.next.freq);
-    }
-
-    if (d_debug_level > 2) {
-        printf("[Rotator ctrl] "
-               "New phase inc: %f\t"
-               "Offset: %lu\t"
-               "Sample offset: %lu\n",
-               phase_inc,
-               abs_next_sof_idx,
-               d_rot_ctrl.next.idx);
-    }
+    GR_LOG_DEBUG_LEVEL(2,
+                       d_logger,
+                       boost::format("- Cumulative frequency offset: %g") %
+                           d_rot_ctrl.next.freq);
+    GR_LOG_DEBUG_LEVEL(3,
+                       d_logger,
+                       boost::format("[Rotator ctrl] "
+                                     "New phase inc: %f\t"
+                                     "Offset: %lu\t"
+                                     "Sample offset: %lu") %
+                           phase_inc % abs_next_sof_idx % d_rot_ctrl.next.idx);
 }
 
 void plframe_idx_t::step(uint16_t n_slots, bool has_pilots)
@@ -734,9 +731,10 @@ int plsync_cc_impl::general_work(int noutput_items,
                 // corresponding to the first SOF/PLHEADER symbol. Consider that
                 // the SOF detection happens at the last PLHEADER symbol.
                 const uint64_t abs_sof_idx = nitems_read(0) + i - 89;
-
-                if (d_debug_level > 1)
-                    printf("SOF count: %lu; Index: %lu\n", d_sof_cnt, abs_sof_idx);
+                GR_LOG_DEBUG_LEVEL(2,
+                                   d_logger,
+                                   boost::format("SOF count: %lu; Index: %lu") %
+                                       d_sof_cnt % abs_sof_idx);
 
                 // Cache some information from the last PLFRAME before handling the new
                 // PLHEADER. As soon as the PLHEADER is handled, the PLSC decoder will
@@ -792,8 +790,10 @@ int plsync_cc_impl::general_work(int noutput_items,
                 // useful to prevent wrong frame detection when it's known a priori that
                 // certain PLS values cannot be found in the input stream.
                 if (!d_pls_enabled[d_curr_frame_info.pls.plsc]) {
-                    if (d_debug_level > 1)
-                        printf("PLFRAME rejected (PLS=%u)\n", d_curr_frame_info.pls.plsc);
+                    GR_LOG_DEBUG_LEVEL(2,
+                                       d_logger,
+                                       boost::format("PLFRAME rejected (PLS=%u)") %
+                                           d_curr_frame_info.pls.plsc);
                     d_rejected_cnt++;
                     continue;
                 }
