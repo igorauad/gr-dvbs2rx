@@ -188,13 +188,6 @@ bool freq_sync::estimate_coarse(const gr_complex* in, bool full, uint8_t plsc)
     coarse_corrected = abs(coarse_foffset) < fine_foffset_corr_range;
 
     GR_LOG_DEBUG_LEVEL(2, d_logger, "Frequency offset estimation:");
-    if (d_debug_level > 3) {
-        dump_complex_vec(in, N, "In Symbols");
-        dump_complex_vec(pilot_mod_rm, N, "Mod rm");
-        dump_complex_vec(pilot_corr, L + 1, "Autocorr");
-        dump_real_vec(angle_corr, L + 1, "Corr Angle");
-        dump_real_vec(angle_diff, L, "Angle diff");
-    }
     GR_LOG_DEBUG_LEVEL(
         2, d_logger, boost::format("- Coarse frequency offset: %g") % coarse_foffset);
     GR_LOG_DEBUG_LEVEL(
@@ -257,11 +250,6 @@ float freq_sync::estimate_pilot_phase(const gr_complex* in, int i_blk)
         avg_phase += 2 * M_PI;
     /* TODO find a branchless way of computing this - maybe with fmod */
 
-    if (d_debug_level > 4) {
-        std::string label = "Pilot block " + std::to_string(i_blk);
-        dump_complex_vec(in, PILOT_BLK_LEN, label.c_str());
-    }
-
     return avg_phase;
 }
 
@@ -314,11 +302,6 @@ void freq_sync::estimate_fine_pilot_mode(const gr_complex* p_plheader,
 
     GR_LOG_DEBUG_LEVEL(
         2, d_logger, boost::format("Fine frequency offset: %g") % fine_foffset);
-
-    if (d_debug_level > 3) {
-        dump_real_vec(angle_pilot.data(), n_pilot_blks + 1, "Pilot angles");
-        dump_real_vec(angle_diff_f.data(), n_pilot_blks, "Pilot angle diff");
-    }
 }
 
 bool freq_sync::estimate_fine_pilotless_mode(float curr_plheader_phase,

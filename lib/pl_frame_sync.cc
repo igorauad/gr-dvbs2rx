@@ -221,11 +221,6 @@ bool frame_sync::step(const gr_complex& in)
                                          "%+.1fj") %
                                d_sym_cnt % sof_corr.real() % sof_corr.imag() %
                                plsc_corr.real() % plsc_corr.imag());
-        if (d_debug_level > 3) {
-            dump_complex_vec(d_sof_buf, "SOF buffer");
-            dump_complex_vec(d_plsc_e_buf, "PLSC even buffer");
-            dump_complex_vec(d_plsc_o_buf, "PLSC odd buffer");
-        }
         d_sym_cnt = 0; // prepare to index the data symbols
     }
 
