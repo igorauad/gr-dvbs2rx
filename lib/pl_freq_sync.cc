@@ -313,7 +313,7 @@ void freq_sync::estimate_fine_pilot_mode(const gr_complex* p_plheader,
     fine_est_ready = true;
 
     GR_LOG_DEBUG_LEVEL(
-        2, d_logger, boost::format("- Fine frequency offset: %g") % fine_foffset);
+        2, d_logger, boost::format("Fine frequency offset: %g") % fine_foffset);
 
     if (d_debug_level > 3) {
         dump_real_vec(angle_pilot.data(), n_pilot_blks + 1, "Pilot angles");

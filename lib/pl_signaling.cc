@@ -145,7 +145,7 @@ void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
         uint64_t rx_plsc = rx_scrambled_plsc ^ plsc_scrambler;
 
         GR_LOG_DEBUG_LEVEL(
-            5, d_logger, boost::format("Descrambled PLSC: 0x%016lX\n") % rx_plsc);
+            3, d_logger, boost::format("Descrambled PLSC: 0x%016lX\n") % rx_plsc);
 
         /* Decode the descrambled hard decisions */
         d_plsc = d_reed_muller_decoder.decode(rx_plsc);
@@ -154,16 +154,16 @@ void plsc_decoder::decode(const gr_complex* bpsk_in, bool coherent, bool soft)
     // Parse the PLSC
     d_pls_info.parse(d_plsc);
 
-    GR_LOG_DEBUG_LEVEL(
-        1,
-        d_logger,
-        boost::format("Decoded PLSC: {MODCOD: %2u, Short FECFRAME: %1u, Pilots: %1u}") %
-            d_pls_info.modcod % d_pls_info.short_fecframe % d_pls_info.has_pilots);
-    GR_LOG_DEBUG_LEVEL(
-        2,
-        d_logger,
-        boost::format("Decoded PLSC: {n_mod: %1u, S: %3u, PLFRAME length: %u}") %
-            d_pls_info.n_mod % d_pls_info.n_slots % d_pls_info.plframe_len);
+    GR_LOG_DEBUG_LEVEL(1,
+                       d_logger,
+                       boost::format("MODCOD: %2u; Short FECFRAME: %1u; Pilots: %1u") %
+                           static_cast<unsigned>(d_pls_info.modcod) %
+                           d_pls_info.short_fecframe % d_pls_info.has_pilots);
+    GR_LOG_DEBUG_LEVEL(2,
+                       d_logger,
+                       boost::format("n_mod: %1u; S: %3u; PLFRAME length: %u") %
+                           static_cast<unsigned>(d_pls_info.n_mod) % d_pls_info.n_slots %
+                           d_pls_info.plframe_len);
 }
 
 } // namespace dvbs2rx

@@ -171,7 +171,10 @@ bool frame_sync::step(const gr_complex& in)
     const bool peak_expected = locked;
 
     /* Useful log separator */
-    GR_LOG_DEBUG_LEVEL_IF(2, (is_peak || peak_expected), d_logger, "--");
+    GR_LOG_DEBUG_LEVEL_IF(2,
+                          (is_peak || peak_expected),
+                          d_logger,
+                          "--------------------------------------------------");
 
     /* State machine */
     if (is_peak) {
@@ -187,9 +190,9 @@ bool frame_sync::step(const gr_complex& in)
         d_unlock_cnt = 0; // reset the unlock count just in case it was non-zero
         GR_LOG_DEBUG_LEVEL(2,
                            d_logger,
-                           boost::format("{Peak after: %u, "
-                                         "Timing Metric: %f, "
-                                         "Locked: %u}") %
+                           boost::format("Peak after: %u; "
+                                         "Timing Metric: %f; "
+                                         "Locked: %u") %
                                d_sof_interval % d_timing_metric %
                                (d_state == frame_sync_state_t::locked));
     } else if (peak_expected) {
@@ -214,8 +217,8 @@ bool frame_sync::step(const gr_complex& in)
     if (is_peak || peak_expected) {
         GR_LOG_DEBUG_LEVEL(3,
                            d_logger,
-                           boost::format("{Sym: %u, SOF: %+.1f %+.1fj, PLSC: %+.1f "
-                                         "%+.1fj}") %
+                           boost::format("Sym: %u; SOF: %+.1f %+.1fj; PLSC: %+.1f "
+                                         "%+.1fj") %
                                d_sym_cnt % sof_corr.real() % sof_corr.imag() %
                                plsc_corr.real() % plsc_corr.imag());
         if (d_debug_level > 3) {

@@ -278,16 +278,12 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
                         boost::format("rot_phase_inc tag offset error is too high: %d") %
                             error);
 
-        GR_LOG_DEBUG_LEVEL(3,
-                           d_logger,
-                           boost::format("[Rotator ctrl] "
-                                         "Phase inc tag: %f\t"
-                                         "Offset: %lu\t"
-                                         "Expected: %lu\t"
-                                         "Error: %3d\t"
-                                         "Delay: %3d") %
-                               current_phase_inc % tags[j].offset % abs_sof_idx % error %
-                               d_rot_ctrl.tag_delay);
+        GR_LOG_DEBUG_LEVEL(
+            3,
+            d_logger,
+            boost::format("Rotator ctrl - Tagged Phase Inc: %f; Offset Error: %d; "
+                          "Delay: %d") %
+                current_phase_inc % error % d_rot_ctrl.tag_delay);
     }
 }
 
@@ -355,15 +351,13 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
 
     GR_LOG_DEBUG_LEVEL(2,
                        d_logger,
-                       boost::format("- Cumulative frequency offset: %g") %
+                       boost::format("Cumulative frequency offset: %g") %
                            d_rot_ctrl.next.freq);
-    GR_LOG_DEBUG_LEVEL(3,
-                       d_logger,
-                       boost::format("[Rotator ctrl] "
-                                     "New phase inc: %f\t"
-                                     "Offset: %lu\t"
-                                     "Sample offset: %lu") %
-                           phase_inc % abs_next_sof_idx % d_rot_ctrl.next.idx);
+    GR_LOG_DEBUG_LEVEL(
+        3,
+        d_logger,
+        boost::format("Rotator ctrl - Sent New Phase Inc: %f; Offset: %lu") % phase_inc %
+            abs_next_sof_idx);
 }
 
 void plframe_idx_t::step(uint16_t n_slots, bool has_pilots)
