@@ -16,6 +16,7 @@
 template <typename TYPE, typename ALG>
 class LDPCDecoder
 {
+    typedef typename TYPE::value_type code_type;
     TYPE *bnl, *pty;
     uint16_t* pos;
     uint8_t* cnc;
@@ -77,6 +78,24 @@ class LDPCDecoder
         }
     }
 
+    void serial_to_parallel(TYPE* data, code_type* code)
+    {
+        for (int n = 0; n < TYPE::SIZE; n++) {
+            for (int j = 0; j < N; j++) {
+                reinterpret_cast<code_type*>(data + j)[n] = code[(n * N) + j];
+            }
+        }
+    }
+
+    void parallel_to_serial(TYPE* data, code_type* code)
+    {
+        for (int n = 0; n < TYPE::SIZE; n++) {
+            for (int j = 0; j < N; j++) {
+                code[(n * N) + j] = reinterpret_cast<code_type*>(data + j)[n];
+            }
+        }
+    }
+
 public:
     LDPCDecoder() : initialized(false) {}
     void init(LDPCInterface* it)
@@ -121,8 +140,12 @@ public:
         delete[] pos;
         pos = tmp;
     }
-    int operator()(TYPE* data, TYPE* parity, int trials = 25, int blocks = 1)
+    int operator()(void* buffer, code_type* code, int trials = 25)
     {
+        const int blocks = TYPE::SIZE;
+        TYPE* data = reinterpret_cast<TYPE*>(buffer);
+        TYPE* parity = data + K;
+        serial_to_parallel(data, code);
         reset();
         for (int i = 0; i < q; ++i)
             for (int j = 0; j < M; ++j)
@@ -132,6 +155,7 @@ public:
         for (int i = 0; i < q; ++i)
             for (int j = 0; j < M; ++j)
                 parity[q * j + i] = pty[M * i + j];
+        parallel_to_serial(data, code);
         return trials;
     }
     ~LDPCDecoder()

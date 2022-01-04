@@ -19,7 +19,7 @@ RUN add-apt-repository -y ppa:blockstream/satellite && \
 ADD . /src/gr-dvbs2rx/
 RUN cd /src/gr-dvbs2rx/ && mkdir build && cd build && \
     cmake -DENABLE_DOXYGEN=OFF .. && \
-    cmake --build . && \
+    cmake --build . -j$(nproc) && \
     cmake --install . && \
     ldconfig && \
     cd ../../ && rm -r gr-dvbs2rx/

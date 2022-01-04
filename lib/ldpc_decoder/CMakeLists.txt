@@ -1,0 +1,21 @@
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(^arm)|(^aarch64)")
+  add_library(ldpc_decoder_neon STATIC ldpc_decoder_neon.cc)
+  if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(^aarch64)")
+    target_compile_options(ldpc_decoder_neon PRIVATE -mfpu=neon)
+  endif()
+  list(APPEND LDPC_LIBS ldpc_decoder_neon)
+endif()
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64|amd64)|(^i.86$)")
+  add_library(ldpc_decoder_avx2 STATIC ldpc_decoder_avx2.cc)
+  add_library(ldpc_decoder_sse41 STATIC ldpc_decoder_sse41.cc)
+  target_compile_options(ldpc_decoder_avx2 PRIVATE -mavx2)
+  target_compile_options(ldpc_decoder_sse41 PRIVATE -msse4.1)
+  list(APPEND LDPC_LIBS ldpc_decoder_avx2)
+  list(APPEND LDPC_LIBS ldpc_decoder_sse41)
+endif()
+
+add_library(ldpc_decoder_generic STATIC ldpc_decoder_generic.cc)
+list(APPEND LDPC_LIBS ldpc_decoder_generic)
+
+set(LDPC_LIBS ${LDPC_LIBS} PARENT_SCOPE)

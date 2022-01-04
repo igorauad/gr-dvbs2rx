@@ -6,6 +6,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+add_subdirectory(ldpc_decoder)
+
 ########################################################################
 # Setup library
 ########################################################################
@@ -34,14 +36,24 @@ if(NOT dvbs2rx_sources)
 endif(NOT dvbs2rx_sources)
 
 add_library(gnuradio-dvbs2rx SHARED ${dvbs2rx_sources})
-target_link_libraries(gnuradio-dvbs2rx gnuradio::gnuradio-runtime gnuradio::gnuradio-filter)
+target_link_libraries(gnuradio-dvbs2rx
+    PRIVATE ${LDPC_LIBS}
+    PRIVATE cpu_features
+    PUBLIC gnuradio::gnuradio-runtime
+    PUBLIC gnuradio::gnuradio-filter
+  )
 target_include_directories(gnuradio-dvbs2rx
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
     PUBLIC $<INSTALL_INTERFACE:include>
   )
 set_target_properties(gnuradio-dvbs2rx PROPERTIES DEFINE_SYMBOL "gnuradio_dvbs2rx_EXPORTS")
 
+option(NATIVE_OPTIMIZATIONS "Optimize build for the local machine" OFF)
+if (NATIVE_OPTIMIZATIONS)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall")
+else()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+endif()
 
 if(APPLE)
     set_target_properties(gnuradio-dvbs2rx PROPERTIES

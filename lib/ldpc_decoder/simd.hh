@@ -1183,7 +1183,7 @@ static inline SIMD<int64_t, WIDTH> vsign(SIMD<int64_t, WIDTH> a, SIMD<int64_t, W
 #endif
 #endif
 
-#ifdef __ARM_NEON__
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include "neon.hh"
 #endif
 

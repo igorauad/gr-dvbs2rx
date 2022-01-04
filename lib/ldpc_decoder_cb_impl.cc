@@ -11,11 +11,49 @@
 #include "config.h"
 #endif
 
+#include "cpu_features_macros.h"
 #include "ldpc_decoder_cb_impl.h"
 #include <gnuradio/io_signature.h>
 #include <gnuradio/logger.h>
 #include <boost/format.hpp>
 #include <cmath>
+
+#ifdef CPU_FEATURES_ARCH_ARM
+#include "cpuinfo_arm.h"
+using namespace cpu_features;
+static const ArmFeatures features = GetArmInfo().features;
+static const bool has_neon = features.neon;
+#endif
+
+#ifdef CPU_FEATURES_ARCH_AARCH64
+static const bool has_neon = true; // always available on aarch64
+#endif
+
+#ifdef CPU_FEATURES_ARCH_X86
+#include "cpuinfo_x86.h"
+using namespace cpu_features;
+static const X86Features features = GetX86Info().features;
+#endif
+
+namespace ldpc_neon {
+void ldpc_dec_init(LDPCInterface* it);
+int ldpc_dec_decode(void* buffer, int8_t* code, int trials);
+} // namespace ldpc_neon
+
+namespace ldpc_avx2 {
+void ldpc_dec_init(LDPCInterface* it);
+int ldpc_dec_decode(void* buffer, int8_t* code, int trials);
+} // namespace ldpc_avx2
+
+namespace ldpc_sse41 {
+void ldpc_dec_init(LDPCInterface* it);
+int ldpc_dec_decode(void* buffer, int8_t* code, int trials);
+} // namespace ldpc_sse41
+
+namespace ldpc_generic {
+void ldpc_dec_init(LDPCInterface* it);
+int ldpc_dec_decode(void* buffer, int8_t* code, int trials);
+} // namespace ldpc_generic
 
 constexpr int DVB_S2_TABLE_B1::DEG[];
 constexpr int DVB_S2_TABLE_B1::LEN[];
@@ -607,19 +645,55 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     dvb_standard = standard;
     output_mode = outputmode;
     info_mode = infomode;
-    soft = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
-    dint = new int8_t[ldpc->code_len() * SIZEOF_SIMD];
+
+    decode = nullptr;
+    std::string impl = "generic";
+#ifdef CPU_FEATURES_ARCH_ANY_ARM
+    d_simd_size = 16;
+    if (has_neon) {
+        ldpc_neon::ldpc_dec_init(ldpc);
+        decode = &ldpc_neon::ldpc_dec_decode;
+        impl = "neon";
+    } else {
+        ldpc_generic::ldpc_dec_init(ldpc);
+        decode = &ldpc_generic::ldpc_dec_decode;
+    }
+#else
+#ifdef CPU_FEATURES_ARCH_X86
+    d_simd_size = features.avx2 ? 32 : 16;
+    if (features.avx2) {
+        ldpc_avx2::ldpc_dec_init(ldpc);
+        decode = &ldpc_avx2::ldpc_dec_decode;
+        impl = "avx2";
+    } else if (features.sse4_1) {
+        ldpc_sse41::ldpc_dec_init(ldpc);
+        decode = &ldpc_sse41::ldpc_dec_decode;
+        impl = "sse4_1";
+    } else {
+        ldpc_generic::ldpc_dec_init(ldpc);
+        decode = &ldpc_generic::ldpc_dec_decode;
+    }
+#else
+    // Not ARM, nor x86. Use generic implementation.
+    d_simd_size = 16;
+    ldpc_generic::ldpc_dec_init(ldpc);
+    decode = &ldpc_generic::ldpc_dec_decode;
+#endif
+#endif
+    assert(decoder != nullptr);
+    GR_LOG_DEBUG(d_debug_logger, boost::format("LDPC decoder implementation: %s") % impl);
+
+    soft = new int8_t[ldpc->code_len() * d_simd_size];
+    dint = new int8_t[ldpc->code_len() * d_simd_size];
     tempu = new int8_t[ldpc->code_len()];
     tempv = new int8_t[ldpc->code_len()];
-    aligned_buffer =
-        aligned_alloc(sizeof(simd_type), sizeof(simd_type) * ldpc->code_len());
-    decode.init(ldpc);
+    aligned_buffer = aligned_alloc(d_simd_size, d_simd_size * ldpc->code_len());
     generate_interleave_lookup();
     generate_deinterleave_lookup();
     if (outputmode == OM_MESSAGE) {
-        set_output_multiple(nbch * SIZEOF_SIMD);
+        set_output_multiple(nbch * d_simd_size);
     } else {
-        set_output_multiple(frame_size * SIZEOF_SIMD);
+        set_output_multiple(frame_size * d_simd_size);
     }
 }
 
@@ -986,6 +1060,9 @@ void ldpc_decoder_cb_impl::forecast(int noutput_items,
     }
 }
 
+const int DEFAULT_TRIALS = 25;
+#define FACTOR 2 // same factor used on the decoder implementation
+
 int ldpc_decoder_cb_impl::general_work(int noutput_items,
                                        gr_vector_int& ninput_items,
                                        gr_vector_const_void_star& input_items,
@@ -995,11 +1072,9 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
     const gr_complex* insnr = (const gr_complex*)input_items[0];
     unsigned char* out = (unsigned char*)output_items[0];
     const int CODE_LEN = ldpc->code_len();
-    const int DATA_LEN = ldpc->data_len();
     const int MOD_BITS = mod->bits();
-    simd_type* simd = reinterpret_cast<simd_type*>(aligned_buffer);
     int8_t tmp[MOD_BITS];
-    int8_t* code;
+    int8_t* code = nullptr;
     float sp, np, sigma, precision_sum;
     gr_complex s, e;
     const int SYMBOLS = CODE_LEN / MOD_BITS;
@@ -1010,8 +1085,8 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
     int8_t *c1, *c2, *c3;
     int output_size = output_mode ? nbch : frame_size;
 
-    for (int i = 0; i < noutput_items; i += output_size * SIZEOF_SIMD) {
-        for (int blk = 0; blk < SIZEOF_SIMD; blk++) {
+    for (int i = 0; i < noutput_items; i += output_size * d_simd_size) {
+        for (int blk = 0; blk < d_simd_size; blk++) {
             if (frame == 0) {
                 sp = 0;
                 np = 0;
@@ -1212,31 +1287,21 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             in += frame_size / MOD_BITS;
             consumed += frame_size / MOD_BITS;
         }
-        for (int n = 0; n < SIZEOF_SIMD; n++) {
-            for (int j = 0; j < CODE_LEN; j++) {
-                reinterpret_cast<code_type*>(simd + j)[n] = code[(n * CODE_LEN) + j];
-            }
-        }
-        int count = decode(simd, simd + DATA_LEN, trials, SIZEOF_SIMD);
-        for (int n = 0; n < SIZEOF_SIMD; n++) {
-            for (int j = 0; j < CODE_LEN; j++) {
-                code[(n * CODE_LEN) + j] = reinterpret_cast<code_type*>(simd + j)[n];
-            }
-        }
+        int count = decode(aligned_buffer, code, trials);
         if (count < 0) {
             total_trials += trials;
             GR_LOG_INFO(d_logger,
                         boost::format("frame = %d, snr = %.2f, trials = %d (max)") %
-                            (chunk * SIZEOF_SIMD) % snr % trials);
+                            (chunk * d_simd_size) % snr % trials);
         } else {
             total_trials += (trials - count);
             GR_LOG_INFO(d_logger,
                         boost::format("frame = %d, snr = %.2f, trials = %d") %
-                            (chunk * SIZEOF_SIMD) % snr % (trials - count));
+                            (chunk * d_simd_size) % snr % (trials - count));
         }
         chunk++;
         precision_sum = 0;
-        for (int blk = 0; blk < SIZEOF_SIMD; blk++) {
+        for (int blk = 0; blk < d_simd_size; blk++) {
             switch (signal_constellation) {
             case MOD_QPSK:
                 for (int j = 0; j < CODE_LEN; j++) {
@@ -1379,8 +1444,8 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             insnr += frame_size / MOD_BITS;
             frame++;
         }
-        precision = precision_sum / SIZEOF_SIMD;
-        for (int blk = 0; blk < SIZEOF_SIMD; blk++) {
+        precision = precision_sum / d_simd_size;
+        for (int blk = 0; blk < d_simd_size; blk++) {
             for (int j = 0; j < output_size; j++) {
                 if (code[j + (blk * CODE_LEN)] >= 0) {
                     *out++ = 0;

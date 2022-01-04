@@ -8,7 +8,7 @@ will be provided in the future.
 
 To build from source, run:
 ```
-git clone https://github.com/igorauad/gr-dvbs2rx.git
+git clone --recursive https://github.com/igorauad/gr-dvbs2rx.git
 cd gr-dvbs2rx/
 mkdir build
 cd build

@@ -169,6 +169,8 @@ add_custom_target(uninstall
 ########################################################################
 # Add subdirectories
 ########################################################################
+SET(BUILD_TESTING OFF CACHE BOOL "Build libcpu_features without tests")
+add_subdirectory(cpu_features EXCLUDE_FROM_ALL)
 add_subdirectory(include/dvbs2rx)
 add_subdirectory(lib)
 add_subdirectory(apps)

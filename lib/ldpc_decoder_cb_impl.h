@@ -10,39 +10,14 @@
 #ifndef INCLUDED_DVBS2RX_LDPC_DECODER_CB_IMPL_H
 #define INCLUDED_DVBS2RX_LDPC_DECODER_CB_IMPL_H
 
-#include "algorithms.hh"
 #include "dvb_defines.h"
 #include "dvb_s2_tables.hh"
 #include "dvb_s2x_tables.hh"
 #include "dvb_t2_tables.hh"
-#include "ldpc.hh"
+#include "ldpc_decoder/ldpc.hh"
 #include "psk.hh"
 #include "qam.hh"
 #include <dvbs2rx/ldpc_decoder_cb.h>
-
-#define FACTOR 2
-
-#ifdef __AVX2__
-const int SIZEOF_SIMD = 32;
-#else
-const int SIZEOF_SIMD = 16;
-#endif
-
-typedef int8_t code_type;
-const int SIMD_WIDTH = SIZEOF_SIMD / sizeof(code_type);
-typedef SIMD<code_type, SIMD_WIDTH> simd_type;
-
-#if 0
-#include "flooding_decoder.hh"
-typedef SelfCorrectedUpdate<simd_type> update_type;
-typedef MinSumAlgorithm<simd_type, update_type> algorithm_type;
-const int DEFAULT_TRIALS = 50;
-#else
-#include "layered_decoder.hh"
-typedef NormalUpdate<simd_type> update_type;
-typedef OffsetMinSumAlgorithm<simd_type, update_type, FACTOR> algorithm_type;
-const int DEFAULT_TRIALS = 25;
-#endif
 
 namespace gr {
 namespace dvbs2rx {
@@ -70,12 +45,13 @@ private:
     unsigned int rowaddr2;
     LDPCInterface* ldpc;
     Modulation<gr_complex, int8_t>* mod;
-    LDPCDecoder<simd_type, algorithm_type> decode;
+    int d_simd_size;
     int8_t* soft;
     int8_t* dint;
     int8_t* tempu;
     int8_t* tempv;
     void* aligned_buffer;
+    int (*decode)(void*, int8_t*, int);
 
     int interleave_lookup_table[FRAME_SIZE_NORMAL];
     int deinterleave_lookup_table[FRAME_SIZE_NORMAL];

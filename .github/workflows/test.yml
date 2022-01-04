@@ -12,6 +12,8 @@ jobs:
       image: igorfreire/gnuradio-oot-dev:3.9.4-ubuntu-focal
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
     - name: Install dependencies
       run: apt update && apt install -y libsndfile1-dev
     - name: Configure CMake
