@@ -4,7 +4,7 @@
 # * The CPU benchmarking requires https://github.com/google/benchmark
 # * The BER benchmarking requires https://github.com/aff3ct/aff3ct
 # ##############################################################################
-option(BENCHMARK_CPU "Enable CPU benchmarking" ON)
+option(BENCHMARK_CPU "Enable CPU benchmarking" OFF)
 if(BENCHMARK_CPU)
   find_package(benchmark REQUIRED)
   if(NOT benchmark_FOUND)
@@ -15,7 +15,7 @@ if(BENCHMARK_CPU)
   add_subdirectory(cpu)
 endif(BENCHMARK_CPU)
 
-option(BENCHMARK_BER "Enable BER benchmarking" ON)
+option(BENCHMARK_BER "Enable BER benchmarking" OFF)
 if(BENCHMARK_BER)
   find_package(AFF3CT CONFIG 2.3.2)
   if(NOT AFF3CT_FOUND)

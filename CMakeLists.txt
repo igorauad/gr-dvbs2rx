@@ -140,12 +140,6 @@ else(DOXYGEN_FOUND)
 endif(DOXYGEN_FOUND)
 
 ########################################################################
-# Setup benchmarking
-########################################################################
-option(BENCHMARK "Enable benchmarking" OFF)
-message(STATUS "Benchmarking ${BENCHMARK}")
-
-########################################################################
 # Other build options/definitions
 ########################################################################
 option(DEBUG_LOGS "Enable low-level debug logs" ON)
@@ -177,9 +171,7 @@ add_subdirectory(apps)
 add_subdirectory(docs)
 add_subdirectory(python)
 add_subdirectory(grc)
-if(BENCHMARK)
-  add_subdirectory(bench)
-endif(BENCHMARK)
+add_subdirectory(bench)
 
 ########################################################################
 # Install cmake search helper for this library
