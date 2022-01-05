@@ -15,13 +15,13 @@ if(BENCHMARK_CPU)
   add_subdirectory(cpu)
 endif(BENCHMARK_CPU)
 
-option(BENCHMARK_BER "Enable BER benchmarking" OFF)
-if(BENCHMARK_BER)
+option(BENCHMARK_FEC "Enable FEC benchmarking" OFF)
+if(BENCHMARK_FEC)
   find_package(AFF3CT CONFIG 2.3.2)
   if(NOT AFF3CT_FOUND)
     message(
       FATAL_ERROR
-        "Could not find libaff3ct. Install it or set -DBENCHMARK_BER=OFF")
+        "Could not find libaff3ct. Install it or set -DBENCHMARK_FEC=OFF")
   endif(NOT AFF3CT_FOUND)
-  add_subdirectory(ber)
-endif(BENCHMARK_BER)
+  add_subdirectory(fec)
+endif(BENCHMARK_FEC)

@@ -49,12 +49,11 @@ options:
   relative to the build directory. This feature requires the [libbenchmark
   library](https://github.com/google/benchmark).
 
-- `BENCHMARK_BER`: when set to `ON`, builds an application to assess the bit
-  error rate (BER) performance of various forward error correction (FEC)
-  configurations. The current implementation focuses on the PLSC decoder and
-  yields the `bench_plsc` application at the `bench/ber/` subdirectory of the
-  build directory. This option requires the [aff3ct
-  library](http://aff3ct.github.io).
+- `BENCHMARK_FEC`: when set to `ON`, builds an application to assess the
+  performance of various forward error correction (FEC) configurations. The
+  current implementation focuses on the PLSC decoder and yields the `bench_plsc`
+  application at the `bench/fec/` subdirectory of the build directory. This
+  option requires the [aff3ct library](http://aff3ct.github.io) (version 2.3.5).
 
 - `DEBUG_LOGS`: when set to OFF, disables the low-level logs available by
   default to debug the physical layer operation.

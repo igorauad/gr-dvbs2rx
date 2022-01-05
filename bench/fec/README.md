@@ -3,7 +3,7 @@
 ## Hard Decoding
 
 ```
-bench/ber/bench_plsc --hard --fe 10000000
+bench/fec/bench_plsc --hard --fe 10000000
 ```
 
 ```
@@ -49,7 +49,7 @@ bench/ber/bench_plsc --hard --fe 10000000
 ## Soft Decoding
 
 ```
-bench/ber/bench_plsc --fe 10000000
+bench/fec/bench_plsc --fe 10000000
 ```
 
 ```
