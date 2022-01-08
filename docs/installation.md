@@ -53,7 +53,8 @@ options:
   performance of various forward error correction (FEC) configurations. The
   current implementation focuses on the PLSC decoder and yields the `bench_plsc`
   application at the `bench/fec/` subdirectory of the build directory. This
-  option requires the [aff3ct library](http://aff3ct.github.io) (version 2.3.5).
+  option requires the [aff3ct library](http://aff3ct.github.io) (version 3.0.0
+  or later).
 
 - `DEBUG_LOGS`: when set to OFF, disables the low-level logs available by
   default to debug the physical layer operation.
