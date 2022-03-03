@@ -3,9 +3,12 @@ set(CMAKE_THREAD_PREFER_PTHREAD ON)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-# PLSC BER benchmarking using the AFF3CT library
-add_executable(bench_plsc ${CMAKE_CURRENT_SOURCE_DIR}/src/bench_plsc.cc)
-target_link_libraries(bench_plsc PRIVATE aff3ct::aff3ct-static-lib
-                                         boost_program_options gnuradio-dvbs2rx)
-target_include_directories(
-  bench_plsc PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../lib>)
+list(APPEND bench_apps bench_plsc bench_bch)
+
+foreach(app IN LISTS bench_apps)
+  add_executable(${app} ${CMAKE_CURRENT_SOURCE_DIR}/src/${app}.cc)
+  target_link_libraries(${app} PRIVATE aff3ct::aff3ct-static-lib
+                                       boost_program_options gnuradio-dvbs2rx)
+  target_include_directories(
+    ${app} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../lib>)
+endforeach(app IN LISTS bench_apps)
