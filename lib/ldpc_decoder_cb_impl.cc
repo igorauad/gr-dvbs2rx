@@ -680,7 +680,7 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     decode = &ldpc_generic::ldpc_dec_decode;
 #endif
 #endif
-    assert(decoder != nullptr);
+    assert(decode != nullptr);
     GR_LOG_DEBUG(d_debug_logger, boost::format("LDPC decoder implementation: %s") % impl);
 
     soft = new int8_t[ldpc->code_len() * d_simd_size];
