@@ -10,14 +10,16 @@ RUN git clone https://github.com/osmocom/gr-osmosdr && \
     cd gr-osmosdr/ && \
     mkdir build && cd build && \
     cmake -DENABLE_DOXYGEN=OFF .. && \
-    cmake --build . && \
+    cmake --build . -j$(nproc) && \
     cmake --install . && \
     ldconfig && \
     cd ../../ && rm -r gr-osmosdr/
 RUN add-apt-repository -y ppa:blockstream/satellite && \
     apt install -y tsduck
 ADD . /src/gr-dvbs2rx/
-RUN cd /src/gr-dvbs2rx/ && mkdir build && cd build && \
+RUN cd /src/gr-dvbs2rx/ && \
+    git clone https://github.com/google/cpu_features.git && \
+    mkdir build && cd build && \
     cmake -DENABLE_DOXYGEN=OFF .. && \
     cmake --build . -j$(nproc) && \
     cmake --install . && \

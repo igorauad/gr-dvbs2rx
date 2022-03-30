@@ -5,3 +5,4 @@ __pycache__/
 TAGS
 apps/*.py
 examples/*.py
+cpu_features/
