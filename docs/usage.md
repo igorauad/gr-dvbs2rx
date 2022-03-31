@@ -27,7 +27,8 @@ directly into its standard output (stdout). Finally, the Rx output goes to the
 null device.
 
 > NOTE: If you don't have an MPEG TS file to test, you can download an [example
-> TS file](http://www.w6rz.net/thefuryclip.ts).
+> TS file](http://www.w6rz.net/thefuryclip.ts). Alternatively, you can use a
+> transport stream generator (see Example 10).
 
 The Tx and Rx applications offer flexible source and sink options, which can be
 modified using the `--source` and `--sink` command-line switches. For example,
@@ -173,17 +174,17 @@ Subsequently, the `mpe` plugin unpacks the UDP/IP packets within the MPE layer
 and forwards these packets towards the loopback interface with address
 `127.0.0.1`.
 
-Besides, this example uses noteworthy descriptor redirection options, which
-ensure only the MPEG TS output is fed into `tsp` and not the receiver logs. At
-first, the TS output is fed into descriptor 3 through option `-out-fd 3`.
-However, descriptor three is later redirected to stdout through option `3>&1`.
-At the same time, the original stdout (containing the receiver logs) goes to
-stderr using `1>&2`. In the end, only the TS output is piped into `tsp`, and the
-logs are preserved on the console via stderr.
+This example uses noteworthy descriptor redirection options, which ensure only
+the MPEG TS output is fed into `tsp` and not the receiver logs. At first, the TS
+output is fed into descriptor 3 through option `-out-fd 3`. However, descriptor
+three is later redirected to stdout through option `3>&1`. At the same time, the
+original stdout (containing the receiver logs) goes to stderr using `1>&2`. In
+the end, only the TS output is piped into `tsp`, and the logs are preserved on
+the console via stderr.
 
-Lastly, another useful application from the TSDuck toolkit is the `tsdump` tool,
-which dumps all the incoming TS packets into the console in real-time. You can
-use it as follows:
+Another useful application from the TSDuck toolkit is the `tsdump` tool, which
+dumps all the incoming TS packets into the console in real-time. You can use it
+as follows:
 
 **Example 9**:
 ```
@@ -192,6 +193,14 @@ cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsdump --no-pager --
 
 Please refer to TSDuck's [user
 guide](https://tsduck.io/download/docs/tsduck.pdf) for further information.
+
+Lastly, note you can use the `tsp` application's `craft` plugin to generate a
+fake MPEG transport stream on the input to the `dvbs2-tx` app, as follows:
+
+**Example 10**:
+```
+tsp -I craft --pid 100 | dvbs2-tx | dvbs2-rx --sink file --out-file /dev/null
+```
 
 ## Receiver Monitoring
 
@@ -206,7 +215,7 @@ HTTP requests. In both cases, it returns the information in JSON format.
 The example below illustrates the case of a receiver launching a monitoring
 server for on-demand access via HTTP requests:
 
-**Example 10:**
+**Example 11:**
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --mon-server
 ```
@@ -222,7 +231,7 @@ curl -s http://localhost:9004 | python3 -m json.tool
 Alternatively, you may want to print the performance metrics continuously to the
 console. To do so, run with option `--log-stats`, as follows:
 
-**Example 11:**
+**Example 12:**
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --log-stats
 ```
