@@ -250,7 +250,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    amp: 'sqrt(N0 / sps) '
+    amp: 'sqrt(N0 * sps) '
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -656,7 +656,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     samp_delay: '0'
-    taps: firdes.root_raised_cosine(1.0, samp_rate, sym_rate, rolloff, n_rrc_taps)
+    taps: firdes.root_raised_cosine(sps, samp_rate, sym_rate, rolloff, n_rrc_taps)
     type: ccf
   states:
     bus_sink: false

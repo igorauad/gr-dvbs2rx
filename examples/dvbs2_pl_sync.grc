@@ -41,7 +41,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [768, 236.0]
+    coordinate: [784, 236.0]
     rotation: 0
     state: enabled
 - name: EsN0
@@ -53,7 +53,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [696, 236.0]
+    coordinate: [712, 236.0]
     rotation: 0
     state: enabled
 - name: N0
@@ -65,7 +65,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [840, 236.0]
+    coordinate: [856, 236.0]
     rotation: 0
     state: enabled
 - name: freq_offset
@@ -98,7 +98,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [608, 236.0]
+    coordinate: [624, 236.0]
     rotation: 0
     state: enabled
 - name: pilot_len
@@ -110,7 +110,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [424, 236.0]
+    coordinate: [440, 236.0]
     rotation: 0
     state: true
 - name: plframe_len
@@ -122,7 +122,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [328, 236.0]
+    coordinate: [336, 236.0]
     rotation: 0
     state: true
 - name: plheader_len
@@ -134,7 +134,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [504, 236.0]
+    coordinate: [520, 236.0]
     rotation: 0
     state: true
 - name: samp_rate
@@ -270,7 +270,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    amp: sqrt(N0)
+    amp: sqrt(N0 * sps)
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -617,7 +617,7 @@ blocks:
     minoutbuf: '0'
     nthreads: '1'
     samp_delay: '0'
-    taps: firdes.root_raised_cosine(1.0, samp_rate, sym_rate, rolloff, n_rrc_taps)
+    taps: firdes.root_raised_cosine(sps, samp_rate, sym_rate, rolloff, n_rrc_taps)
     type: ccc
   states:
     bus_sink: false
@@ -855,7 +855,7 @@ blocks:
     alpha7: '1.0'
     alpha8: '1.0'
     alpha9: '1.0'
-    autoscale: 'False'
+    autoscale: 'True'
     average: '0.05'
     axislabels: 'True'
     bw: samp_rate

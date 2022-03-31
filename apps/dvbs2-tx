@@ -60,7 +60,6 @@ class dvbs2_tx(gr.top_block):
         code_rate = self.modcod.upper().replace("8PSK", "").replace("QPSK", "")
         self.code_rate = code_rate
         self.samp_rate = self.sym_rate * self.sps
-        self.n_rrc_taps = int(2 * self.rrc_delay * self.sps) + 1
         self.constellation = self.modcod.replace(code_rate, "")
 
         ##################################################
@@ -147,7 +146,7 @@ class dvbs2_tx(gr.top_block):
             EsN0 = 10**(EsN0_db / 10)
             N0 = Es / EsN0
             noise_source = analog.noise_source_c(analog.GR_GAUSSIAN,
-                                                 sqrt(N0 / self.sps), 0)
+                                                 sqrt(N0 * self.sps), 0)
             add_block = blocks.add_vcc(1)
             self.connect((noise_source, 0), (add_block, 1))
             self.connect((add_block, 0), (sink, 0))
@@ -200,16 +199,57 @@ class dvbs2_tx(gr.top_block):
                                                   dtv.INTERPOLATION_OFF)
         pl_framer = dtv.dvbs2_physical_cc(frame_size, code_rate, constellation,
                                           pilots, 0)
-        interp_fir_filter = filter.interp_fir_filter_ccf(
-            int(self.sps / 2),
-            firdes.root_raised_cosine(1.0, self.samp_rate, self.sym_rate,
-                                      self.rolloff, self.n_rrc_taps))
-        interp_fir_filter.declare_sample_delay(0)
 
         self.connect((source_block, 0), (bbheader, 0), (bbscrambler, 0),
                      (bch_encoder, 0), (ldpc_encoder, 0), (interleaver, 0),
-                     (xfecframe_mapper, 0), (pl_framer, 0),
-                     (interp_fir_filter, 0), (sink_block, 0))
+                     (xfecframe_mapper, 0), (pl_framer, 0))
+
+        # The PL framer outputs an unfiltered sequence upsampled by 2 (i.e., a
+        # zero-interpolated sequence). Hence, upsample the remaining ratio
+        # (sps/2) to achieve an overall oversampling of sps samples per symbol.
+        interp_sps = self.sps / 2  # remaining ratio
+
+        # Use the polyphase arbitrary resampler if the remaining interpolation
+        # ratio is fractional. Otherwise, use the conventional integer-factor
+        # interpolating FIR filter for better performance.
+        if (interp_sps.is_integer()):
+            # The RRC taps must be designed for an oversampling of sps (the
+            # overall ratio) but the filter block should apply an upsampling of
+            # only "sps/2" given the PL framer already upsamples by 2.
+            ntaps = int(2 * self.rrc_delay * self.sps) + 1
+            rrc_taps = firdes.root_raised_cosine(
+                self.sps,  # gain (has to be equal to the total interp factor)
+                self.sps,  # overall oversampling ratio
+                1.0,  # symbol rate
+                self.rolloff,
+                ntaps)
+            interp_filter = filter.interp_fir_filter_ccf(
+                int(interp_sps), rrc_taps)
+            self.connect((pl_framer, 0), (interp_filter, 0))
+        else:
+            # The polyphase arbitrary resampler does not work well with the
+            # upsampled sequence produced by the PL framer. Hence, first, undo
+            # the PL framer's upsampling (downsample by 2). Then, interpolate
+            # the resulting symbol-spaced sequence by the full sps ratio.
+            downsampler = blocks.keep_m_in_n(gr.sizeof_gr_complex, 1, 2, 0)
+            nfilts = 32  # typically enough for low quantization error
+            ntaps = int(2 * nfilts * self.rrc_delay * self.sps) + 1
+            rrc_taps = filter.firdes.root_raised_cosine(
+                nfilts,  # gain (has to be equal to the number of pfb branches)
+                nfilts,  # sampling rate based on 32 filters in resampler
+                1.0,  # symbol rate
+                self.rolloff,
+                ntaps)
+            interp_filter = filter.pfb_arb_resampler_ccf(self.sps, rrc_taps)
+            self.connect((pl_framer, 0), (downsampler, 0), (interp_filter, 0))
+
+        # The PL framer does not declare a delay due to its upsampling-by-2
+        # operation. Hence, consider the total oversampling ratio when
+        # declaring the interpolator's delay below. Also, note the same delay
+        # applies to both the polyphase and non-polyphase resamplers.
+        interp_filter.declare_sample_delay(int(self.rrc_delay * self.sps))
+
+        self.connect((interp_filter, 0), (sink_block, 0))
 
 
 def argument_parser():
@@ -254,8 +294,8 @@ def argument_parser():
                         help="Oversampling ratio in samples per symbol")
     parser.add_argument("-s",
                         "--sym-rate",
-                        type=intx,
-                        default=1000000,
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1000000)),
                         help="Symbol rate in bauds")
 
     src_group = parser.add_argument_group('Source Options')
