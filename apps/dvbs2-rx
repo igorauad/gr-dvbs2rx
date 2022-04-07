@@ -1031,11 +1031,13 @@ def argument_parser():
     snk_group.add_argument("--out-file",
                            type=str,
                            help="Output file used if sink=file")
-    snk_group.add_argument("--out-stream",
-                           type=str,
-                           choices=["ts", "bb"],
-                           default="ts",
-                           help="Output stream: MPEG TS (\"ts\") or descrambled BBFRAMEs (\"bb\")")
+    snk_group.add_argument(
+        "--out-stream",
+        type=str,
+        choices=["ts", "bb"],
+        default="ts",
+        help="Output stream: MPEG TS (\"ts\") or descrambled BBFRAMEs (\"bb\")"
+    )
 
     rtl_group = parser.add_argument_group('RTL-SDR Options')
     rtl_group.add_argument(
@@ -1093,7 +1095,7 @@ def main():
                 x11 = ctypes.cdll.LoadLibrary('libX11.so')
                 x11.XInitThreads()
             except:
-                gr.log.warning("Warning: failed to XInitThreads()")
+                gr.log.warn("Warning: failed to XInitThreads()")
 
         if StrictVersion("4.5.0") <= StrictVersion(
                 Qt.qVersion()) < StrictVersion("5.0.0"):
