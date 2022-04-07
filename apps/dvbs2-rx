@@ -51,6 +51,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.gui_plsync_time = options.gui_plsync_time or options.gui_all
         self.in_fd = options.in_fd
         self.in_file = options.in_file
+        self.in_iq_format = options.in_iq_format
         self.in_repeat = options.in_repeat
         self.ldpc_iterations = options.ldpc_iterations
         self.modcod = options.modcod
@@ -455,36 +456,48 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             connect to the DVB-S2 Rx input.
         """
         if (self.source == "fd" or self.source == "file"):
+            in_size = gr.sizeof_char if self.in_iq_format == "u8" else \
+                gr.sizeof_gr_complex
+
             if (self.source == "fd"):
                 blocks_file_or_fd_source = blocks.file_descriptor_source(
-                    gr.sizeof_char, self.in_fd, False)
+                    in_size, self.in_fd, False)
             else:
                 blocks_file_or_fd_source = blocks.file_source(
-                    gr.sizeof_char, self.in_file, self.in_repeat)
-            # Pipeline to convert the fd/file IQ stream into a complex stream,
-            # assuming the independent I and Q are uint8_t streams.
-            blocks_deinterleave = blocks.deinterleave(gr.sizeof_char, 1)
-            blocks_uchar_to_float_0 = blocks.uchar_to_float()
-            blocks_uchar_to_float_1 = blocks.uchar_to_float()
-            blocks_add_const_ff_0 = blocks.add_const_ff(-127)
-            blocks_add_const_ff_1 = blocks.add_const_ff(-127)
-            blocks_multiply_const_ff_1 = blocks.multiply_const_ff(1 / 128)
-            blocks_multiply_const_ff_0 = blocks.multiply_const_ff(1 / 128)
-            blocks_float_to_complex_0 = blocks.float_to_complex(1)
+                    in_size, self.in_file, self.in_repeat)
+
             blocks_throttle_0 = blocks.throttle(gr.sizeof_gr_complex,
                                                 self.samp_rate, True)
-            self.connect((blocks_file_or_fd_source, 0),
-                         (blocks_deinterleave, 0))
-            self.connect(
-                (blocks_deinterleave, 0), (blocks_uchar_to_float_0, 0),
-                (blocks_add_const_ff_0, 0), (blocks_multiply_const_ff_0, 0),
-                (blocks_float_to_complex_0, 0))
-            self.connect(
-                (blocks_deinterleave, 1), (blocks_uchar_to_float_1, 0),
-                (blocks_add_const_ff_1, 0), (blocks_multiply_const_ff_1, 0),
-                (blocks_float_to_complex_0, 1))
-            self.connect((blocks_float_to_complex_0, 0),
-                         (blocks_throttle_0, 0))
+
+            if (self.in_iq_format == "u8"):
+                # Convert the fd/file IQ stream into a complex stream assuming
+                # each I and Q component is represented by a uint8_t.
+                blocks_deinterleave = blocks.deinterleave(gr.sizeof_char, 1)
+                blocks_uchar_to_float_0 = blocks.uchar_to_float()
+                blocks_uchar_to_float_1 = blocks.uchar_to_float()
+                blocks_add_const_ff_0 = blocks.add_const_ff(-127)
+                blocks_add_const_ff_1 = blocks.add_const_ff(-127)
+                blocks_multiply_const_ff_1 = blocks.multiply_const_ff(1 / 128)
+                blocks_multiply_const_ff_0 = blocks.multiply_const_ff(1 / 128)
+                blocks_float_to_complex_0 = blocks.float_to_complex(1)
+                self.connect((blocks_file_or_fd_source, 0),
+                             (blocks_deinterleave, 0))
+                self.connect((blocks_deinterleave, 0),
+                             (blocks_uchar_to_float_0, 0),
+                             (blocks_add_const_ff_0, 0),
+                             (blocks_multiply_const_ff_0, 0),
+                             (blocks_float_to_complex_0, 0))
+                self.connect((blocks_deinterleave, 1),
+                             (blocks_uchar_to_float_1, 0),
+                             (blocks_add_const_ff_1, 0),
+                             (blocks_multiply_const_ff_1, 0),
+                             (blocks_float_to_complex_0, 1))
+                self.connect((blocks_float_to_complex_0, 0),
+                             (blocks_throttle_0, 0))
+            else:
+                self.connect((blocks_file_or_fd_source, 0),
+                             (blocks_throttle_0, 0))
+
             source = blocks_throttle_0
         elif (self.source == "rtl"):
             import osmosdr  # lazy import to avoid failure if source != rtl
@@ -1018,6 +1031,10 @@ def argument_parser():
         action='store_true',
         default=False,
         help="Read repeatedly from the input file if source=file")
+    src_group.add_argument("--in-iq-format",
+                           choices=['fc32', 'u8'],
+                           default='fc32',
+                           help="Input IQ format")
 
     snk_group = parser.add_argument_group('Sink Options')
     snk_group.add_argument("--sink",

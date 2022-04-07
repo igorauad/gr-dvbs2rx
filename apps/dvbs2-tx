@@ -39,6 +39,7 @@ class dvbs2_tx(gr.top_block):
         self.in_fd = options.in_fd
         self.in_file = options.in_file
         self.in_repeat = options.in_repeat
+        self.out_iq_format = options.out_iq_format
         self.modcod = options.modcod
         self.out_fd = options.out_fd
         self.out_file = options.out_file
@@ -94,34 +95,40 @@ class dvbs2_tx(gr.top_block):
         """
 
         if (self.sink == "fd" or self.sink == "file"):
-            # Convert the complex IQ stream into an interleaved uchar stream.
-            throttle = blocks.throttle(gr.sizeof_gr_complex, self.samp_rate,
-                                       True)
-            complex_to_float_0 = blocks.complex_to_float(1)
-            multiply_const_0 = blocks.multiply_const_ff(128)
-            multiply_const_1 = blocks.multiply_const_ff(128)
-            add_const_0 = blocks.add_const_ff(127)
-            add_const_1 = blocks.add_const_ff(127)
-            float_to_uchar_0 = blocks.float_to_uchar()
-            float_to_uchar_1 = blocks.float_to_uchar()
-            interleaver = blocks.interleave(gr.sizeof_char, 1)
+            # First block on the pipeline
+            sink = throttle = blocks.throttle(gr.sizeof_gr_complex,
+                                              self.samp_rate, True)
+
+            out_size = gr.sizeof_char if self.out_iq_format == "u8" else \
+                gr.sizeof_gr_complex
 
             if (self.sink == "fd"):
                 file_or_fd_sink = blocks.file_descriptor_sink(
-                    gr.sizeof_char, self.out_fd)
+                    out_size, self.out_fd)
             else:
-                file_or_fd_sink = blocks.file_sink(gr.sizeof_char,
-                                                   self.out_file)
-            self.connect((throttle, 0), (complex_to_float_0, 0))
-            self.connect((complex_to_float_0, 0), (multiply_const_0, 0))
-            self.connect((complex_to_float_0, 1), (multiply_const_1, 0))
-            self.connect((multiply_const_0, 0), (add_const_0, 0),
-                         (float_to_uchar_0, 0), (interleaver, 0))
-            self.connect((multiply_const_1, 0), (add_const_1, 0),
-                         (float_to_uchar_1, 0), (interleaver, 1))
-            self.connect((interleaver, 0), (file_or_fd_sink, 0))
-            # First block on the pipeline
-            sink = throttle
+                file_or_fd_sink = blocks.file_sink(out_size, self.out_file)
+
+            if (self.out_iq_format == "u8"):
+                # Convert the complex stream into an interleaved uchar stream.
+                complex_to_float_0 = blocks.complex_to_float(1)
+                multiply_const_0 = blocks.multiply_const_ff(128)
+                multiply_const_1 = blocks.multiply_const_ff(128)
+                add_const_0 = blocks.add_const_ff(127)
+                add_const_1 = blocks.add_const_ff(127)
+                float_to_uchar_0 = blocks.float_to_uchar()
+                float_to_uchar_1 = blocks.float_to_uchar()
+                interleaver = blocks.interleave(gr.sizeof_char, 1)
+                self.connect((throttle, 0), (complex_to_float_0, 0))
+                self.connect((complex_to_float_0, 0), (multiply_const_0, 0))
+                self.connect((complex_to_float_0, 1), (multiply_const_1, 0))
+                self.connect((multiply_const_0, 0), (add_const_0, 0),
+                             (float_to_uchar_0, 0), (interleaver, 0))
+                self.connect((multiply_const_1, 0), (add_const_1, 0),
+                             (float_to_uchar_1, 0), (interleaver, 1))
+                self.connect((interleaver, 0), (file_or_fd_sink, 0))
+            else:
+                self.connect((throttle, 0), (file_or_fd_sink, 0))
+
         elif (self.sink == "usrp"):
             sink = uhd.usrp_sink(
                 ",".join((self.usrp_addr, '')),
@@ -328,6 +335,10 @@ def argument_parser():
     snk_group.add_argument("--out-file",
                            type=str,
                            help="Output file used if sink=file")
+    snk_group.add_argument("--out-iq-format",
+                           choices=['fc32', 'u8'],
+                           default='fc32',
+                           help="Output IQ format")
 
     usrp_group = parser.add_argument_group('USRP Options')
     usrp_group.add_argument("--usrp-addr", type=str, help="USRP address")
