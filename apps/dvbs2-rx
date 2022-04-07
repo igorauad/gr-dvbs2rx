@@ -52,6 +52,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.in_fd = options.in_fd
         self.in_file = options.in_file
         self.in_iq_format = options.in_iq_format
+        self.in_real_time = options.in_real_time
         self.in_repeat = options.in_repeat
         self.ldpc_iterations = options.ldpc_iterations
         self.modcod = options.modcod
@@ -466,9 +467,6 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                 blocks_file_or_fd_source = blocks.file_source(
                     in_size, self.in_file, self.in_repeat)
 
-            blocks_throttle_0 = blocks.throttle(gr.sizeof_gr_complex,
-                                                self.samp_rate, True)
-
             if (self.in_iq_format == "u8"):
                 # Convert the fd/file IQ stream into a complex stream assuming
                 # each I and Q component is represented by a uint8_t.
@@ -492,13 +490,16 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                              (blocks_add_const_ff_1, 0),
                              (blocks_multiply_const_ff_1, 0),
                              (blocks_float_to_complex_0, 1))
-                self.connect((blocks_float_to_complex_0, 0),
-                             (blocks_throttle_0, 0))
+                source = blocks_float_to_complex_0
             else:
-                self.connect((blocks_file_or_fd_source, 0),
-                             (blocks_throttle_0, 0))
+                source = blocks_file_or_fd_source
 
-            source = blocks_throttle_0
+            if self.in_real_time:
+                blocks_throttle_0 = blocks.throttle(gr.sizeof_gr_complex,
+                                                    self.samp_rate, True)
+                self.connect((source, 0), (blocks_throttle_0, 0))
+                source = blocks_throttle_0
+
         elif (self.source == "rtl"):
             import osmosdr  # lazy import to avoid failure if source != rtl
             rtl_arg = self.rtl_serial if (self.rtl_serial
@@ -1035,6 +1036,12 @@ def argument_parser():
                            choices=['fc32', 'u8'],
                            default='fc32',
                            help="Input IQ format")
+    src_group.add_argument(
+        "--in-real-time",
+        action='store_true',
+        default=False,
+        help="Throttle the input to simulate the sample rate. Applicable if "
+        "source=file or source=fd.")
 
     snk_group = parser.add_argument_group('Sink Options')
     snk_group.add_argument("--sink",
