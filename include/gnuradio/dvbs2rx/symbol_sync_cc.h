@@ -9,7 +9,7 @@
 #define INCLUDED_DVBS2RX_SYMBOL_SYNC_CC_H
 
 #include <gnuradio/block.h>
-#include <dvbs2rx/api.h>
+#include <gnuradio/dvbs2rx/api.h>
 
 namespace gr {
 namespace dvbs2rx {

@@ -13,7 +13,7 @@
 #include "bitman.hh"
 #include "bose_chaudhuri_hocquenghem_decoder.hh"
 #include "galois_field.hh"
-#include <dvbs2rx/bch_decoder_bb.h>
+#include <gnuradio/dvbs2rx/bch_decoder_bb.h>
 
 namespace gr {
 namespace dvbs2rx {

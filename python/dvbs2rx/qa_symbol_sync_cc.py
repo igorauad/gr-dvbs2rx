@@ -11,16 +11,16 @@ from gnuradio import gr, gr_unittest
 from gnuradio import blocks
 from gnuradio.filter import firdes
 try:
-    from dvbs2rx import symbol_sync_cc
+    from gnuradio.dvbs2rx import symbol_sync_cc
 except ImportError:
     import os
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
     try:
-        from dvbs2rx import symbol_sync_cc
+        from gnuradio.dvbs2rx import symbol_sync_cc
     except ImportError:
-        from python import symbol_sync_cc
+        from python.dvbs2rx import symbol_sync_cc
 
 
 def randQpskSyms(nsyms):
@@ -31,6 +31,7 @@ def randQpskSyms(nsyms):
 
 
 class qa_plsync_cc(gr_unittest.TestCase):
+
     def _set_up_flowgraph(self,
                           in_stream,
                           sps=2,

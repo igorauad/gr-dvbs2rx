@@ -23,7 +23,7 @@
 
 namespace py = pybind11;
 
-#include <dvbs2rx/dvbt2_config.h>
+#include <gnuradio/dvbs2rx/dvbt2_config.h>
 // pydoc.h is automatically generated in the build directory
 #include <dvbt2_config_pydoc.h>
 

@@ -12,9 +12,9 @@
 #define INCLUDED_DVBS2RX_BBDEHEADER_BB_H
 
 #include <gnuradio/block.h>
-#include <dvbs2rx/api.h>
-#include <dvbs2rx/dvb_config.h>
-#include <dvbs2rx/dvbt2_config.h>
+#include <gnuradio/dvbs2rx/api.h>
+#include <gnuradio/dvbs2rx/dvb_config.h>
+#include <gnuradio/dvbs2rx/dvbt2_config.h>
 
 namespace gr {
 namespace dvbs2rx {

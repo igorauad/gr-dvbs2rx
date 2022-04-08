@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(plsync_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(6f4f75b44ce6ae300cf56bb7c8e9a4ef)                     */
+/* BINDTOOL_HEADER_FILE_HASH(ff0382d7df18d094862c06aa8767ac72)                     */
 /***********************************************************************************/
 
 #include <pybind11/chrono.h>
@@ -24,7 +24,7 @@
 
 namespace py = pybind11;
 
-#include <dvbs2rx/plsync_cc.h>
+#include <gnuradio/dvbs2rx/plsync_cc.h>
 // pydoc.h is automatically generated in the build directory
 #include <plsync_cc_pydoc.h>
 

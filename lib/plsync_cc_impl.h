@@ -15,7 +15,7 @@
 #include "pl_frame_sync.h"
 #include "pl_freq_sync.h"
 #include "pl_signaling.h"
-#include <dvbs2rx/plsync_cc.h>
+#include <gnuradio/dvbs2rx/plsync_cc.h>
 #include <volk/volk_alloc.hh>
 
 namespace gr {

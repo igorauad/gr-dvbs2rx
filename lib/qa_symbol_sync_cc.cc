@@ -8,7 +8,7 @@
  */
 
 #include <gnuradio/attributes.h>
-#include <dvbs2rx/symbol_sync_cc.h>
+#include <gnuradio/dvbs2rx/symbol_sync_cc.h>
 #include <boost/test/unit_test.hpp>
 
 namespace gr {

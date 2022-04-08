@@ -3,7 +3,7 @@ label: Symbol Synchronizer
 category: '[Core]/Digital Television/DVB-S2'
 
 templates:
-  imports: import dvbs2rx
+  imports: from gnuradio import dvbs2rx
   make: dvbs2rx.symbol_sync_cc(${sps}, ${loop_bw}, ${damping_factor}, ${rolloff}, ${rrc_delay}, ${n_subfilt}, ${interp_method})
 
 parameters:

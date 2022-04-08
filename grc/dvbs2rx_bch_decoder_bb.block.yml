@@ -29,7 +29,7 @@ outputs:
     dtype: byte
 
 templates:
-    imports: import dvbs2rx
+    imports: from gnuradio import dvbs2rx
     make: |-
         dvbs2rx.bch_decoder_bb(
             *dvbs2rx.params.translate(${standard},

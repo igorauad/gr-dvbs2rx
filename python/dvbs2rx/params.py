@@ -1,11 +1,11 @@
 from textwrap import fill
 try:
-    import dvbs2rx  # noqa: F401
+    import gnuradio.dvbs2rx as dvbs2rx  # noqa: F401
 except ImportError:
     # When running tests before the module installation, assume the PYTHONPATH
     # includes the top-level build directory, which contains a "python/"
     # directory holding the built Python files to be installed.
-    import python as dvbs2rx  # noqa: F401
+    import python.dvbs2rx as dvbs2rx  # noqa: F401
 from . import defs
 
 

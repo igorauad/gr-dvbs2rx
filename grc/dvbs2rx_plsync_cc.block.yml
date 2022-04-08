@@ -3,7 +3,7 @@ label: DVB-S2 PL Sync
 category: '[Core]/Digital Television/DVB-S2'
 
 templates:
-  imports: import dvbs2rx
+  imports: from gnuradio import dvbs2rx
   make: dvbs2rx.plsync_cc(${gold_code}, ${freq_est_period}, ${sps}, ${debug_level},
                   ${acm_vcm}, ${multistream}, ${pls_filter_lo}, ${pls_filter_hi})
 

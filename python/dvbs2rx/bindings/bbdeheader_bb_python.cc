@@ -13,8 +13,8 @@
 /* If manual edits are made, the following tags should be modified accordingly.    */
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
-/* BINDTOOL_HEADER_FILE(ldpc_decoder_cb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(b27571f315079f91962df6573d7763fb)                     */
+/* BINDTOOL_HEADER_FILE(bbdeheader_bb.h)                                        */
+/* BINDTOOL_HEADER_FILE_HASH(b2fb4aae40855ac589b0c5b88ecf0897)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -23,36 +23,32 @@
 
 namespace py = pybind11;
 
-#include <dvbs2rx/ldpc_decoder_cb.h>
+#include <gnuradio/dvbs2rx/bbdeheader_bb.h>
 // pydoc.h is automatically generated in the build directory
-#include <ldpc_decoder_cb_pydoc.h>
+#include <bbdeheader_bb_pydoc.h>
 
-void bind_ldpc_decoder_cb(py::module& m)
+void bind_bbdeheader_bb(py::module& m)
 {
 
-    using ldpc_decoder_cb = ::gr::dvbs2rx::ldpc_decoder_cb;
+    using bbdeheader_bb = ::gr::dvbs2rx::bbdeheader_bb;
 
 
-    py::class_<ldpc_decoder_cb,
-               gr::block,
-               gr::basic_block,
-               std::shared_ptr<ldpc_decoder_cb>>(m, "ldpc_decoder_cb", D(ldpc_decoder_cb))
+    py::class_<bbdeheader_bb, gr::block, gr::basic_block, std::shared_ptr<bbdeheader_bb>>(
+        m, "bbdeheader_bb", D(bbdeheader_bb))
 
-        .def(py::init(&ldpc_decoder_cb::make),
+        .def(py::init(&bbdeheader_bb::make),
              py::arg("standard"),
              py::arg("framesize"),
              py::arg("rate"),
-             py::arg("constellation"),
-             py::arg("outputmode"),
-             py::arg("infomode"),
-             py::arg("max_trials"),
-             D(ldpc_decoder_cb, make))
+             D(bbdeheader_bb, make))
 
-        .def("get_snr", &ldpc_decoder_cb::get_snr, D(ldpc_decoder_cb, get_snr))
+        .def("get_packet_count",
+             &bbdeheader_bb::get_packet_count,
+             D(bbdeheader_bb, get_packet_count))
 
-        .def("get_average_trials",
-             &ldpc_decoder_cb::get_average_trials,
-             D(ldpc_decoder_cb, get_average_trials))
+        .def("get_error_count",
+             &bbdeheader_bb::get_error_count,
+             D(bbdeheader_bb, get_error_count))
 
         ;
 }

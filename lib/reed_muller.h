@@ -11,7 +11,7 @@
 #define INCLUDED_DVBS2RX_REED_MULLER_H
 
 #include "pl_defs.h"
-#include <dvbs2rx/api.h>
+#include <gnuradio/dvbs2rx/api.h>
 #include <volk/volk_alloc.hh>
 
 namespace gr {

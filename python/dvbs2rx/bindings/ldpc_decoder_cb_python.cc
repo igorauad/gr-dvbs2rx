@@ -13,8 +13,8 @@
 /* If manual edits are made, the following tags should be modified accordingly.    */
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
-/* BINDTOOL_HEADER_FILE(bch_decoder_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(01ffd2f5de7fd1ec12824b24fea5d18f)                     */
+/* BINDTOOL_HEADER_FILE(ldpc_decoder_cb.h)                                        */
+/* BINDTOOL_HEADER_FILE_HASH(84d156a5fff532606c23a17c3e9ca9c0)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -23,35 +23,36 @@
 
 namespace py = pybind11;
 
-#include <dvbs2rx/bch_decoder_bb.h>
+#include <gnuradio/dvbs2rx/ldpc_decoder_cb.h>
 // pydoc.h is automatically generated in the build directory
-#include <bch_decoder_bb_pydoc.h>
+#include <ldpc_decoder_cb_pydoc.h>
 
-void bind_bch_decoder_bb(py::module& m)
+void bind_ldpc_decoder_cb(py::module& m)
 {
 
-    using bch_decoder_bb = ::gr::dvbs2rx::bch_decoder_bb;
+    using ldpc_decoder_cb = ::gr::dvbs2rx::ldpc_decoder_cb;
 
 
-    py::class_<bch_decoder_bb,
+    py::class_<ldpc_decoder_cb,
                gr::block,
                gr::basic_block,
-               std::shared_ptr<bch_decoder_bb>>(m, "bch_decoder_bb", D(bch_decoder_bb))
+               std::shared_ptr<ldpc_decoder_cb>>(m, "ldpc_decoder_cb", D(ldpc_decoder_cb))
 
-        .def(py::init(&bch_decoder_bb::make),
+        .def(py::init(&ldpc_decoder_cb::make),
              py::arg("standard"),
              py::arg("framesize"),
              py::arg("rate"),
+             py::arg("constellation"),
              py::arg("outputmode"),
-             D(bch_decoder_bb, make))
+             py::arg("infomode"),
+             py::arg("max_trials"),
+             D(ldpc_decoder_cb, make))
 
-        .def("get_frame_count",
-             &bch_decoder_bb::get_frame_count,
-             D(bch_decoder_bb, get_frame_count))
+        .def("get_snr", &ldpc_decoder_cb::get_snr, D(ldpc_decoder_cb, get_snr))
 
-        .def("get_error_count",
-             &bch_decoder_bb::get_error_count,
-             D(bch_decoder_bb, get_error_count))
+        .def("get_average_trials",
+             &ldpc_decoder_cb::get_average_trials,
+             D(ldpc_decoder_cb, get_average_trials))
 
         ;
 }

@@ -11,7 +11,7 @@
 #define INCLUDED_DVBS2RX_BBDESCRAMBLER_BB_IMPL_H
 
 #include "dvb_defines.h"
-#include <dvbs2rx/bbdescrambler_bb.h>
+#include <gnuradio/dvbs2rx/bbdescrambler_bb.h>
 
 namespace gr {
 namespace dvbs2rx {

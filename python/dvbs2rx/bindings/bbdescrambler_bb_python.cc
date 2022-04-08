@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Free Software Foundation, Inc.
+ * Copyright 2020 Free Software Foundation, Inc.
  *
  * This file is part of GNU Radio
  *
@@ -13,8 +13,8 @@
 /* If manual edits are made, the following tags should be modified accordingly.    */
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
-/* BINDTOOL_HEADER_FILE(symbol_sync_cc.h)                                          */
-/* BINDTOOL_HEADER_FILE_HASH(66ddcf2f34a8d58a4597459e91769c51)                     */
+/* BINDTOOL_HEADER_FILE(bbdescrambler_bb.h)                                        */
+/* BINDTOOL_HEADER_FILE_HASH(1b054cd08803121f19cb3e29633c8d51)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -23,27 +23,29 @@
 
 namespace py = pybind11;
 
-#include <dvbs2rx/symbol_sync_cc.h>
+#include <gnuradio/dvbs2rx/bbdescrambler_bb.h>
 // pydoc.h is automatically generated in the build directory
-#include <symbol_sync_cc_pydoc.h>
+#include <bbdescrambler_bb_pydoc.h>
 
-void bind_symbol_sync_cc(py::module& m)
+void bind_bbdescrambler_bb(py::module& m)
 {
 
-    using symbol_sync_cc = gr::dvbs2rx::symbol_sync_cc;
+    using bbdescrambler_bb = ::gr::dvbs2rx::bbdescrambler_bb;
 
-    py::class_<symbol_sync_cc,
+
+    py::class_<bbdescrambler_bb,
+               gr::sync_block,
                gr::block,
                gr::basic_block,
-               std::shared_ptr<symbol_sync_cc>>(m, "symbol_sync_cc", D(symbol_sync_cc))
+               std::shared_ptr<bbdescrambler_bb>>(
+        m, "bbdescrambler_bb", D(bbdescrambler_bb))
 
-        .def(py::init(&symbol_sync_cc::make),
-             py::arg("sps"),
-             py::arg("loop_bw"),
-             py::arg("damping_factor"),
-             py::arg("rolloff"),
-             py::arg("rrc_delay") = 5,
-             py::arg("n_subfilt") = 128,
-             py::arg("interp_method") = 0,
-             D(symbol_sync_cc, make));
+        .def(py::init(&bbdescrambler_bb::make),
+             py::arg("standard"),
+             py::arg("framesize"),
+             py::arg("rate"),
+             D(bbdescrambler_bb, make))
+
+
+        ;
 }

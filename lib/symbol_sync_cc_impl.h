@@ -10,8 +10,8 @@
 #ifndef INCLUDED_DVBS2RX_SYMBOL_SYNC_CC_IMPL_H
 #define INCLUDED_DVBS2RX_SYMBOL_SYNC_CC_IMPL_H
 
+#include <gnuradio/dvbs2rx/symbol_sync_cc.h>
 #include <gnuradio/gr_complex.h>
-#include <dvbs2rx/symbol_sync_cc.h>
 #include <volk/volk_alloc.hh>
 
 namespace gr {

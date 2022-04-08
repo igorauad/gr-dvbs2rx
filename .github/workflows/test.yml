@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: igorfreire/gnuradio-oot-dev:3.9.4-ubuntu-focal
+      image: igorfreire/gnuradio-oot-dev:3.10.1-ubuntu-focal
     steps:
     - uses: actions/checkout@v2
       with:

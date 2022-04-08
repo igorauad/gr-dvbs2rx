@@ -17,7 +17,7 @@
 #include "ldpc_decoder/ldpc.hh"
 #include "psk.hh"
 #include "qam.hh"
-#include <dvbs2rx/ldpc_decoder_cb.h>
+#include <gnuradio/dvbs2rx/ldpc_decoder_cb.h>
 
 namespace gr {
 namespace dvbs2rx {

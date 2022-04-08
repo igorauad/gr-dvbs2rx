@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Free Software Foundation, Inc.
+ * Copyright 2021 Free Software Foundation, Inc.
  *
  * This file is part of GNU Radio
  *
@@ -13,8 +13,8 @@
 /* If manual edits are made, the following tags should be modified accordingly.    */
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
-/* BINDTOOL_HEADER_FILE(bbdescrambler_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(a9a7ec647d82781419a9fdb2e20fbdad)                     */
+/* BINDTOOL_HEADER_FILE(symbol_sync_cc.h)                                          */
+/* BINDTOOL_HEADER_FILE_HASH(9a1af62e0d1bde87191c0a0ee46e1169)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -23,29 +23,27 @@
 
 namespace py = pybind11;
 
-#include <dvbs2rx/bbdescrambler_bb.h>
+#include <gnuradio/dvbs2rx/symbol_sync_cc.h>
 // pydoc.h is automatically generated in the build directory
-#include <bbdescrambler_bb_pydoc.h>
+#include <symbol_sync_cc_pydoc.h>
 
-void bind_bbdescrambler_bb(py::module& m)
+void bind_symbol_sync_cc(py::module& m)
 {
 
-    using bbdescrambler_bb = ::gr::dvbs2rx::bbdescrambler_bb;
+    using symbol_sync_cc = gr::dvbs2rx::symbol_sync_cc;
 
-
-    py::class_<bbdescrambler_bb,
-               gr::sync_block,
+    py::class_<symbol_sync_cc,
                gr::block,
                gr::basic_block,
-               std::shared_ptr<bbdescrambler_bb>>(
-        m, "bbdescrambler_bb", D(bbdescrambler_bb))
+               std::shared_ptr<symbol_sync_cc>>(m, "symbol_sync_cc", D(symbol_sync_cc))
 
-        .def(py::init(&bbdescrambler_bb::make),
-             py::arg("standard"),
-             py::arg("framesize"),
-             py::arg("rate"),
-             D(bbdescrambler_bb, make))
-
-
-        ;
+        .def(py::init(&symbol_sync_cc::make),
+             py::arg("sps"),
+             py::arg("loop_bw"),
+             py::arg("damping_factor"),
+             py::arg("rolloff"),
+             py::arg("rrc_delay") = 5,
+             py::arg("n_subfilt") = 128,
+             py::arg("interp_method") = 0,
+             D(symbol_sync_cc, make));
 }

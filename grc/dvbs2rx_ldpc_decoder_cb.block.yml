@@ -41,7 +41,7 @@ outputs:
     dtype: byte
 
 templates:
-    imports: import dvbs2rx
+    imports: from gnuradio import dvbs2rx
     make: |-
         dvbs2rx.ldpc_decoder_cb(
             *dvbs2rx.params.translate(${standard},

@@ -12,18 +12,19 @@ from gnuradio import gr, gr_unittest
 from gnuradio import blocks
 from math import ceil, floor
 try:
-    from dvbs2rx import bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL, C1_4
+    from gnuradio.dvbs2rx import (bbdeheader_bb, STANDARD_DVBS2,
+                                  FECFRAME_NORMAL, C1_4)
 except ImportError:
     import os
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
     try:
-        from dvbs2rx import (bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL,
-                             C1_4)
+        from gnuradio.dvbs2rx import (bbdeheader_bb, STANDARD_DVBS2,
+                                      FECFRAME_NORMAL, C1_4)
     except ImportError:
-        from python import (bbdeheader_bb, STANDARD_DVBS2, FECFRAME_NORMAL,
-                            C1_4)
+        from python.dvbs2rx import (bbdeheader_bb, STANDARD_DVBS2,
+                                    FECFRAME_NORMAL, C1_4)
 
 DVBS2_GEN_POLY = '111010101'  # x^8 + x^7 + x^6 + x^4 + x^2 +1
 BBHEADER_NO_CRC_FMT = "!BBHHBH"  # BBHEADER format excluding the CRC field
@@ -175,6 +176,7 @@ def gen_bbframe_stream(kbch, n_frames, up_stream, syncd=0):
 
 
 class qa_bbdeheader_bb(gr_unittest.TestCase):
+
     def setUp(self):
         self.tb = gr.top_block()
 

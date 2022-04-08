@@ -1,4 +1,4 @@
-FROM igorfreire/gnuradio-oot-dev:3.9.4-ubuntu-focal
+FROM igorfreire/gnuradio-oot-dev:3.10.1-ubuntu-focal
 RUN apt-get install -y libusb-1.0-0-dev libosmosdr-dev libsndfile1-dev
 RUN git clone https://github.com/osmocom/rtl-sdr.git && \
     cd rtl-sdr/ && mkdir build && cd build/ && \

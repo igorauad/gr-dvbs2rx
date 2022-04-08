@@ -14,8 +14,8 @@
 #include "delay_line.h"
 #include "pl_defs.h"
 #include "pl_submodule.h"
+#include <gnuradio/dvbs2rx/api.h>
 #include <gnuradio/gr_complex.h>
-#include <dvbs2rx/api.h>
 #include <chrono>
 
 /* correlator lengths, based on the number of differentials that we know in

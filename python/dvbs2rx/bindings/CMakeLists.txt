@@ -30,8 +30,8 @@ list(APPEND dvbs2rx_python_files
     python_bindings.cc)
 
 GR_PYBIND_MAKE_OOT(dvbs2rx
-   ../..
+   ../../..
    gr::dvbs2rx
    "${dvbs2rx_python_files}")
 
-install(TARGETS dvbs2rx_python DESTINATION ${GR_PYTHON_DIR}/dvbs2rx COMPONENT pythonapi)
+install(TARGETS dvbs2rx_python DESTINATION ${GR_PYTHON_DIR}/gnuradio/dvbs2rx COMPONENT pythonapi)

@@ -74,7 +74,7 @@ ENDIF()
 # Install directories
 ########################################################################
 include(FindPkgConfig)
-find_package(Gnuradio "3.9.2" REQUIRED COMPONENTS blocks fft filter)
+find_package(Gnuradio "3.10" REQUIRED COMPONENTS blocks fft filter)
 include(GrVersion)
 
 include(GrPlatform) #define LIB_SUFFIX
@@ -165,11 +165,11 @@ add_custom_target(uninstall
 ########################################################################
 SET(BUILD_TESTING OFF CACHE BOOL "Build libcpu_features without tests")
 add_subdirectory(cpu_features EXCLUDE_FROM_ALL)
-add_subdirectory(include/dvbs2rx)
+add_subdirectory(include/gnuradio/dvbs2rx)
 add_subdirectory(lib)
 add_subdirectory(apps)
 add_subdirectory(docs)
-add_subdirectory(python)
+add_subdirectory(python/dvbs2rx)
 add_subdirectory(grc)
 add_subdirectory(bench)
 

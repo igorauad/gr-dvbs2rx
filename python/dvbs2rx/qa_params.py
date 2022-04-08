@@ -8,19 +8,20 @@
 import itertools
 from gnuradio import gr_unittest
 try:
-    from dvbs2rx import params, dvbs2rx_python
+    from gnuradio.dvbs2rx import params, dvbs2rx_python
 except ImportError:
     import os
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
     try:
-        from dvbs2rx import params, dvbs2rx_python
+        from gnuradio.dvbs2rx import params, dvbs2rx_python
     except ImportError:
-        from python import params, dvbs2rx_python
+        from python.dvbs2rx import params, dvbs2rx_python
 
 
 class qa_params(gr_unittest.TestCase):
+
     def setUp(self):
         pass
 

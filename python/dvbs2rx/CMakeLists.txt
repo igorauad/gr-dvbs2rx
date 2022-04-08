@@ -24,7 +24,7 @@ GR_PYTHON_INSTALL(
     __init__.py
 	defs.py
 	params.py
-    DESTINATION ${GR_PYTHON_DIR}/dvbs2rx
+    DESTINATION ${GR_PYTHON_DIR}/gnuradio/dvbs2rx
 )
 
 ########################################################################

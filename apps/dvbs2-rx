@@ -30,7 +30,7 @@ from gnuradio.eng_arg import eng_float, intx
 from gnuradio.fft import window
 from gnuradio.filter import firdes
 
-import dvbs2rx
+from gnuradio import dvbs2rx
 
 MAX_RX_GAIN = {'usrp': 75, 'rtl': 50}
 MAX_FREQ = {'usrp': 6e9, 'rtl': 2.2e9}

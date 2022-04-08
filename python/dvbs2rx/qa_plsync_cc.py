@@ -14,16 +14,16 @@ import numpy as np
 from gnuradio import gr, gr_unittest
 from gnuradio import blocks, digital, analog
 try:
-    from dvbs2rx import plsync_cc
+    from gnuradio.dvbs2rx import plsync_cc
 except ImportError:
     import os
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
     try:
-        from dvbs2rx import plsync_cc
+        from gnuradio.dvbs2rx import plsync_cc
     except ImportError:
-        from python import plsync_cc
+        from python.dvbs2rx import plsync_cc
 
 SQRT2_2 = sqrt(2) / 2
 JSQRT2_2 = SQRT2_2 * 1j
@@ -176,6 +176,7 @@ def rnd_const_mapper_input(n_symbols, bits_per_sym):
 
 
 class qa_plsync_cc(gr_unittest.TestCase):
+
     def setUp(self):
         self.tb = gr.top_block()
         self.gold_code = 0

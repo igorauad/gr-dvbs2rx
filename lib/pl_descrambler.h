@@ -11,8 +11,8 @@
 #define INCLUDED_DVBS2RX_PL_DESCRAMBLER_H
 
 #include "pl_defs.h"
+#include <gnuradio/dvbs2rx/api.h>
 #include <gnuradio/gr_complex.h>
-#include <dvbs2rx/api.h>
 #include <volk/volk_alloc.hh>
 
 namespace gr {

@@ -11,7 +11,7 @@
 #define INCLUDED_DVBS2RX_BBDEHEADER_BB_IMPL_H
 
 #include "dvb_defines.h"
-#include <dvbs2rx/bbdeheader_bb.h>
+#include <gnuradio/dvbs2rx/bbdeheader_bb.h>
 
 typedef struct {
     int ts_gs;

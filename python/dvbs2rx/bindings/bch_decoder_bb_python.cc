@@ -13,8 +13,8 @@
 /* If manual edits are made, the following tags should be modified accordingly.    */
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
-/* BINDTOOL_HEADER_FILE(bbdeheader_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(73bd10c491421a48b9aa3da2ca362140)                     */
+/* BINDTOOL_HEADER_FILE(bch_decoder_bb.h)                                        */
+/* BINDTOOL_HEADER_FILE_HASH(1f8d75f887a9cc1705e9283da7eb9db7)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -23,32 +23,35 @@
 
 namespace py = pybind11;
 
-#include <dvbs2rx/bbdeheader_bb.h>
+#include <gnuradio/dvbs2rx/bch_decoder_bb.h>
 // pydoc.h is automatically generated in the build directory
-#include <bbdeheader_bb_pydoc.h>
+#include <bch_decoder_bb_pydoc.h>
 
-void bind_bbdeheader_bb(py::module& m)
+void bind_bch_decoder_bb(py::module& m)
 {
 
-    using bbdeheader_bb = ::gr::dvbs2rx::bbdeheader_bb;
+    using bch_decoder_bb = ::gr::dvbs2rx::bch_decoder_bb;
 
 
-    py::class_<bbdeheader_bb, gr::block, gr::basic_block, std::shared_ptr<bbdeheader_bb>>(
-        m, "bbdeheader_bb", D(bbdeheader_bb))
+    py::class_<bch_decoder_bb,
+               gr::block,
+               gr::basic_block,
+               std::shared_ptr<bch_decoder_bb>>(m, "bch_decoder_bb", D(bch_decoder_bb))
 
-        .def(py::init(&bbdeheader_bb::make),
+        .def(py::init(&bch_decoder_bb::make),
              py::arg("standard"),
              py::arg("framesize"),
              py::arg("rate"),
-             D(bbdeheader_bb, make))
+             py::arg("outputmode"),
+             D(bch_decoder_bb, make))
 
-        .def("get_packet_count",
-             &bbdeheader_bb::get_packet_count,
-             D(bbdeheader_bb, get_packet_count))
+        .def("get_frame_count",
+             &bch_decoder_bb::get_frame_count,
+             D(bch_decoder_bb, get_frame_count))
 
         .def("get_error_count",
-             &bbdeheader_bb::get_error_count,
-             D(bbdeheader_bb, get_error_count))
+             &bch_decoder_bb::get_error_count,
+             D(bch_decoder_bb, get_error_count))
 
         ;
 }
