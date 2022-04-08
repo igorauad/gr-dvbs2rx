@@ -348,6 +348,18 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
         return eye_sink
 
+    def _add_gui_block(self, name, gui_obj, pos):
+        self.gui_blocks[name] = gui_obj
+
+        # For compatibility with GR 3.9 and 3.10, check both pyqwidget() and
+        # qwidget() from the QT GUI object.
+        if hasattr(gui_obj, 'pyqwidget'):
+            gui_obj_win = sip.wrapinstance(gui_obj.pyqwidget(), Qt.QWidget)
+        else:
+            gui_obj_win = sip.wrapinstance(gui_obj.qwidget(), Qt.QWidget)
+
+        self.top_grid_layout.addWidget(gui_obj_win, *pos)
+
     def setup_gui(self):
         Qt.QWidget.__init__(self)
         self.setWindowTitle("DVB-S2 Rx")
@@ -382,64 +394,44 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         ##################################################
         # Blocks
         ##################################################
+        self.gui_blocks = {}
 
         # Waterfall sink observing the signal directly out of the source
-        self.qtgui_waterfall_sink_x_0 = self._get_waterfall_sink(
-            "Input Signal")
-        self._qtgui_waterfall_sink_x_0_win = sip.wrapinstance(
-            self.qtgui_waterfall_sink_x_0.pyqwidget(), Qt.QWidget)
-        self.top_grid_layout.addWidget(self._qtgui_waterfall_sink_x_0_win, 0,
-                                       0, 1, 1)
+        self._add_gui_block('waterfall_sink',
+                            self._get_waterfall_sink("Input Signal"),
+                            (0, 0, 1, 1))
 
         # Frequency sink observing the IQ streams output by the AGC and the
         # rotator blocks. Useful for inspection of the frequency correction.
-        self.qtgui_freq_sink_agc_rotator_out = self._get_freq_sink(
-            "Frequency Correction")
-        self._qtgui_freq_sink_agc_rotator_out_win = sip.wrapinstance(
-            self.qtgui_freq_sink_agc_rotator_out.pyqwidget(), Qt.QWidget)
-        self.top_grid_layout.addWidget(
-            self._qtgui_freq_sink_agc_rotator_out_win, 0, 1, 1, 1)
+        self._add_gui_block('freq_sink_agc_rotator_out',
+                            self._get_freq_sink("Frequency Correction"),
+                            (0, 1, 1, 1))
 
         # Number sink showing the RMS level
-        self.qtgui_number_sink_0 = self._get_number_sink("RMS Level")
-        self._qtgui_number_sink_0_win = sip.wrapinstance(
-            self.qtgui_number_sink_0.pyqwidget(), Qt.QWidget)
-        self.top_grid_layout.addWidget(self._qtgui_number_sink_0_win, 2, 0, 1,
-                                       2)
+        self._add_gui_block('rms_number_sink',
+                            self._get_number_sink("RMS Level"), (2, 0, 1, 2))
 
         # Constellation sink for inspection of the symbol sync output
-        self.qtgui_const_sink_sym_sync_out = self._get_const_sink(
-            "Symbol Sync Output")
-        self._qtgui_const_sink_sym_sync_out_win = sip.wrapinstance(
-            self.qtgui_const_sink_sym_sync_out.pyqwidget(), Qt.QWidget)
-        self.top_grid_layout.addWidget(self._qtgui_const_sink_sym_sync_out_win,
-                                       1, 0, 1, 1)
+        self._add_gui_block('const_sink_sym_sync_out',
+                            self._get_const_sink("Symbol Sync Output"),
+                            (1, 0, 1, 1))
 
         # Constellation sink for inspection of the phase-synchronized PL sync
         # output
-        self.qtgui_const_sink_plsync_out = self._get_const_sink(
-            "PL Sync Output")
-        self._qtgui_const_sink_plsync_out_win = sip.wrapinstance(
-            self.qtgui_const_sink_plsync_out.pyqwidget(), Qt.QWidget)
-        self.top_grid_layout.addWidget(self._qtgui_const_sink_plsync_out_win,
-                                       1, 1, 1, 1)
+        self._add_gui_block('const_sink_plsync_out',
+                            self._get_const_sink("PL Sync Output"),
+                            (1, 1, 1, 1))
 
         # Optional time sink to observe the PL Sync output in the time-domain
         if (self.gui_plsync_time):
-            self.qtgui_time_sink_plsync_out = self._get_time_sink(
-                "PL Sync Output")
-            self._qtgui_time_sink_plsync_out_win = sip.wrapinstance(
-                self.qtgui_time_sink_plsync_out.pyqwidget(), Qt.QWidget)
-            self.top_grid_layout.addWidget(
-                self._qtgui_time_sink_plsync_out_win, 0, 2, 1, 1)
+            self._add_gui_block('time_sink_plsync_out',
+                                self._get_time_sink("PL Sync Output"),
+                                (0, 2, 1, 1))
 
         # Optional eye sink to observe the PL Sync output on an eye diagram
         if (self.gui_eye):
-            self.qtgui_eye_sink_plsync_out = self._get_eye_sink()
-            self._qtgui_eye_sink_plsync_out_win = sip.wrapinstance(
-                self.qtgui_eye_sink_plsync_out.pyqwidget(), Qt.QWidget)
-            self.top_grid_layout.addWidget(self._qtgui_eye_sink_plsync_out_win,
-                                           1, 2, 1, 1)
+            self._add_gui_block('eye_sink_plsync_out', self._get_eye_sink(),
+                                (1, 2, 1, 1))
 
         # Stretch columns and rows
         n_columns = 3 if (self.gui_plsync_time or self.gui_eye) else 2
@@ -538,9 +530,9 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         if (self.gui):
             self.blocks_rms_xx_0 = blocks.rms_cf(0.0001)
             self.connect((source, 0), (self.blocks_rms_xx_0, 0))
-            self.connect((source, 0), (self.qtgui_waterfall_sink_x_0, 0))
+            self.connect((source, 0), (self.gui_blocks['waterfall_sink'], 0))
             self.connect((self.blocks_rms_xx_0, 0),
-                         (self.qtgui_number_sink_0, 0))
+                         (self.gui_blocks['rms_number_sink'], 0))
 
         return source
 
@@ -707,16 +699,19 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
         if (self.gui):
             self.connect((symbol_sync, 0),
-                         (self.qtgui_const_sink_sym_sync_out, 0))
-            self.connect((plsync, 0), (self.qtgui_const_sink_plsync_out, 0))
+                         (self.gui_blocks['const_sink_sym_sync_out'], 0))
+            self.connect((plsync, 0),
+                         (self.gui_blocks['const_sink_plsync_out'], 0))
             if (self.gui_plsync_time):
-                self.connect((plsync, 0), (self.qtgui_time_sink_plsync_out, 0))
+                self.connect((plsync, 0),
+                             (self.gui_blocks['time_sink_plsync_out'], 0))
             if (self.gui_eye):
-                self.connect((plsync, 0), (self.qtgui_eye_sink_plsync_out, 0))
+                self.connect((plsync, 0),
+                             (self.gui_blocks['eye_sink_plsync_out'], 0))
             self.connect((analog_agc, 0),
-                         (self.qtgui_freq_sink_agc_rotator_out, 0))
+                         (self.gui_blocks['freq_sink_agc_rotator_out'], 0))
             self.connect((rotator, 0),
-                         (self.qtgui_freq_sink_agc_rotator_out, 1))
+                         (self.gui_blocks['freq_sink_agc_rotator_out'], 1))
 
         # Some of the blocks are accessed later. Save them as members:
         self.bbdeheader = bbdeheader
