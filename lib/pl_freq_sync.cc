@@ -187,11 +187,9 @@ bool freq_sync::estimate_coarse(const gr_complex* in, bool full, uint8_t plsc)
      * offset falls within the fine correction range */
     coarse_corrected = abs(coarse_foffset) < fine_foffset_corr_range;
 
-    GR_LOG_DEBUG_LEVEL(2, d_logger, "Frequency offset estimation:");
-    GR_LOG_DEBUG_LEVEL(
-        2, d_logger, boost::format("- Coarse frequency offset: %g") % coarse_foffset);
-    GR_LOG_DEBUG_LEVEL(
-        2, d_logger, boost::format("- Coarse corrected: %u") % coarse_corrected);
+    GR_LOG_DEBUG_LEVEL(2, "Frequency offset estimation:");
+    GR_LOG_DEBUG_LEVEL(2, "- Coarse frequency offset: {:g}", coarse_foffset);
+    GR_LOG_DEBUG_LEVEL(2, "- Coarse corrected: {:d}", coarse_corrected);
 
     /* Reset autocorrelation accumulator */
     std::fill(pilot_corr.begin(), pilot_corr.end(), 0);
@@ -300,8 +298,7 @@ void freq_sync::estimate_fine_pilot_mode(const gr_complex* p_plheader,
     fine_foffset = sum_diff / (2.0 * GR_M_PI * PILOT_BLK_PERIOD * n_pilot_blks);
     fine_est_ready = true;
 
-    GR_LOG_DEBUG_LEVEL(
-        2, d_logger, boost::format("Fine frequency offset: %g") % fine_foffset);
+    GR_LOG_DEBUG_LEVEL(2, "Fine frequency offset: {:g}", fine_foffset);
 }
 
 bool freq_sync::estimate_fine_pilotless_mode(float curr_plheader_phase,
@@ -345,8 +342,7 @@ bool freq_sync::estimate_fine_pilotless_mode(float curr_plheader_phase,
     fine_foffset = delta_phase / (2.0 * GR_M_PI * curr_plframe_len);
     fine_est_ready = true;
 
-    GR_LOG_DEBUG_LEVEL(
-        2, d_logger, boost::format("- Fine frequency offset: %g") % fine_foffset);
+    GR_LOG_DEBUG_LEVEL(2, "- Fine frequency offset: {:g}", fine_foffset);
 
     return true;
 }
@@ -432,7 +428,7 @@ void freq_sync::derotate_plheader(const gr_complex* in, bool open_loop)
     const gr_complex* p_plheader = (open_loop) ? pp_plheader.data() : in;
     const float plheader_phase = estimate_sof_phase(p_plheader);
 
-    GR_LOG_DEBUG_LEVEL(3, d_logger, boost::format("PLHEADER phase: %g") % plheader_phase);
+    GR_LOG_DEBUG_LEVEL(3, "PLHEADER phase: {:g}", plheader_phase);
 
     gr_complex phase_correction = gr_expj(-plheader_phase);
     volk_32fc_s32fc_multiply_32fc(

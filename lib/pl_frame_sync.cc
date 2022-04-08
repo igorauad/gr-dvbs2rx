@@ -173,54 +173,55 @@ bool frame_sync::step(const gr_complex& in)
     /* Useful log separator */
     GR_LOG_DEBUG_LEVEL_IF(2,
                           (is_peak || peak_expected),
-                          d_logger,
                           "--------------------------------------------------");
 
     /* State machine */
     if (is_peak) {
         if (d_state == frame_sync_state_t::searching) {
             d_state = frame_sync_state_t::found;
-            GR_LOG_DEBUG_LEVEL(1, d_logger, "PLFRAME found");
+            GR_LOG_DEBUG_LEVEL(1, "PLFRAME found");
         } else if (d_state == frame_sync_state_t::found && d_sym_cnt == d_frame_len) {
             d_state = frame_sync_state_t::locked;
             d_lock_time = std::chrono::system_clock::now();
-            GR_LOG_DEBUG_LEVEL(1, d_logger, "PLFRAME lock acquired");
+            GR_LOG_DEBUG_LEVEL(1, "PLFRAME lock acquired");
         }
         d_sof_interval = d_sym_cnt;
         d_unlock_cnt = 0; // reset the unlock count just in case it was non-zero
         GR_LOG_DEBUG_LEVEL(2,
-                           d_logger,
-                           boost::format("Peak after: %u; "
-                                         "Timing Metric: %f; "
-                                         "Locked: %u") %
-                               d_sof_interval % d_timing_metric %
-                               (d_state == frame_sync_state_t::locked));
+                           "Peak after: {:d}; "
+                           "Timing Metric: {:f}; "
+                           "Locked: {:d}",
+                           d_sof_interval,
+                           d_timing_metric,
+                           (d_state == frame_sync_state_t::locked));
     } else if (peak_expected) {
         // Unlock only if the timing metric fails to exceed the threshold for
         // `d_unlock_thresh` consecutive frames. It's important to avoid
         // unlocking prematurely when running under high noise.
         d_unlock_cnt++;
-        GR_LOG_DEBUG_LEVEL(
-            2,
-            d_logger,
-            boost::format("Insufficient timing metric: %f (occurrence %u/%u)") %
-                d_timing_metric % d_unlock_cnt % d_unlock_thresh);
+        GR_LOG_DEBUG_LEVEL(2,
+                           "Insufficient timing metric: {:f} (occurrence {:d}/{:d})",
+                           d_timing_metric,
+                           d_unlock_cnt,
+                           d_unlock_thresh);
 
         if (d_unlock_cnt == d_unlock_thresh) {
             d_state = frame_sync_state_t::searching;
             d_unlock_cnt = 0;
-            GR_LOG_DEBUG_LEVEL(1, d_logger, "PLFRAME lock lost");
+            GR_LOG_DEBUG_LEVEL(1, "PLFRAME lock lost");
         }
     }
 
     /* Further debugging logs and symbol count reset */
     if (is_peak || peak_expected) {
         GR_LOG_DEBUG_LEVEL(3,
-                           d_logger,
-                           boost::format("Sym: %u; SOF: %+.1f %+.1fj; PLSC: %+.1f "
-                                         "%+.1fj") %
-                               d_sym_cnt % sof_corr.real() % sof_corr.imag() %
-                               plsc_corr.real() % plsc_corr.imag());
+                           "Sym: {:d}; SOF: {:+.1f} {:+.1f}j; PLSC: {:+.1f} "
+                           "%+.1fj",
+                           d_sym_cnt,
+                           sof_corr.real(),
+                           sof_corr.imag(),
+                           plsc_corr.real(),
+                           plsc_corr.imag());
         d_sym_cnt = 0; // prepare to index the data symbols
     }
 

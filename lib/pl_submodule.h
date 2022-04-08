@@ -18,17 +18,17 @@ namespace dvbs2rx {
 // Low-level debug logging controlled by level
 #ifdef DEBUG_LOGS
 
-#define GR_LOG_DEBUG_LEVEL(level, ...) \
-    do {                               \
-        if (d_debug_level >= level) {  \
-            GR_LOG_DEBUG(__VA_ARGS__); \
-        }                              \
+#define GR_LOG_DEBUG_LEVEL(level, ...)    \
+    do {                                  \
+        if (d_debug_level >= level) {     \
+            d_logger->debug(__VA_ARGS__); \
+        }                                 \
     } while (0)
 
 #define GR_LOG_DEBUG_LEVEL_IF(level, condition, ...) \
     do {                                             \
         if (d_debug_level >= level && condition) {   \
-            GR_LOG_DEBUG(__VA_ARGS__);               \
+            d_logger->debug(__VA_ARGS__);            \
         }                                            \
     } while (0)
 

@@ -273,16 +273,14 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
         d_closed_loop = true;
 
         if (abs(error) > tolerance) // sanity check
-            GR_LOG_WARN(d_logger,
-                        boost::format("rot_phase_inc tag offset error is too high: %d") %
-                            error);
+            d_logger->warn("rot_phase_inc tag offset error is too high: {:d}", error);
 
-        GR_LOG_DEBUG_LEVEL(
-            3,
-            d_logger,
-            boost::format("Rotator ctrl - Tagged Phase Inc: %f; Offset Error: %d; "
-                          "Delay: %d") %
-                current_phase_inc % error % d_rot_ctrl.tag_delay);
+        GR_LOG_DEBUG_LEVEL(3,
+                           "Rotator ctrl - Tagged Phase Inc: {:+f}; Offset Error: {:+d}; "
+                           "Delay: {:+d}",
+                           current_phase_inc,
+                           error,
+                           d_rot_ctrl.tag_delay);
     }
 }
 
@@ -348,15 +346,11 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     msg = pmt::dict_add(msg, offset_key, pmt::from_uint64(d_rot_ctrl.next.idx));
     message_port_pub(d_port_id, msg);
 
-    GR_LOG_DEBUG_LEVEL(2,
-                       d_logger,
-                       boost::format("Cumulative frequency offset: %g") %
-                           d_rot_ctrl.next.freq);
-    GR_LOG_DEBUG_LEVEL(
-        3,
-        d_logger,
-        boost::format("Rotator ctrl - Sent New Phase Inc: %f; Offset: %lu") % phase_inc %
-            abs_next_sof_idx);
+    GR_LOG_DEBUG_LEVEL(2, "Cumulative frequency offset: {:g}", d_rot_ctrl.next.freq);
+    GR_LOG_DEBUG_LEVEL(3,
+                       "Rotator ctrl - Sent New Phase Inc: {:+f}; Offset: {:d}",
+                       phase_inc,
+                       abs_next_sof_idx);
 }
 
 void plframe_idx_t::step(uint16_t n_slots, bool has_pilots)
@@ -724,10 +718,8 @@ int plsync_cc_impl::general_work(int noutput_items,
                 // corresponding to the first SOF/PLHEADER symbol. Consider that
                 // the SOF detection happens at the last PLHEADER symbol.
                 const uint64_t abs_sof_idx = nitems_read(0) + i - 89;
-                GR_LOG_DEBUG_LEVEL(2,
-                                   d_logger,
-                                   boost::format("SOF count: %lu; Index: %lu") %
-                                       d_sof_cnt % abs_sof_idx);
+                GR_LOG_DEBUG_LEVEL(
+                    2, "SOF count: {:d}; Index: {:d}", d_sof_cnt, abs_sof_idx);
 
                 // Cache some information from the last PLFRAME before handling the new
                 // PLHEADER. As soon as the PLHEADER is handled, the PLSC decoder will
@@ -783,10 +775,8 @@ int plsync_cc_impl::general_work(int noutput_items,
                 // useful to prevent wrong frame detection when it's known a priori that
                 // certain PLS values cannot be found in the input stream.
                 if (!d_pls_enabled[d_curr_frame_info.pls.plsc]) {
-                    GR_LOG_DEBUG_LEVEL(2,
-                                       d_logger,
-                                       boost::format("PLFRAME rejected (PLS=%u)") %
-                                           d_curr_frame_info.pls.plsc);
+                    GR_LOG_DEBUG_LEVEL(
+                        2, "PLFRAME rejected (PLS={:d})", d_curr_frame_info.pls.plsc);
                     d_rejected_cnt++;
                     continue;
                 }

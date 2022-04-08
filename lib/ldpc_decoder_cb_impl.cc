@@ -681,7 +681,7 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
 #endif
 #endif
     assert(decode != nullptr);
-    GR_LOG_DEBUG(d_debug_logger, boost::format("LDPC decoder implementation: %s") % impl);
+    d_debug_logger->debug("LDPC decoder implementation: {:s}", impl);
 
     soft = new int8_t[ldpc->code_len() * d_simd_size];
     dint = new int8_t[ldpc->code_len() * d_simd_size];
@@ -1291,14 +1291,16 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
         int count = decode(aligned_buffer, code, trials);
         if (count < 0) {
             total_trials += trials;
-            GR_LOG_INFO(d_logger,
-                        boost::format("frame = %d, snr = %.2f, trials = %d (max)") %
-                            (chunk * d_simd_size) % snr % trials);
+            d_logger->info("frame = {:d}, snr = {:.2f}, trials = {:d} (max)",
+                           (chunk * d_simd_size),
+                           snr,
+                           trials);
         } else {
             total_trials += (trials - count);
-            GR_LOG_INFO(d_logger,
-                        boost::format("frame = %d, snr = %.2f, trials = %d") %
-                            (chunk * d_simd_size) % snr % (trials - count));
+            d_logger->info("frame = {:d}, snr = {:.2f}, trials = {:d}",
+                           (chunk * d_simd_size),
+                           snr,
+                           (trials - count));
         }
         chunk++;
         precision_sum = 0;
@@ -1436,11 +1438,12 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             precision_sum += FACTOR / (sigma * sigma);
             total_snr += snr;
             if (info_mode) {
-                GR_LOG_INFO(d_logger,
-                            boost::format("frame = %d, snr = %.2f, average trials = %d, "
-                                          "average snr = %.2f") %
-                                frame % snr % (total_trials / chunk) %
-                                (total_snr / (frame + 1)));
+                d_logger->info("frame = {:d}, snr = {:.2f}, average trials = {:d}, "
+                               "average snr =,.2f",
+                               frame,
+                               snr,
+                               (total_trials / chunk),
+                               (total_snr / (frame + 1)));
             }
             insnr += frame_size / MOD_BITS;
             frame++;

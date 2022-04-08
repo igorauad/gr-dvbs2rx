@@ -344,7 +344,7 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
 
         if (check != TRUE) {
             synched = FALSE;
-            GR_LOG_WARN(d_logger, "Baseband header crc failed.");
+            d_logger->warn("Baseband header crc failed.");
             in += kbch;
             continue;
         }
@@ -388,43 +388,42 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
         // Validate the UPL, DFL and the SYNCD fields of the BBHEADER
         if (h->dfl > max_dfl) {
             synched = FALSE;
-            GR_LOG_WARN(d_logger, "Baseband header invalid (dfl > kbch - 80).");
+            d_logger->warn("Baseband header invalid (dfl > kbch - 80).");
             in += max_dfl;
             continue;
         }
 
         if (h->dfl % 8 != 0) {
             synched = FALSE;
-            GR_LOG_WARN(d_logger, "Baseband header invalid (dfl not a multiple of 8).");
+            d_logger->warn("Baseband header invalid (dfl not a multiple of 8).");
             in += max_dfl;
             continue;
         }
 
         if (h->syncd > h->dfl) {
             synched = FALSE;
-            GR_LOG_WARN(d_logger, "Baseband header invalid (syncd > dfl).");
+            d_logger->warn("Baseband header invalid (syncd > dfl).");
             in += max_dfl;
             continue;
         }
 
         if (h->upl != (TRANSPORT_PACKET_LENGTH * 8)) {
             synched = FALSE;
-            GR_LOG_WARN(d_logger, "Baseband header unsupported (upl != 188 bytes).");
+            d_logger->warn("Baseband header unsupported (upl != 188 bytes).");
             in += max_dfl;
             continue;
         }
 
         if (h->syncd % 8 != 0) {
             synched = FALSE;
-            GR_LOG_WARN(d_logger,
-                        "Baseband header unsupported (syncd not byte-aligned).");
+            d_logger->warn("Baseband header unsupported (syncd not byte-aligned).");
             in += max_dfl;
             continue;
         }
 
         // Skip the initial SYNCD bits of the DATAFIELD if re-synchronizing
         if (synched == FALSE) {
-            GR_LOG_INFO(d_logger, "Baseband header resynchronizing.");
+            d_logger->info("Baseband header resynchronizing.");
             if (mode == INPUTMODE_NORMAL) {
                 in += h->syncd + 8;
                 df_remaining -= h->syncd + 8;
@@ -566,9 +565,9 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
     }
 
     if (errors != 0) {
-        GR_LOG_INFO(d_logger,
-                    boost::format("TS packet crc errors = %d (PER = %g)") % errors %
-                        ((double)d_error_cnt / d_packet_cnt));
+        d_logger->info("TS packet crc errors = {:d} (PER = {:g})",
+                       errors,
+                       ((double)d_error_cnt / d_packet_cnt));
     }
 
     // Tell runtime system how many input items we consumed on
