@@ -18,7 +18,6 @@ from gnuradio import dtv
 from gnuradio import eng_notation
 from gnuradio import filter
 from gnuradio import gr
-from gnuradio import uhd
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio.filter import firdes
 
@@ -51,9 +50,17 @@ class dvbs2_tx(gr.top_block):
         self.source = options.source
         self.sps = options.sps
         self.sym_rate = options.sym_rate
-        self.usrp_addr = options.usrp_addr
-        self.usrp_antenna = options.usrp_antenna
-        self.usrp_gain = options.usrp_gain
+        self.usrp = {
+            'antenna': options.usrp_antenna,
+            'args': options.usrp_args,
+            'channels': [0],
+            'clock_source': options.usrp_clock_source,
+            'gain': options.usrp_gain,
+            'otw_format': options.usrp_otw_format,
+            'stream_args': options.usrp_stream_args or '',
+            'subdev': options.usrp_subdev,
+            'time_source': options.usrp_time_source,
+        }
 
         ##################################################
         # Variables
@@ -130,20 +137,29 @@ class dvbs2_tx(gr.top_block):
                 self.connect((throttle, 0), (file_or_fd_sink, 0))
 
         elif (self.sink == "usrp"):
-            sink = uhd.usrp_sink(
-                ",".join((self.usrp_addr, '')),
+            from gnuradio import uhd
+            sink = usrp_sink = uhd.usrp_sink(
+                self.usrp['args'],
                 uhd.stream_args(
                     cpu_format="fc32",
-                    args='',
-                    channels=list(range(0, 1)),
+                    otw_format=self.usrp['otw_format'],
+                    args=self.usrp['stream_args'],
+                    channels=self.usrp['channels'],
                 ),
                 "",
             )
-            sink.set_samp_rate(self.samp_rate)
-            sink.set_time_unknown_pps(uhd.time_spec(0))
-            sink.set_center_freq(self.freq, 0)
-            sink.set_antenna(self.usrp_antenna, 0)
-            sink.set_gain(self.usrp_gain, 0)
+            chan = 0
+            if self.usrp['clock_source'] is not None:
+                usrp_sink.set_clock_source(self.usrp['clock_source'], chan)
+            if self.usrp['time_source'] is not None:
+                usrp_sink.set_time_source(self.usrp['time_source'], chan)
+            if self.usrp['subdev'] is not None:
+                usrp_sink.set_subdev_spec(self.usrp['subdev'], chan)
+            usrp_sink.set_samp_rate(self.samp_rate)
+            usrp_sink.set_time_unknown_pps(uhd.time_spec(0))
+            usrp_sink.set_center_freq(self.freq, chan)
+            usrp_sink.set_antenna(self.usrp['antenna'], chan)
+            usrp_sink.set_gain(self.usrp['gain'], chan)
 
         # Simulation options
         # 1) Noise
@@ -341,15 +357,40 @@ def argument_parser():
                            help="Output IQ format")
 
     usrp_group = parser.add_argument_group('USRP Options')
-    usrp_group.add_argument("--usrp-addr", type=str, help="USRP address")
+    usrp_group.add_argument(
+        "--usrp-args",
+        type=str,
+        help="USRP device address arguments as a comma-delimited string with "
+        "key=value pairs")
     usrp_group.add_argument("--usrp-antenna",
                             type=str,
                             default="TX/RX",
                             help="USRP antenna")
+    usrp_group.add_argument("--usrp-clock-source",
+                            type=str,
+                            choices=['internal', 'external', 'mimo', 'gpsdo'],
+                            help="USRP clock source")
     usrp_group.add_argument("--usrp-gain",
                             type=float,
                             default=0,
                             help="USRP Tx gain")
+    usrp_group.add_argument("--usrp-otw-format",
+                            type=str,
+                            choices=['sc16', 'sc12', 'sc8'],
+                            default='sc16',
+                            help="USRP over-the-wire data format")
+    usrp_group.add_argument(
+        "--usrp-stream-args",
+        type=str,
+        help="USRP Tx streaming arguments as a comma-delimited string with "
+        "key=value pairs")
+    usrp_group.add_argument("--usrp-subdev",
+                            type=str,
+                            help="USRP subdevice specification")
+    usrp_group.add_argument("--usrp-time-source",
+                            type=str,
+                            choices=['external', 'mimo', 'gpsdo'],
+                            help="USRP time source")
 
     sim_group = parser.add_argument_group('Simulation Options')
     sim_group.add_argument(
@@ -363,27 +404,29 @@ def argument_parser():
 
     options = parser.parse_args()
 
-    if (options.sink == "usrp" and options.usrp_addr is None):
-        parser.error("argument --usrp-addr is required when --sink=\"usrp\"")
+    if (options.sink == "usrp" and options.usrp_args is None):
+        parser.error("argument --usrp-args is required when --sink=\"usrp\"")
 
     return options
 
 
 def main():
     options = argument_parser()
+
+    gr.log.info("Starting DVB-S2 Tx")
+
     tb = dvbs2_tx(options)
 
     def sig_handler(sig=None, frame=None):
         tb.stop()
         tb.wait()
-
+        gr.log.info("Stopping DVB-S2 Tx")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
 
     tb.start()
-
     tb.wait()
 
 

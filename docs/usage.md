@@ -78,10 +78,14 @@ interface of a USRP, as follows:
 
 **Example 5:**
 ```
-dvbs2-tx --sink usrp --out-usrp "serial=xyz" --freq 1316.9e6 --sym-rate 1e6
+dvbs2-tx --sink usrp --usrp-args "serial=xyz" --freq 1316.9e6 --sym-rate 1e6
 ```
 
-Where option `--out-usrp` specifies the identifier of the destination USRP.
+where option `--usrp-args` specifies the
+[address identifier](https://files.ettus.com/manual/page_identification.html)
+of the target USRP device.
+See the help menu for further USRP options like gain, antenna, clock/time
+source, and more.
 
 ## Experimenting with Parameters
 

@@ -79,9 +79,18 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.sym_sync_damping = options.sym_sync_damping
         self.sym_sync_impl = options.sym_sync_impl
         self.sym_sync_loop_bw = options.sym_sync_loop_bw
-        self.usrp_addr = options.usrp_addr
-        self.usrp_antenna = options.usrp_antenna
-        self.usrp_gain = options.usrp_gain
+        self.usrp = {
+            'antenna': options.usrp_antenna,
+            'args': options.usrp_args,
+            'channels': [0],
+            'clock_source': options.usrp_clock_source,
+            'gain': options.usrp_gain,
+            'lo_offset': options.usrp_lo_offset,
+            'otw_format': options.usrp_otw_format,
+            'stream_args': options.usrp_stream_args or '',
+            'subdev': options.usrp_subdev,
+            'time_source': options.usrp_time_source,
+        }
 
         ##################################################
         # Variables
@@ -513,19 +522,37 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             source = rtlsdr
         elif (self.source == "usrp"):
             from gnuradio import uhd
-            usrp = uhd.usrp_source(
-                ",".join((self.usrp_addr, '')),
+            source = usrp_source = uhd.usrp_source(
+                self.usrp['args'],
                 uhd.stream_args(
                     cpu_format="fc32",
-                    args='',
-                    channels=list(range(0, 1)),
+                    otw_format=self.usrp['otw_format'],
+                    args=self.usrp['stream_args'],
+                    channels=self.usrp['channels'],
                 ))
-            usrp.set_samp_rate(self.samp_rate)
-            usrp.set_time_unknown_pps(uhd.time_spec(0))
-            usrp.set_center_freq(self.freq, 0)
-            usrp.set_antenna(self.usrp_antenna, 0)
-            usrp.set_gain(self.usrp_gain, 0)
-            source = usrp
+            chan = 0
+            if self.usrp['clock_source'] is not None:
+                usrp_source.set_clock_source(self.usrp['clock_source'], chan)
+            if self.usrp['time_source'] is not None:
+                usrp_source.set_time_source(self.usrp['time_source'], chan)
+            if self.usrp['subdev'] is not None:
+                usrp_source.set_subdev_spec(self.usrp['subdev'], chan)
+            usrp_source.set_samp_rate(self.samp_rate)
+            usrp_source.set_time_unknown_pps(uhd.time_spec(0))
+
+            # Tune the RF frontend with an offset relative to the target center
+            # frequency. In other words, tune the LO to "freq - lo_offset"
+            # instead of "freq". By default, set the LO offset to the sampling
+            # rate and let the FPGA's DSP apply the remaining frequency shift
+            # of "exp(j*2*pi*n*samp_rate/master_clock_rate)". With that, the DC
+            # component due to LO leakage ends up out of the observed band.
+            # Just make sure to use an LO offset within +-master_clock_rate/2.
+            lo_offset = self.samp_rate if self.usrp['lo_offset'] is None else \
+                self.usrp['lo_offset']
+            usrp_source.set_center_freq(uhd.tune_request(self.freq, lo_offset),
+                                        chan)
+            usrp_source.set_antenna(self.usrp['antenna'], chan)
+            usrp_source.set_gain(self.usrp['gain'], chan)
 
         if (self.gui):
             self.blocks_rms_xx_0 = blocks.rms_cf(0.0001)
@@ -1078,20 +1105,49 @@ def argument_parser():
                                help="RTL-SDR serial number")
 
     usrp_group = parser.add_argument_group('USRP Options')
-    usrp_group.add_argument("--usrp-addr", type=str, help="USRP address")
+    usrp_group.add_argument(
+        "--usrp-args",
+        type=str,
+        help="USRP device address arguments as a comma-delimited string with "
+        "key=value pairs")
     usrp_group.add_argument("--usrp-antenna",
                             type=str,
                             default="TX/RX",
                             help="USRP antenna")
+    usrp_group.add_argument("--usrp-clock-source",
+                            type=str,
+                            choices=['internal', 'external', 'mimo', 'gpsdo'],
+                            help="USRP clock source")
     usrp_group.add_argument("--usrp-gain",
                             type=float,
                             default=0,
                             help="USRP Rx gain")
+    usrp_group.add_argument(
+        "--usrp-lo-offset",
+        type=eng_float,
+        help="USRP\'s tune request LO offset frequency in Hz")
+    usrp_group.add_argument("--usrp-otw-format",
+                            type=str,
+                            choices=['sc16', 'sc12', 'sc8'],
+                            default='sc16',
+                            help="USRP over-the-wire data format")
+    usrp_group.add_argument(
+        "--usrp-stream-args",
+        type=str,
+        help="USRP Rx streaming arguments as a comma-delimited string with "
+        "key=value pairs")
+    usrp_group.add_argument("--usrp-subdev",
+                            type=str,
+                            help="USRP subdevice specification")
+    usrp_group.add_argument("--usrp-time-source",
+                            type=str,
+                            choices=['external', 'mimo', 'gpsdo'],
+                            help="USRP time source")
 
     options = parser.parse_args()
 
-    if (options.source == "usrp" and options.usrp_addr is None):
-        parser.error("argument --usrp-addr is required when --source=\"usrp\"")
+    if (options.source == "usrp" and options.usrp_args is None):
+        parser.error("argument --usrp-args is required when --source=\"usrp\"")
 
     if (options.sym_sync_impl == "oot"
             and not (options.sps.is_integer() and int(options.sps) % 2 == 0)):
