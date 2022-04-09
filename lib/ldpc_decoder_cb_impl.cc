@@ -692,6 +692,7 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     generate_deinterleave_lookup();
     if (outputmode == OM_MESSAGE) {
         set_output_multiple(nbch * d_simd_size);
+        set_relative_rate((double)nbch / frame_size);
     } else {
         set_output_multiple(frame_size * d_simd_size);
     }

@@ -391,6 +391,7 @@ bch_decoder_bb_impl::bch_decoder_bb_impl(dvb_standard_t standard,
     output_mode = outputmode;
     if (outputmode == OM_MESSAGE) {
         set_output_multiple(kbch);
+        set_relative_rate((double)kbch / nbch);
     } else {
         set_output_multiple(nbch);
     }
