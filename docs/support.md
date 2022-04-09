@@ -29,8 +29,6 @@
     - Please feel free to get in touch if you would like to use another SDR
       device/board. Adding support should be straightforward if the device
       already has GNU Radio support. Pull requests are also welcome.
-    - Note the Tx and Rx support for USRPs has not been tested yet. Please get
-      in touch if you are able to test with these devices and find any problems.
 
 - The Tx application takes an MPEG transport stream on the input, and the RX
   application likewise outputs a transport stream. None of them offer any

@@ -1,11 +1,12 @@
 # Usage
 
-- Contents
+- [Usage](#usage)
   - [Input and Output Options](#input-and-output-options)
   - [Experimenting with Parameters](#experimenting-with-parameters)
   - [Graphical User Interface](#graphical-user-interface)
   - [Processing the MPEG Transport Stream](#processing-the-mpeg-transport-stream)
   - [Receiver Monitoring](#receiver-monitoring)
+  - [Further Information](#further-information)
 
 
 ## Input and Output Options
@@ -15,52 +16,62 @@ descriptors, regular files, and SDR boards. By default, they read the input from
 stdin (file descriptor 0) and output to stdout (file descriptor 1). Hence, for
 testing purposes, the Tx output can be piped into the Rx input as follows:
 
-**Example 1:**
+### Example 1
 ```
 cat example.ts | dvbs2-tx | dvbs2-rx > /dev/null
 ```
 
-Note the Tx reads the MPEG transport stream (TS) file (`example.ts`) from its
-standard input (stdin) and transmits the corresponding IQ stream. Meanwhile, the
-Rx reads the IQ stream fed into its stdin and outputs the decoded MPEG TS stream
-directly into its standard output (stdout). Finally, the Rx output goes to the
-null device.
+In this case, the Tx reads the MPEG transport stream (TS) file (`example.ts`)
+from its standard input (stdin) and transmits the corresponding IQ stream into
+the Rx app. Meanwhile, the Rx app outputs the decoded MPEG TS stream directly
+into its standard output (stdout), which is redirected to the null device.
 
-> NOTE: If you don't have an MPEG TS file to test, you can download an [example
-> TS file](http://www.w6rz.net/thefuryclip.ts). Alternatively, you can use a
-> transport stream generator (see Example 10).
+If you don't have an MPEG TS file for testing, you can download an [example TS
+file](http://www.w6rz.net/thefuryclip.ts). Alternatively, you can use a
+transport stream generator. The `tsp` tool from the [TSDuck](https://tsduck.io)
+toolkit provides such a generator (see the [installation
+instructions](#tsduck-installation)), which can be used as follows:
 
-The Tx and Rx applications offer flexible source and sink options, which can be
-modified using the `--source` and `--sink` command-line switches. For example,
-instead of using file descriptors, as in **Example 1**, you can specify source
-and sink files directly, as follows:
+### Example 2
+```
+tsp -I craft --pid 100 | dvbs2-tx | dvbs2-rx > /dev/null
+```
 
-**Example 2:**
+In this case, it is the `craft` plugin from `tsp` that is generating a fake MPEG
+transport stream with packet ID (PID) 100 on the input to the `dvbs2-tx` app.
+
+So far, both examples have adopted the file descriptor interface for input and
+output. However, the applications offer flexible source and sink options, which
+can be modified using the `--source` and `--sink` command-line switches. For
+example, you can specify source and sink files directly, as follows:
+
+### Example 3
 ```
 dvbs2-tx --source file --in-file example.ts | \
     dvbs2-rx --sink file --out-file /dev/null
 ```
 
 When using file descriptors, it is also possible to configure which descriptors
-take the input and output. One problem in **Example 1** is that the output from
-`dvbs2-rx` is entirely redirected to the null device, including the receiver
-logs. As an alternative, the MPEG TS output can be fed into a separate file
-descriptor instead of the regular stdout (descriptor 1), as follows:
+take the input and output. One problem in [Example 1](#example-1) is that the
+output from `dvbs2-rx` is entirely redirected to the null device, including the
+receiver logs. As an alternative, the MPEG TS output can be fed into a separate
+file descriptor instead of the stdout (descriptor 1), as follows:
 
-**Example 3:**
+### Example 4
 ```
 cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3> /dev/null
 ```
 
-In this example, only the decoded TS output is fed to descriptor 3, whereas the
-receiver logs continue to be printed to the console via the standard output.
-Hence, this command is equivalent to that of **Example 2**, since `--out-file`
-regulates the file for the TS output only, excluding the receiver logs.
+In this example, only the decoded TS output is fed into descriptor 3, whereas
+the receiver logs continue to be printed to the console via the standard output.
+Hence, this command is equivalent to that of [Example 3](#example-2), since
+`--out-file` regulates the file for the TS output only, excluding the receiver
+logs.
 
-Next, if you are running an SDR interface, you can run a command like the
-following for the receiver:
+Next, if your goal is to receive using an RTL-SDR interface, you can run a
+command like the following:
 
-**Example 4:**
+### Example 5
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6
 ```
@@ -73,19 +84,28 @@ Where:
 - Option `--sym-rate` specifies the symbol rate (also known as baud rate) in
   symbols per second (or bauds).
 
-Similarly, the Tx application can feed the transmit IQ stream into the Tx
-interface of a USRP, as follows:
+Similarly, using a USRP device, you can receive with:
 
-**Example 5:**
+### Example 6
 ```
-dvbs2-tx --sink usrp --usrp-args "serial=xyz" --freq 1316.9e6 --sym-rate 1e6
+dvbs2-rx -f 1316.9e6 -s 1e6 --source usrp --usrp-args "serial=xyz"
 ```
 
 where option `--usrp-args` specifies the
 [address identifier](https://files.ettus.com/manual/page_identification.html)
 of the target USRP device.
-See the help menu for further USRP options like gain, antenna, clock/time
-source, and more.
+
+The same holds for the Tx application. A USRP device can be used for
+transmission as follows:
+
+### Example 7
+```
+tsp -I craft --pid 100 | \
+  dvbs2-tx --sink usrp --usrp-args "serial=xyz" --freq 1316.9e6 --sym-rate 1e6
+```
+
+See the help menu (`dvbs2-tx --help` and `dvbs2-rx --help`) for further USRP
+options like gain, antenna, clock/time source, and more.
 
 ## Experimenting with Parameters
 
@@ -94,7 +114,7 @@ DVB-S2 parameters. For instance, the previous Tx-Rx loopback example can be
 adapted to test a different MODCOD, FEC frame size, roll-off factor, symbol
 rate, and pilot configuration:
 
-**Example 6:**
+### Example 8
 ```
 dvbs2-tx \
     --source file \
@@ -131,9 +151,9 @@ command:
 ## Graphical User Interface
 
 A graphical user interface (GUI) is available on the receiver application. You
-can optionally enable it by running with the option `--gui`, as follows:
+can optionally enable it by running with the `--gui` option, as follows:
 
-**Example 7:**
+### Example 9
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --gui
 ```
@@ -148,17 +168,17 @@ looking for a lightweight execution, consider running without the GUI.
 
 ## Processing the MPEG Transport Stream
 
-The MPEG Transport Stream layer is beyond the scope of this project. For
-example, the DVB-S2 Rx application only aims to output the MPEG TS stream for an
-external application instead of handling the MPEG stream itself. Likewise, the
-Tx application takes a fully-formatted TS stream on its input and does not
-modify the TS stream at all.
+The MPEG Transport Stream layer is beyond the scope of this project. The DVB-S2
+Rx application only aims to output the MPEG TS stream for an external
+application instead of handling the MPEG stream itself. Likewise, the Tx
+application takes a fully-formatted TS stream on its input and does not modify
+the TS stream at all.
 
 A recommended application to handle the MPEG TS layer is the `tsp` tool from the
 [TSDuck](https://tsduck.io) toolkit. The following example demonstrates how you
 can pipe the output from `dvbs2-rx` into `tsp`.
 
-**Example 8**:
+### Example 10
 ```
 cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | \
   tsp -P mpe --pid 32 --udp-forward --local-address 127.0.0.1 -O drop
@@ -190,21 +210,13 @@ Another useful application from the TSDuck toolkit is the `tsdump` tool, which
 dumps all the incoming TS packets into the console in real-time. You can use it
 as follows:
 
-**Example 9**:
+### Example 11
 ```
 cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsdump --no-pager --headers-only
 ```
 
 Please refer to TSDuck's [user
 guide](https://tsduck.io/download/docs/tsduck.pdf) for further information.
-
-Lastly, note you can use the `tsp` application's `craft` plugin to generate a
-fake MPEG transport stream on the input to the `dvbs2-tx` app, as follows:
-
-**Example 10**:
-```
-tsp -I craft --pid 100 | dvbs2-tx | dvbs2-rx --sink file --out-file /dev/null
-```
 
 ## Receiver Monitoring
 
@@ -216,10 +228,10 @@ the MPEG TS packet counts, and so on. The receiver application can provide such
 metrics either through periodic logs printed to the console or on-demand via
 HTTP requests. In both cases, it returns the information in JSON format.
 
-The example below illustrates the case of a receiver launching a monitoring
-server for on-demand access via HTTP requests:
+The example below illustrates the monitoring server launched for on-demand
+access via HTTP requests:
 
-**Example 11:**
+### Example 12
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --mon-server
 ```
@@ -235,9 +247,51 @@ curl -s http://localhost:9004 | python3 -m json.tool
 Alternatively, you may want to print the performance metrics continuously to the
 console. To do so, run with option `--log-stats`, as follows:
 
-**Example 12:**
+### Example 13
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --log-stats
+```
+
+## Further Information
+
+### TSDuck Installation
+
+You can install TSDuck directly from the
+[available binaries](https://tsduck.io/download/tsduck/) or from the
+[Blockstream Satellite](https://github.com/Blockstream/satellite) package
+repositories, as follows:
+
+Ubuntu:
+```
+add-apt-repository ppa:blockstream/satellite
+apt-get update
+apt-get install tsduck
+```
+
+Debian:
+
+```
+add-apt-repository https://aptly.blockstream.com/satellite/debian/
+apt-key adv --keyserver keyserver.ubuntu.com \
+    --recv-keys 87D07253F69E4CD8629B0A21A94A007EC9D4458C
+apt-get update
+apt-get install tsduck
+```
+
+Raspbian:
+
+```
+add-apt-repository https://aptly.blockstream.com/satellite/raspbian/
+apt-key adv --keyserver keyserver.ubuntu.com \
+    --recv-keys 87D07253F69E4CD8629B0A21A94A007EC9D4458C
+apt-get update
+apt-get install tsduck
+```
+
+Fedora:
+```
+dnf copr enable blockstream/satellite
+dnf install tsduck
 ```
 
 ---
