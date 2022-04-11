@@ -413,14 +413,11 @@ def argument_parser():
 def main():
     options = argument_parser()
 
-    gr.log.info("Starting DVB-S2 Tx")
-
     tb = dvbs2_tx(options)
 
     def sig_handler(sig=None, frame=None):
         tb.stop()
         tb.wait()
-        gr.log.info("Stopping DVB-S2 Tx")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, sig_handler)
