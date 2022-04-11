@@ -6,25 +6,40 @@
 #
 # DVB-S2 Transmitter
 
+import ctypes
+import os
 import signal
 import sys
+import time
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from datetime import datetime
+from distutils.version import StrictVersion
 from math import pi, sqrt
+from threading import Thread
 
 import pmt
+import sip
+from PyQt5 import Qt, QtCore
 from gnuradio import analog
 from gnuradio import blocks
 from gnuradio import dtv
 from gnuradio import eng_notation
 from gnuradio import filter
 from gnuradio import gr
+from gnuradio import qtgui
 from gnuradio.eng_arg import eng_float, intx
+from gnuradio.fft import window
 from gnuradio.filter import firdes
 
 import dvbs2rx
 
+MAX_USRP_TX_GAIN = 65
+MAX_USRP_FREQ = 6e9
+MIN_USRP_FREQ = 10e6
 
-class dvbs2_tx(gr.top_block):
+
+class dvbs2_tx(gr.top_block, Qt.QWidget):
+
     def __init__(self, options):
         gr.top_block.__init__(self, "DVB-S2 Tx", catch_exceptions=True)
 
@@ -35,6 +50,9 @@ class dvbs2_tx(gr.top_block):
         self.freq = options.freq
         self.freq_offset = options.freq_offset
         self.gold_code = options.gold_code
+        self.gui = options.gui
+        self.gui_out_time = options.gui_out_time or options.gui_all
+        self.gui_out_freq = options.gui_out_freq or options.gui_all
         self.in_fd = options.in_fd
         self.in_file = options.in_file
         self.in_repeat = options.in_repeat
@@ -69,13 +87,232 @@ class dvbs2_tx(gr.top_block):
         self.code_rate = code_rate
         self.samp_rate = self.sym_rate * self.sps
         self.constellation = self.modcod.replace(code_rate, "")
+        self.plframe_len = dvbs2rx.params.pl_info(self.constellation,
+                                                  self.code_rate,
+                                                  self.frame_size,
+                                                  self.pilots)['plframe_len']
+        self.start_time = datetime.now()
+        self.uptime = datetime.now() - self.start_time
 
         ##################################################
         # Flowgraph
         ##################################################
+        if (self.gui):
+            self.setup_gui()
         source_block = self.connect_source()
         sink_block = self.connect_sink()
         self.connect_dvbs2tx(source_block, sink_block)
+
+    def _uptime_monitoring(self, qtgui_label, period=1):
+        while (True):
+            self.uptime = datetime.now() - self.start_time
+            Qt.QMetaObject.invokeMethod(qtgui_label, "setText",
+                                        Qt.Q_ARG("QString", str(self.uptime)))
+            time.sleep(period)
+
+    def _get_time_sink(self, name):
+        time_sink = qtgui.time_sink_c(
+            self.plframe_len,  # size
+            self.sym_rate,  # samp_rate
+            name,  # name
+            1,  # number of inputs
+            None  # parent
+        )
+        time_sink.set_update_time(0.10)
+        time_sink.set_y_axis(-1, 1)
+
+        time_sink.set_y_label('Amplitude', "")
+
+        time_sink.enable_tags(True)
+        time_sink.set_trigger_mode(qtgui.TRIG_MODE_FREE, qtgui.TRIG_SLOPE_POS,
+                                   0.0, 0, 0, "")
+        time_sink.enable_autoscale(True)
+        time_sink.enable_grid(True)
+        time_sink.enable_axis_labels(True)
+        time_sink.enable_control_panel(False)
+        time_sink.enable_stem_plot(False)
+
+        labels = [
+            'I', 'Q', 'Signal 3', 'Signal 4', 'Signal 5', 'Signal 6',
+            'Signal 7', 'Signal 8', 'Signal 9', 'Signal 10'
+        ]
+        widths = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        colors = [
+            'blue', 'red', 'green', 'black', 'cyan', 'magenta', 'yellow',
+            'dark red', 'dark green', 'dark blue'
+        ]
+        alphas = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        styles = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        markers = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+
+        for i in range(2):
+            if len(labels[i]) == 0:
+                if (i % 2 == 0):
+                    time_sink.set_line_label(i, "Re{{Data {0}}}".format(i / 2))
+                else:
+                    time_sink.set_line_label(i, "Im{{Data {0}}}".format(i / 2))
+            else:
+                time_sink.set_line_label(i, labels[i])
+            time_sink.set_line_width(i, widths[i])
+            time_sink.set_line_color(i, colors[i])
+            time_sink.set_line_style(i, styles[i])
+            time_sink.set_line_marker(i, markers[i])
+            time_sink.set_line_alpha(i, alphas[i])
+
+        return time_sink
+
+    def _get_freq_sink(self, name, ninput=1):
+        freq_sink = qtgui.freq_sink_c(
+            1024,  # size
+            window.WIN_BLACKMAN_hARRIS,  # wintype
+            0,  # fc
+            self.samp_rate,  # bw
+            name,  # name
+            ninput,
+            None  # parent
+        )
+        freq_sink.set_update_time(0.10)
+        freq_sink.set_y_axis(-140, 10)
+        freq_sink.set_y_label('Relative Gain', 'dB')
+        freq_sink.set_trigger_mode(qtgui.TRIG_MODE_FREE, 0.0, 0, "")
+        freq_sink.enable_autoscale(True)
+        freq_sink.enable_grid(True)
+        freq_sink.set_fft_average(0.05)
+        freq_sink.enable_axis_labels(True)
+        freq_sink.enable_control_panel(False)
+        freq_sink.set_fft_window_normalized(False)
+
+        labels = ['Before', 'After', '', '', '', '', '', '', '', '']
+        widths = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        colors = [
+            "blue", "red", "green", "black", "cyan", "magenta", "yellow",
+            "dark red", "dark green", "dark blue"
+        ]
+        alphas = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+        for i in range(ninput):
+            if len(labels[i]) == 0:
+                freq_sink.set_line_label(i, "Data {0}".format(i))
+            else:
+                freq_sink.set_line_label(i, labels[i])
+            freq_sink.set_line_width(i, widths[i])
+            freq_sink.set_line_color(i, colors[i])
+            freq_sink.set_line_alpha(i, alphas[i])
+
+        return freq_sink
+
+    def _add_gui_block(self, name, gui_obj, pos):
+        self.gui_blocks[name] = gui_obj
+
+        # For compatibility with GR 3.9 and 3.10, check both pyqwidget() and
+        # qwidget() from the QT GUI object.
+        if hasattr(gui_obj, 'pyqwidget'):
+            gui_obj_win = sip.wrapinstance(gui_obj.pyqwidget(), Qt.QWidget)
+        else:
+            gui_obj_win = sip.wrapinstance(gui_obj.qwidget(), Qt.QWidget)
+
+        self.top_grid_layout.addWidget(gui_obj_win, *pos)
+
+    def setup_gui(self):
+        Qt.QWidget.__init__(self)
+        self.setWindowTitle("DVB-S2 Tx")
+        qtgui.util.check_set_qss()
+        try:
+            self.setWindowIcon(Qt.QIcon.fromTheme('gnuradio-grc'))
+        except:
+            pass
+        self.top_scroll_layout = Qt.QVBoxLayout()
+        self.setLayout(self.top_scroll_layout)
+        self.top_scroll = Qt.QScrollArea()
+        self.top_scroll.setFrameStyle(Qt.QFrame.NoFrame)
+        self.top_scroll_layout.addWidget(self.top_scroll)
+        self.top_scroll.setWidgetResizable(True)
+        self.top_widget = Qt.QWidget()
+        self.top_scroll.setWidget(self.top_widget)
+        self.top_layout = Qt.QVBoxLayout(self.top_widget)
+        self.top_grid_layout = Qt.QGridLayout()
+        self.top_layout.addLayout(self.top_grid_layout)
+
+        self.settings = Qt.QSettings("GNU Radio", "dvbs2-tx")
+
+        try:
+            if StrictVersion(Qt.qVersion()) < StrictVersion("5.0.0"):
+                self.restoreGeometry(
+                    self.settings.value("geometry").toByteArray())
+            else:
+                self.restoreGeometry(self.settings.value("geometry"))
+        except:
+            pass
+
+        ##################################################
+        # Blocks
+        ##################################################
+        self.gui_blocks = {}
+        n_rows = 1
+        n_optional = self.gui_out_time + self.gui_out_freq
+        n_columns = max(n_optional, 1)
+
+        # Add labels
+        self.qtgui_label = {}
+        for label, var in zip(["MODCOD", "Frame Size", "Pilots", "Uptime"], [
+                self.modcod,
+                self.frame_size.capitalize(), "On" if self.pilots else "Off",
+                str(self.uptime)
+        ]):
+            qtgui_label_tool_bar = Qt.QToolBar(self)
+            qtgui_label_tool_bar.addWidget(Qt.QLabel(label + ": "))
+            self.qtgui_label[label] = Qt.QLabel(str(var))
+            qtgui_label_tool_bar.addWidget(self.qtgui_label[label])
+            self.top_layout.addWidget(qtgui_label_tool_bar)
+
+        # Keep updating the uptime label on a thread
+        self.uptime_thread = Thread(target=self._uptime_monitoring,
+                                    args=(self.qtgui_label["Uptime"], ),
+                                    daemon=True)
+        self.uptime_thread.start()
+
+        if (self.gui_out_time):
+            self._add_gui_block('time_sink_iq_out',
+                                self._get_time_sink("IQ Output"), (0, 0))
+
+        if (self.gui_out_freq):
+            pos = (0, 0) if n_optional <= 1 else (0, 1)
+            self._add_gui_block('freq_sink_iq_out',
+                                self._get_freq_sink("Output PSD"), pos)
+
+        # Optional SDR controls
+        if (self.sink == 'usrp'):
+            if n_columns >= 2:
+                n_rows += 1
+                pos = [(1, 0), (1, 1)]
+            else:
+                n_rows += 2
+                pos = [(1, 0), (2, 0)]
+
+            # Gain
+            qt_gain_range = qtgui.Range(0, MAX_USRP_TX_GAIN, 1,
+                                        self.usrp['gain'], 200)
+            gui_gain_widget = qtgui.RangeWidget(qt_gain_range,
+                                                self.set_gui_gain, "Gain",
+                                                "counter_slider", float,
+                                                QtCore.Qt.Horizontal)
+            self.top_grid_layout.addWidget(gui_gain_widget, *pos[0])
+
+            # Center Frequency
+            qt_freq_range = qtgui.Range(MIN_USRP_FREQ, MAX_USRP_FREQ, 10e6,
+                                        self.freq, 200)
+            gui_freq_widget = qtgui.RangeWidget(qt_freq_range,
+                                                self.set_gui_freq,
+                                                "Center Frequency",
+                                                "counter_slider", float,
+                                                QtCore.Qt.Horizontal)
+            self.top_grid_layout.addWidget(gui_freq_widget, *pos[1])
+
+        # Stretch columns and rows
+        for r in range(0, n_rows):
+            self.top_grid_layout.setRowStretch(r, 1)
+        for c in range(0, n_columns):
+            self.top_grid_layout.setColumnStretch(c, 1)
 
     def connect_source(self):
         """Connect the MPEG TS source
@@ -138,7 +375,7 @@ class dvbs2_tx(gr.top_block):
 
         elif (self.sink == "usrp"):
             from gnuradio import uhd
-            sink = usrp_sink = uhd.usrp_sink(
+            sink = self.usrp_sink = usrp_sink = uhd.usrp_sink(
                 self.usrp['args'],
                 uhd.stream_args(
                     cpu_format="fc32",
@@ -274,6 +511,42 @@ class dvbs2_tx(gr.top_block):
 
         self.connect((interp_filter, 0), (sink_block, 0))
 
+        if (self.gui):
+            if (self.gui_out_time):
+                self.connect((interp_filter, 0),
+                             (self.gui_blocks['time_sink_iq_out'], 0))
+            if (self.gui_out_freq):
+                self.connect((interp_filter, 0),
+                             (self.gui_blocks['freq_sink_iq_out'], 0))
+
+    def setStyleSheetFromFile(self, theme):
+        try:
+            prefixes = [gr.prefix(), "/usr/local", "/usr"]
+            found = False
+            for prefix in prefixes:
+                filename = os.path.join(prefix, "share", "gnuradio", "themes",
+                                        theme)
+                if os.path.exists(filename):
+                    found = True
+                    break
+            if (not found):
+                gr.log.error("Failed to locate theme {}".format(theme))
+                return
+            with open(filename) as ss:
+                self.setStyleSheet(ss.read())
+        except Exception as e:
+            gr.log.error(str(e))
+
+    def set_gui_gain(self, new_gain):
+        if (self.sink == 'usrp'):
+            self.usrp['gain'] = new_gain
+            self.usrp_sink.set_gain(self.usrp['gain'], 0)
+
+    def set_gui_freq(self, new_freq):
+        self.freq = new_freq
+        if (self.sink == 'usrp'):
+            self.usrp_sink.set_center_freq(self.freq, 0)
+
 
 def argument_parser():
     description = 'DVB-S2 Transmitter'
@@ -320,6 +593,30 @@ def argument_parser():
                         type=eng_float,
                         default=eng_notation.num_to_str(float(1000000)),
                         help="Symbol rate in bauds")
+
+    gui_group = parser.add_argument_group('GUI Options')
+    gui_group.add_argument("--gui",
+                           action='store_true',
+                           default=False,
+                           help="Launch a graphical user interface (GUI).")
+    gui_group.add_argument(
+        "--gui-out-time",
+        action='store_true',
+        default=False,
+        help="Add widget to display the output IQ in the time domain.")
+    gui_group.add_argument(
+        "--gui-out-freq",
+        action='store_true',
+        default=False,
+        help="Add widget to display the output IQ in the frequency domain.")
+    gui_group.add_argument("--gui-all",
+                           action='store_true',
+                           default=False,
+                           help="Enable all available GUI widgets.")
+    gui_group.add_argument("--gui-dark",
+                           action='store_true',
+                           default=False,
+                           help="Launch the GUI in dark mode.")
 
     src_group = parser.add_argument_group('Source Options')
     src_group.add_argument("--source",
@@ -413,18 +710,47 @@ def argument_parser():
 def main():
     options = argument_parser()
 
+    gui_mode = options.gui
+    if (gui_mode):
+        if sys.platform.startswith('linux'):
+            try:
+                x11 = ctypes.cdll.LoadLibrary('libX11.so')
+                x11.XInitThreads()
+            except:
+                pass
+
+        if StrictVersion("4.5.0") <= StrictVersion(
+                Qt.qVersion()) < StrictVersion("5.0.0"):
+            style = gr.prefs().get_string('qtgui', 'style', 'raster')
+            Qt.QApplication.setGraphicsSystem(style)
+        qapp = Qt.QApplication(sys.argv)
+
     tb = dvbs2_tx(options)
+    tb.start()
+
+    if (gui_mode):
+        if (options.gui_dark):
+            tb.setStyleSheetFromFile("dark.qss")
+        tb.show()
+    else:
+        tb.wait()
 
     def sig_handler(sig=None, frame=None):
         tb.stop()
         tb.wait()
-        sys.exit(0)
+        if (gui_mode):
+            Qt.QApplication.quit()
+        else:
+            sys.exit(0)
 
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
 
-    tb.start()
-    tb.wait()
+    if (gui_mode):
+        timer = Qt.QTimer()
+        timer.start(500)
+        timer.timeout.connect(lambda: None)
+        qapp.exec_()
 
 
 if __name__ == '__main__':
