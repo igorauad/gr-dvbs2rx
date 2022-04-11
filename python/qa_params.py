@@ -151,6 +151,42 @@ class qa_params(gr_unittest.TestCase):
         with self.assertRaises(ValueError):
             params.pls_filter(128)
 
+    def test_pl_info(self):
+        info = params.pl_info("QPSK", "1/4", "normal", True)
+        self.assertEqual(info['n_mod'], 2)
+        self.assertEqual(info['n_slots'], 360)
+        self.assertEqual(info['n_pilots'], 22)
+        self.assertEqual(info['plframe_len'], 90 + (22 * 36) + (360 * 90))
+        self.assertEqual(info['xfecframe_len'], 360 * 90)
+
+        info = params.pl_info("QPSK", "1/4", "normal", False)
+        self.assertEqual(info['n_mod'], 2)
+        self.assertEqual(info['n_slots'], 360)
+        self.assertEqual(info['n_pilots'], 0)
+        self.assertEqual(info['plframe_len'], 90 + (360 * 90))
+        self.assertEqual(info['xfecframe_len'], 360 * 90)
+
+        info = params.pl_info("QPSK", "1/4", "short", False)
+        self.assertEqual(info['n_mod'], 2)
+        self.assertEqual(info['n_slots'], 90)
+        self.assertEqual(info['n_pilots'], 0)
+        self.assertEqual(info['plframe_len'], 90 + (90 * 90))
+        self.assertEqual(info['xfecframe_len'], 90 * 90)
+
+        info = params.pl_info("8PSK", "8/9", "short", True)
+        self.assertEqual(info['n_mod'], 3)
+        self.assertEqual(info['n_slots'], 60)
+        self.assertEqual(info['n_pilots'], 3)
+        self.assertEqual(info['plframe_len'], 90 + (60 * 90) + (3 * 36))
+        self.assertEqual(info['xfecframe_len'], 60 * 90)
+
+        info = params.pl_info("8PSK", "8/9", "short", False)
+        self.assertEqual(info['n_mod'], 3)
+        self.assertEqual(info['n_slots'], 60)
+        self.assertEqual(info['n_pilots'], 0)
+        self.assertEqual(info['plframe_len'], 90 + (60 * 90))
+        self.assertEqual(info['xfecframe_len'], 60 * 90)
+
 
 if __name__ == '__main__':
     gr_unittest.run(qa_params)

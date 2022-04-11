@@ -253,3 +253,66 @@ def pls_filter(*pls_tuple):
             u64_filter_lo |= 1 << pls
 
     return (u64_filter_lo, u64_filter_hi)
+
+
+def pl_info(constellation, code, frame_size, pilots):
+    """Get the physical layer signalling (PLS) information
+
+    Args:
+        constellation (str): DVB-S2 constellation.
+        code (str): Code rate.
+        frame_size (str): Frame size ("short" or "normal").
+        pilots (bool): Whether pilots are included in the PLFRAMEs.
+
+    Raises:
+        ValueError: If the parameters are not valid for DVB-S2.
+
+    Returns:
+        dict: Dictionary with the modulation efficiency in bits/sec/Hz, the
+        number of slots, pilot blocks, PLFRAME length, and XFECFRAME length.
+    """
+
+    plsc = dvbs2_pls(constellation, code, frame_size, pilots)
+    modcod = plsc >> 2
+    short_fecframe = plsc & 0x2
+    has_pilots = plsc & 0x1
+    dummy_frame = modcod == 0
+    has_pilots &= not dummy_frame  # a dummy frame cannot have pilots
+
+    # Number of bits per constellation symbol and PLFRAME slots
+    if (modcod >= 1 and modcod <= 11):
+        n_mod = 2
+        n_slots = 360
+    elif (modcod >= 12 and modcod <= 17):
+        n_mod = 3
+        n_slots = 240
+    elif (modcod >= 18 and modcod <= 23):
+        n_mod = 4
+        n_slots = 180
+    elif (modcod >= 24 and modcod <= 28):
+        n_mod = 5
+        n_slots = 144
+    else:
+        n_mod = 0
+        n_slots = 36  # dummy frame
+
+    # For short FECFRAMEs, S is 4 times lower
+    if (short_fecframe and not dummy_frame):
+        n_slots >>= 2
+
+    # Number of pilot blocks
+    n_pilots = ((n_slots - 1) >> 4) if has_pilots else 0
+
+    # PLFRAME length (header + data + pilots)
+    plframe_len = ((n_slots + 1) * 90) + (36 * n_pilots)
+
+    # XFECFRAME length
+    xfecframe_len = n_slots * 90
+
+    return {
+        'n_mod': n_mod,
+        'n_slots': n_slots,
+        'n_pilots': n_pilots,
+        'plframe_len': plframe_len,
+        'xfecframe_len': xfecframe_len
+    }

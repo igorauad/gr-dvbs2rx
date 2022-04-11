@@ -111,14 +111,15 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         ##################################################
         code_rate = self.modcod.upper().replace("8PSK", "").replace("QPSK", "")
         self.code_rate = code_rate
+        self.constellation = self.modcod.replace(code_rate, "")
         self.samp_rate = self.sym_rate * self.sps
-        self.plheader_len = 90
-        self.plframe_len = 33282
-        self.pilot_len = int((360 - 1) / 16) * 36
+        pilots_assumption = self.pilots in ['auto', 'on']  # assume on if auto
+        self.xfecframe_len = dvbs2rx.params.pl_info(
+            self.constellation, self.code_rate, self.frame_size,
+            pilots_assumption)['xfecframe_len']
         self.n_rrc_taps = int(2 * self.rrc_delay * self.sps) + 1
         self.n_poly_rrc_taps = (
             (self.n_rrc_taps - 1) * self.sym_sync_rrc_nfilts) + 1
-        self.constellation = self.modcod.replace(code_rate, "")
 
         ##################################################
         # Flowgraph
@@ -161,7 +162,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
     def _get_time_sink(self, name):
         time_sink = qtgui.time_sink_c(
-            self.plframe_len - self.pilot_len - self.plheader_len,  # size
+            2 * self.xfecframe_len,  # size
             self.sym_rate,  # samp_rate
             name,  # name
             1,  # number of inputs
@@ -257,7 +258,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         freq_sink.set_y_axis(-140, 10)
         freq_sink.set_y_label('Relative Gain', 'dB')
         freq_sink.set_trigger_mode(qtgui.TRIG_MODE_FREE, 0.0, 0, "")
-        freq_sink.enable_autoscale(False)
+        freq_sink.enable_autoscale(True)
         freq_sink.enable_grid(True)
         freq_sink.set_fft_average(0.05)
         freq_sink.enable_axis_labels(True)
