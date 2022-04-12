@@ -227,6 +227,11 @@ class qa_plsync_cc(gr_unittest.TestCase):
             # NOTE: the delay has to be an even number, otherwise the scheduler
             # may not process all the test samples.
 
+        # Append some trailing zeros to ensure the flowgraph runner processes
+        # all the PLFRAME IQ samples. That is, if the runner leaves some
+        # samples unprocessed, make sure they are zero-padding samples.
+        in_syms += tuple(np.zeros(100))
+
         # --- Blocks ---
         src = blocks.vector_source_c(in_syms)
         phase_rot = 2 * pi * freq_offset
