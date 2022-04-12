@@ -30,6 +30,7 @@ void bind_dvbt2_config(py::module& m);
 void bind_ldpc_decoder_cb(py::module& m);
 void bind_plsync_cc(py::module& m);
 void bind_symbol_sync_cc(py::module& m);
+// ) END BINDING_FUNCTION_PROTOTYPES
 
 
 // We need this hack because import_array() returns NULL
