@@ -38,6 +38,46 @@ MAX_USRP_FREQ = 6e9
 MIN_USRP_FREQ = 10e6
 
 
+def scale_rrc_taps(taps: list, sps: int, fullscale: float) -> list:
+    """Scale the RRC filter taps to satisfy a target output amplitude range
+
+    The input to the RRC filter normally consists of BPSK/QPSK/8PSK symbols
+    with unitary average energy (i.e., on the unit circle). After RRC pulse
+    shaping, the filtered samples are still close to unit magnitude near the
+    symbol indexes. However, in between these indexes, over the indexes filled
+    up by the interpolator, the amplitude typically exceeds the +-1 range. This
+    is a problem when feeding an SDR Tx interface like the USRP, which expects
+    samples given as floats within +-1 unless another full-scale amplitude is
+    configured at the device (via stream args).
+
+    This function conveniently scales the RRC filter taps to achieve a target
+    amplitude range. This approach is equivalent to placing a "multiply by
+    constant" block after the RRC filter.
+
+    TODO: adjust the normalization when 16APSK and 32APSK are implemented, if
+    the constellation symbols are designed to exceed unit magnitude.
+
+    Args:
+        taps (list): List of RRC filter taps.
+        sps (int): Oversampling ratio.
+        fullscale (float): Target full-scale amplitude.
+
+    Returns:
+        list: List of scaled RRC taps.
+    """
+
+    # The peak amplitude due to RRC filtering can be predicted by an
+    # upper-bound. The following is based on the method described in
+    # https://dsp.stackexchange.com/a/28808:
+    mag_taps = list(map(abs, taps))
+    max_sum = 0
+    for i in range(sps):
+        sum_i = sum(mag_taps[i::sps])
+        if sum_i > max_sum:
+            max_sum = sum_i
+    return [fullscale * x / max_sum for x in taps]
+
+
 class dvbs2_tx(gr.top_block, Qt.QWidget):
 
     def __init__(self, options):
@@ -49,6 +89,8 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
         self.frame_size = options.frame_size
         self.freq = options.freq
         self.freq_offset = options.freq_offset
+        self.fullscale = 1.0 if options.fullscale is None and \
+            options.sink == "usrp" else options.fullscale
         self.gold_code = options.gold_code
         self.gui = options.gui
         self.gui_out_time = options.gui_out_time or options.gui_all
@@ -495,6 +537,9 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                 1.0,  # symbol rate
                 self.rolloff,
                 ntaps)
+            if self.fullscale is not None:
+                rrc_taps = scale_rrc_taps(rrc_taps, int(self.sps),
+                                          self.fullscale)
             interp_filter = filter.interp_fir_filter_ccf(
                 int(interp_sps), rrc_taps)
             self.connect((pl_framer, 0), (interp_filter, 0))
@@ -512,6 +557,8 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                 1.0,  # symbol rate
                 self.rolloff,
                 ntaps)
+            if self.fullscale is not None:
+                rrc_taps = scale_rrc_taps(rrc_taps, nfilts, self.fullscale)
             interp_filter = filter.pfb_arb_resampler_ccf(self.sps, rrc_taps)
             self.connect((pl_framer, 0), (downsampler, 0), (interp_filter, 0))
 
@@ -607,6 +654,11 @@ def argument_parser():
                         type=eng_float,
                         default=eng_notation.num_to_str(float(1000000)),
                         help="Symbol rate in bauds")
+    parser.add_argument(
+        "--fullscale",
+        type=float,
+        help="Target full-scale amplitude for the output IQ. If undefined, "
+        "defaults to unlimited for sink=fd/file and 1.0 for sink=usrp")
 
     gui_group = parser.add_argument_group('GUI Options')
     gui_group.add_argument("--gui",
