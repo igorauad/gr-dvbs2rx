@@ -119,6 +119,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
             'otw_format': options.usrp_otw_format,
             'stream_args': options.usrp_stream_args or '',
             'subdev': options.usrp_subdev,
+            'sync': options.usrp_sync,
             'time_source': options.usrp_time_source,
         }
 
@@ -357,6 +358,62 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
         for c in range(0, n_columns):
             self.top_grid_layout.setColumnStretch(c, 1)
 
+    def setup_usrp_sink(self):
+        from gnuradio import uhd
+
+        self.usrp_sink = usrp_sink = uhd.usrp_sink(
+            self.usrp['args'],
+            uhd.stream_args(
+                cpu_format="fc32",
+                otw_format=self.usrp['otw_format'],
+                args=self.usrp['stream_args'],
+                channels=self.usrp['channels'],
+            ),
+            "",
+        )
+
+        chan = 0
+        if self.usrp['clock_source'] is not None:
+            usrp_sink.set_clock_source(self.usrp['clock_source'], chan)
+        if self.usrp['time_source'] is not None:
+            usrp_sink.set_time_source(self.usrp['time_source'], chan)
+        if self.usrp['subdev'] is not None:
+            usrp_sink.set_subdev_spec(self.usrp['subdev'], chan)
+        usrp_sink.set_samp_rate(self.samp_rate)
+        usrp_sink.set_center_freq(self.freq, chan)
+        usrp_sink.set_antenna(self.usrp['antenna'], chan)
+        usrp_sink.set_gain(self.usrp['gain'], chan)
+
+        # Set the device time
+        if self.usrp['sync'] == 'unknown_pps':
+            usrp_sink.set_time_unknown_pps(uhd.time_spec(0))
+        elif self.usrp['sync'] == 'pc_clock':
+            usrp_sink.set_time_now(uhd.time_spec(time.time()), uhd.ALL_MBOARDS)
+        elif self.usrp['sync'] == 'pc_clock_next_pps':
+            last_pps = usrp_sink.get_time_last_pps().get_real_secs()
+            while (usrp_sink.get_time_last_pps().get_real_secs() == last_pps):
+                time.sleep(0.05)
+            usrp_sink.set_time_next_pps(uhd.time_spec(int(time.time()) + 1.0))
+            time.sleep(1)
+        elif self.usrp['sync'] == 'gps_time':
+            usrp_sink.set_time_next_pps(
+                uhd.time_spec(
+                    usrp_sink.get_mboard_sensor("gps_time").to_int() + 1.0))
+            time.sleep(1)
+
+        # Get the sample rate actually set on the UHD device and adjust the
+        # oversampling ratio applied by the software resampler/interpolator
+        # so that the nominal symbol rate is reasonably accurate despite
+        # the imperfect USRP sampling rate. NOTE this adjustment works only
+        # if "connect_sink" is called before "connect_dvbs2tx".
+        assert not self.flowgraph_connected, \
+            "Sink must be connected before the flowgraph"
+        actual_samp_rate = usrp_sink.get_samp_rate()
+        self.sps = actual_samp_rate / self.sym_rate
+        self.samp_rate = actual_samp_rate
+
+        return usrp_sink
+
     def connect_source(self):
         """Connect the MPEG TS source
 
@@ -417,40 +474,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                 self.connect((throttle, 0), (file_or_fd_sink, 0))
 
         elif (self.sink == "usrp"):
-            from gnuradio import uhd
-            sink = self.usrp_sink = usrp_sink = uhd.usrp_sink(
-                self.usrp['args'],
-                uhd.stream_args(
-                    cpu_format="fc32",
-                    otw_format=self.usrp['otw_format'],
-                    args=self.usrp['stream_args'],
-                    channels=self.usrp['channels'],
-                ),
-                "",
-            )
-            chan = 0
-            if self.usrp['clock_source'] is not None:
-                usrp_sink.set_clock_source(self.usrp['clock_source'], chan)
-            if self.usrp['time_source'] is not None:
-                usrp_sink.set_time_source(self.usrp['time_source'], chan)
-            if self.usrp['subdev'] is not None:
-                usrp_sink.set_subdev_spec(self.usrp['subdev'], chan)
-            usrp_sink.set_samp_rate(self.samp_rate)
-            usrp_sink.set_time_unknown_pps(uhd.time_spec(0))
-            usrp_sink.set_center_freq(self.freq, chan)
-            usrp_sink.set_antenna(self.usrp['antenna'], chan)
-            usrp_sink.set_gain(self.usrp['gain'], chan)
-
-            # Get the sample rate actually set on the UHD device and adjust the
-            # oversampling ratio applied by the software resampler/interpolator
-            # so that the nominal symbol rate is reasonably accurate despite
-            # the imperfect USRP sampling rate. NOTE this adjustment works only
-            # if "connect_sink" is called before "connect_dvbs2tx".
-            assert not self.flowgraph_connected, \
-                "Sink must be connected before the flowgraph"
-            actual_samp_rate = usrp_sink.get_samp_rate()
-            self.sps = actual_samp_rate / self.sym_rate
-            self.samp_rate = actual_samp_rate
+            sink = self.setup_usrp_sink()
 
         # Simulation options
         # 1) Noise
@@ -750,6 +774,14 @@ def argument_parser():
     usrp_group.add_argument("--usrp-subdev",
                             type=str,
                             help="USRP subdevice specification")
+    usrp_group.add_argument("--usrp-sync",
+                            type=str,
+                            choices=[
+                                'unknown_pps', 'pc_clock', 'pc_clock_next_pps',
+                                'gps_time', 'none'
+                            ],
+                            default='unknown_pps',
+                            help="USRP device time synchronization method")
     usrp_group.add_argument("--usrp-time-source",
                             type=str,
                             choices=['external', 'mimo', 'gpsdo'],
