@@ -97,6 +97,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             'otw_format': options.usrp_otw_format,
             'stream_args': options.usrp_stream_args or '',
             'subdev': options.usrp_subdev,
+            'sync': options.usrp_sync,
             'time_source': options.usrp_time_source,
         }
 
@@ -501,6 +502,61 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         for c in range(0, n_columns):
             self.top_grid_layout.setColumnStretch(c, 1)
 
+    def setup_usrp_source(self):
+        self.usrp_source = usrp_source = uhd.usrp_source(
+            self.usrp['args'],
+            uhd.stream_args(
+                cpu_format="fc32",
+                otw_format=self.usrp['otw_format'],
+                args=self.usrp['stream_args'],
+                channels=self.usrp['channels'],
+            ))
+
+        chan = 0
+        if self.usrp['clock_source'] is not None:
+            usrp_source.set_clock_source(self.usrp['clock_source'], chan)
+        if self.usrp['time_source'] is not None:
+            usrp_source.set_time_source(self.usrp['time_source'], chan)
+        if self.usrp['subdev'] is not None:
+            usrp_source.set_subdev_spec(self.usrp['subdev'], chan)
+        usrp_source.set_samp_rate(self.samp_rate)
+        usrp_source.set_antenna(self.usrp['antenna'], chan)
+        usrp_source.set_gain(self.usrp['gain'], chan)
+
+        # Tune the RF frontend with an offset relative to the target center
+        # frequency. In other words, tune the LO to "freq - lo_offset" instead
+        # of "freq". By default, set the LO offset to the sampling rate and let
+        # the FPGA's DSP apply the remaining frequency shift of
+        # "exp(j*2*pi*n*samp_rate/master_clock_rate)". With that, the DC
+        # component due to LO leakage ends up out of the observed band. Just
+        # make sure to use an LO offset within +-master_clock_rate/2.
+        if self.usrp['lo_offset'] is None:
+            self.usrp['lo_offset'] = self.samp_rate
+        usrp_source.set_center_freq(
+            uhd.tune_request(self.freq, self.usrp['lo_offset']), chan)
+
+        # Set the device time
+        if self.usrp['sync'] == 'unknown_pps':
+            usrp_source.set_time_unknown_pps(uhd.time_spec(0))
+        elif self.usrp['sync'] == 'pc_clock':
+            usrp_source.set_time_now(uhd.time_spec(time.time()),
+                                     uhd.ALL_MBOARDS)
+        elif self.usrp['sync'] == 'pc_clock_next_pps':
+            last_pps = usrp_source.get_time_last_pps().get_real_secs()
+            while (usrp_source.get_time_last_pps().get_real_secs() == last_pps
+                   ):
+                time.sleep(0.05)
+            usrp_source.set_time_next_pps(
+                uhd.time_spec(int(time.time()) + 1.0))
+            time.sleep(1)
+        elif self.usrp['sync'] == 'gps_time':
+            usrp_source.set_time_next_pps(
+                uhd.time_spec(
+                    usrp_source.get_mboard_sensor("gps_time").to_int() + 1.0))
+            time.sleep(1)
+
+        return usrp_source
+
     def connect_source(self):
         """Connect the IQ sample source
 
@@ -572,37 +628,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             rtlsdr.set_bandwidth(0, 0)
             source = rtlsdr
         elif (self.source == "usrp"):
-            source = self.usrp_source = usrp_source = uhd.usrp_source(
-                self.usrp['args'],
-                uhd.stream_args(
-                    cpu_format="fc32",
-                    otw_format=self.usrp['otw_format'],
-                    args=self.usrp['stream_args'],
-                    channels=self.usrp['channels'],
-                ))
-            chan = 0
-            if self.usrp['clock_source'] is not None:
-                usrp_source.set_clock_source(self.usrp['clock_source'], chan)
-            if self.usrp['time_source'] is not None:
-                usrp_source.set_time_source(self.usrp['time_source'], chan)
-            if self.usrp['subdev'] is not None:
-                usrp_source.set_subdev_spec(self.usrp['subdev'], chan)
-            usrp_source.set_samp_rate(self.samp_rate)
-            usrp_source.set_time_unknown_pps(uhd.time_spec(0))
-
-            # Tune the RF frontend with an offset relative to the target center
-            # frequency. In other words, tune the LO to "freq - lo_offset"
-            # instead of "freq". By default, set the LO offset to the sampling
-            # rate and let the FPGA's DSP apply the remaining frequency shift
-            # of "exp(j*2*pi*n*samp_rate/master_clock_rate)". With that, the DC
-            # component due to LO leakage ends up out of the observed band.
-            # Just make sure to use an LO offset within +-master_clock_rate/2.
-            if self.usrp['lo_offset'] is None:
-                self.usrp['lo_offset'] = self.samp_rate
-            usrp_source.set_center_freq(
-                uhd.tune_request(self.freq, self.usrp['lo_offset']), chan)
-            usrp_source.set_antenna(self.usrp['antenna'], chan)
-            usrp_source.set_gain(self.usrp['gain'], chan)
+            source = self.setup_usrp_source()
 
         if (self.gui):
             self.blocks_rms_xx_0 = blocks.rms_cf(0.0001)
@@ -1205,6 +1231,14 @@ def argument_parser():
     usrp_group.add_argument("--usrp-subdev",
                             type=str,
                             help="USRP subdevice specification")
+    usrp_group.add_argument("--usrp-sync",
+                            type=str,
+                            choices=[
+                                'unknown_pps', 'pc_clock', 'pc_clock_next_pps',
+                                'gps_time', 'none'
+                            ],
+                            default='unknown_pps',
+                            help="USRP device time synchronization method")
     usrp_group.add_argument("--usrp-time-source",
                             type=str,
                             choices=['external', 'mimo', 'gpsdo'],
