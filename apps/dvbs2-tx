@@ -26,7 +26,6 @@ from gnuradio import dtv
 from gnuradio import eng_notation
 from gnuradio import filter
 from gnuradio import gr
-from gnuradio import qtgui
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio.fft import window
 from gnuradio.filter import firdes
@@ -154,7 +153,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                                         Qt.Q_ARG("QString", str(self.uptime)))
             time.sleep(period)
 
-    def _get_time_sink(self, name):
+    def _get_time_sink(self, qtgui, name):
         time_sink = qtgui.time_sink_c(
             self.plframe_len,  # size
             self.sym_rate,  # samp_rate
@@ -205,7 +204,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
 
         return time_sink
 
-    def _get_freq_sink(self, name, ninput=1):
+    def _get_freq_sink(self, qtgui, name, ninput=1):
         freq_sink = qtgui.freq_sink_c(
             1024,  # size
             window.WIN_BLACKMAN_hARRIS,  # wintype
@@ -258,6 +257,8 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
         self.top_grid_layout.addWidget(gui_obj_win, *pos)
 
     def setup_gui(self):
+        from gnuradio import qtgui
+
         Qt.QWidget.__init__(self)
         self.setWindowTitle("DVB-S2 Tx")
         qtgui.util.check_set_qss()
@@ -317,12 +318,13 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
 
         if (self.gui_out_time):
             self._add_gui_block('time_sink_iq_out',
-                                self._get_time_sink("IQ Output"), (0, 0))
+                                self._get_time_sink(qtgui, "IQ Output"),
+                                (0, 0))
 
         if (self.gui_out_freq):
             pos = (0, 0) if n_optional <= 1 else (0, 1)
             self._add_gui_block('freq_sink_iq_out',
-                                self._get_freq_sink("Output PSD"), pos)
+                                self._get_freq_sink(qtgui, "Output PSD"), pos)
 
         # Optional SDR controls
         if (self.sink == 'usrp'):
