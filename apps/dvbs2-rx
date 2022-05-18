@@ -81,7 +81,8 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.sink = options.sink
         self.source = options.source
         self.spectral_inversion = options.spectral_inversion
-        self.sps = options.sps
+        self.sps = (options.samp_rate / options.sym_rate) \
+            if options.samp_rate is not None else options.sps
         self.sym_rate = options.sym_rate
         self.sym_sync_damping = options.sym_sync_damping
         self.sym_sync_impl = options.sym_sync_impl
@@ -972,11 +973,16 @@ def argument_parser():
                         type=eng_float,
                         default=eng_notation.num_to_str(float(1e9)),
                         help="Carrier or intermediate frequency in Hz")
-    parser.add_argument("-o",
-                        "--sps",
-                        type=eng_float,
-                        default=eng_notation.num_to_str(float(2)),
-                        help="Oversampling ratio in samples per symbol")
+    samp_rate_group = parser.add_mutually_exclusive_group()
+    samp_rate_group.add_argument(
+        "-o",
+        "--sps",
+        type=eng_float,
+        default=eng_notation.num_to_str(float(2)),
+        help="Oversampling ratio in samples per symbol")
+    samp_rate_group.add_argument("--samp-rate",
+                                 type=eng_float,
+                                 help="Sampling rate in samples per second")
     parser.add_argument("-s",
                         "--sym-rate",
                         type=eng_float,
