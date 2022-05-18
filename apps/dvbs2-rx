@@ -772,7 +772,14 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             first_block = iq_swap
 
         # Symbol timing synchronizer - after the rotator
-        if (self.sym_sync_impl == "in-tree"):
+        sps_is_even_int = self.sps.is_integer() and int(self.sps) % 2 == 0
+        if self.sym_sync_impl == "oot" and not sps_is_even_int:
+            gr.log.warn("The OOT symbol synchronizer requires an even integer "
+                        "sps >= 2 (current sps={})".format(self.sps))
+            gr.log.info("Switching to the in-tree symbol synchronizer")
+            self.sym_sync_impl = "in-tree"
+
+        if self.sym_sync_impl == "in-tree":
             symbol_sync = digital.symbol_sync_cc(
                 digital.TED_GARDNER, self.sps, self.sym_sync_loop_bw,
                 self.sym_sync_damping, 1.0, 1.5, 1,
@@ -1249,12 +1256,6 @@ def argument_parser():
 
     if (options.source == "usrp" and options.usrp_args is None):
         parser.error("argument --usrp-args is required when --source=\"usrp\"")
-
-    if (options.sym_sync_impl == "oot"
-            and not (options.sps.is_integer() and int(options.sps) % 2 == 0)):
-        parser.error(
-            "the OOT symbol synchronizer only supports even and integer "
-            "oversampling ratios. Choose --sym-sync-impl=in-tree otherwise.")
 
     return options
 
