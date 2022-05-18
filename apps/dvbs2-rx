@@ -671,16 +671,17 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         must be known a priori.
 
         Meanwhile, there is still some flexibility on the pilot and SIS/MIS
-        configuration assigned to the PL Sync block. For example, one could
+        configuration assigned to the PL Sync block. For example, it could be
         know a priori whether the input signal contains pilots or not. In this
-        case, it is better to configure the PLS filters accordingly. Similarly,
-        it could be known a priori that the input signal is based on SIS only,
-        in which case it is better to configure "--multistream=off" instead of
-        "on" or "auto". Generally speaking, the more a priori information the
-        user provides to the PL Sync block, the better for performance.
+        case, it is preferable to configure the PLS filters accordingly.
+        Similarly, it could be known a priori that the input signal is based on
+        SIS only, in which case it is better to configure "--multistream=off"
+        instead of "on" or "auto" so that the PL Sync block knows dummy
+        PLFRAMEs are not expected. More generally, the more a priori
+        information provided to the PL Sync block, the better for performance.
 
         Also, in some cases, the user may not know the specific MODCOD and
-        frame size of the underlying signal, even though these are required
+        frame size of the target signal, even though these are required
         parameters. In this scenario, it is useful to force the PL Sync block
         into ACM/VCM mode (using option "--pl-acm-vcm") and enable the debug
         logs with option "--debug=1" or greater. By doing so, the decoded PLSC
@@ -692,24 +693,31 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
         """
 
-        # Get the target CCM-mode PLS. If the pilot configuration is set to
-        # auto, allow the two PLS values corresponding to the same MODCOD and
-        # frame size, with and without pilots.
-        target_pls = list()
-        if (self.pilots == "auto"):
-            for pilots_enabled in [False, True]:
+        if (self.pl_acm_vcm):
+            pls_filter_lo = 0xFFFFFFFFFFFFFFFF
+            pls_filter_hi = 0xFFFFFFFFFFFFFFFF
+        else:
+            # Get the target CCM-mode PLS. If the pilot configuration is set to
+            # auto, allow the two PLS values corresponding to the same MODCOD
+            # and frame size, with and without pilots.
+            target_pls = list()
+            if (self.pilots == "auto"):
+                for pilots_enabled in [False, True]:
+                    target_pls.append(
+                        dvbs2rx.params.dvbs2_pls(self.constellation,
+                                                 self.code_rate,
+                                                 self.frame_size,
+                                                 pilots_enabled))
+            else:
+                pilots_enabled = self.pilots == "on"
                 target_pls.append(
                     dvbs2rx.params.dvbs2_pls(self.constellation,
                                              self.code_rate, self.frame_size,
                                              pilots_enabled))
-        else:
-            pilots_enabled = self.pilots == "on"
-            target_pls.append(
-                dvbs2rx.params.dvbs2_pls(self.constellation, self.code_rate,
-                                         self.frame_size, pilots_enabled))
 
-        # Convert into the corresponding filter bitmasks
-        pls_filter_lo, pls_filter_hi = dvbs2rx.params.pls_filter(*target_pls)
+            # Convert into the corresponding filter bitmasks
+            pls_filter_lo, pls_filter_hi = dvbs2rx.params.pls_filter(
+                *target_pls)
 
         # SIS or MIS? When unsure, it's better to enable MIS so that dummy
         # PLFRAMEs can be processed. Auto mode is the same as leaving MIS on.
