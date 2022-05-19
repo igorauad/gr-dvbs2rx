@@ -16,5 +16,7 @@ install(FILES
     bch_decoder_bb.h
     ldpc_decoder_cb.h
     plsync_cc.h
-    symbol_sync_cc.h DESTINATION include/gnuradio/dvbs2rx
+    rotator_cc.h
+    symbol_sync_cc.h
+    DESTINATION include/gnuradio/dvbs2rx
 )

@@ -26,6 +26,7 @@ list(APPEND dvbs2rx_python_files
     dvbt2_config_python.cc
     ldpc_decoder_cb_python.cc
     plsync_cc_python.cc
+    rotator_cc_python.cc
     symbol_sync_cc_python.cc
     python_bindings.cc)
 

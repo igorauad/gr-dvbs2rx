@@ -25,6 +25,7 @@ list(APPEND dvbs2rx_sources
     pl_signaling.cc
     plsync_cc_impl.cc
     reed_muller.cc
+    rotator_cc_impl.cc
     symbol_sync_cc_impl.cc
     util.cc
 )
