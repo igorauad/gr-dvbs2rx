@@ -773,7 +773,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         analog_agc.set_max_gain(65536)
 
         # Rotator (frequency offset correction)
-        rotator = blocks.rotator_cc(0, True)
+        rotator = dvbs2rx.rotator_cc(0, True)
         if (self.rot_max_buf is not None):
             rotator.set_max_output_buffer(self.rot_max_buf)
         self.connect((analog_agc, 0), (rotator, 0))

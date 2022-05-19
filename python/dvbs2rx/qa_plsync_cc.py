@@ -14,16 +14,16 @@ import numpy as np
 from gnuradio import gr, gr_unittest
 from gnuradio import blocks, digital, analog
 try:
-    from gnuradio.dvbs2rx import plsync_cc
+    from gnuradio.dvbs2rx import plsync_cc, rotator_cc
 except ImportError:
     import os
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
     try:
-        from gnuradio.dvbs2rx import plsync_cc
+        from gnuradio.dvbs2rx import plsync_cc, rotator_cc
     except ImportError:
-        from python.dvbs2rx import plsync_cc
+        from python.dvbs2rx import plsync_cc, rotator_cc
 
 SQRT2_2 = sqrt(2) / 2
 JSQRT2_2 = SQRT2_2 * 1j
@@ -236,8 +236,8 @@ class qa_plsync_cc(gr_unittest.TestCase):
         # --- Blocks ---
         src = blocks.vector_source_c(in_syms)
         phase_rot = 2 * pi * freq_offset
-        chan_rot = blocks.rotator_cc(phase_rot)  # channel rotation
-        freq_corr_rot = blocks.rotator_cc(0, True)  # frequency correction
+        chan_rot = rotator_cc(phase_rot)  # channel rotation
+        freq_corr_rot = rotator_cc(0, True)  # frequency correction
         # Restrict the rotator output buffer to reduce the chances of missing
         # the frequency corrections published via message port.
         freq_corr_rot.set_max_output_buffer(1024)

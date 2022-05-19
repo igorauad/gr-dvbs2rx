@@ -27,7 +27,7 @@ namespace dvbs2rx {
  * Internally, it implements PL frame timing recovery, coarse and fine frequency offset
  * estimation, carrier phase tracking, PLSC decoding, and PL descrambling. Furthermore, it
  * manages frequency corrections carried out by an external rotator block connected via a
- * message port. This feature requires the rotator block from GR Version 3.9.2 or later.
+ * message port.
  *
  * This block can also filter PLFRAMEs based on target PL signaling (PLS) values. In
  * constant coding and modulation (CCM) mode, the PLS filter must specify a single option
