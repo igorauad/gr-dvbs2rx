@@ -242,38 +242,50 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
 
     // Process the tags
     for (unsigned j = 0; j < tags.size(); j++) {
-        // We don't expect the tag to come too often. The shortest PLFRAME has
-        // 3330 symbols (32 slots + PLHEADER), and we only update the rotator
-        // frequency once per PLFRAME at maximum. However, if the symbol_sync_cc
-        // block is used upstream, as of GR v3.9, it can replicate tags and
-        // produce artificial closely-spaced tags. Ignore them here.
+        // We don't expect the tag to come too often. The shortest PLFRAME has 3330
+        // symbols (32 slots + PLHEADER), and we only update the rotator frequency once
+        // per PLFRAME at maximum. However, if the symbol_sync_cc block is used upstream,
+        // as of GR v3.9, it can replicate tags and produce artificial closely-spaced
+        // tags. Ignore them here.
         const int tag_interval = tags[j].offset - d_rot_ctrl.current.idx;
         if (d_rot_ctrl.current.idx > 0 &&
             tag_interval < 1000) // 1000 is arbitrary (< 3330)
             continue;
-        // NOTE: use "d_rot_ctrl.current" instead of "d_rot_ctrl.past" because
-        // we are interested in filtering out replicated tags referring to the
-        // same frame (the current frame).
+        // NOTE: use "d_rot_ctrl.current" instead of "d_rot_ctrl.past" because we are
+        // interested in filtering out replicated tags referring to the same frame
+        // (the current frame).
+
+        // Error between the observed and expected tag offsets.
+        //
+        // Since we correct this error in closed loop, the observed error is the residual
+        // after correction, not the raw tag delay. The total tag delay is the cumulative
+        // sum of the residual errors observed each time. Eventually, the error should
+        // converge to zero and oscillate around that.
+        //
+        // Note the error could be very large if the tag being processed is not really
+        // associated with the current SOF but rather a previous/old PLHEADER. For
+        // example, the frame synchronizer could have unlocked for some time and just
+        // relocked. In this case, the tag search would cover the entire interval since
+        // the last SOF (before unlocking) up to the current SOF (after locking back), and
+        // it could contain old tags (e.g., the last payload before unlocking). If the old
+        // tag was processed below, the error measurement would be significantly off and
+        // could put the closed-loop tag delay estimate in an unrecoverable state. To
+        // avoid this issue, filter out the measurements exceeding the expected tolerance.
+        const int error = abs_sof_idx - tags[j].offset;
+        if (abs(error) > tolerance) {
+            d_logger->warn("rot_phase_inc tag offset error is too high: {:d}", error);
+            continue;
+        }
+        d_rot_ctrl.tag_delay += error;
 
         // The tag confirms the frequency currently configured in the rotator
         const double current_phase_inc = pmt::to_double(tags[j].value);
         d_rot_ctrl.current.freq = -d_sps * current_phase_inc / (2.0 * GR_M_PI);
         d_rot_ctrl.current.idx = tags[j].offset;
 
-        // Error between the observed and expected tag offsets. Since we correct
-        // this error, the observed error is the residual after correction, not
-        // the raw tag delay. The raw error (interpreted as the delay) is the
-        // cumulative sum of the residuals. Eventually, the residuals should
-        // converge to zero and oscillate around that.
-        const int error = abs_sof_idx - tags[j].offset;
-        d_rot_ctrl.tag_delay += error;
-
-        // Flag that the frequency correction loop is now effectively closed (the rotator
-        // blocks is actively helping this block).
+        // Flag that the frequency correction loop is now effectively closed (the
+        // rotator blocks is actively helping this block).
         d_closed_loop = true;
-
-        if (abs(error) > tolerance) // sanity check
-            d_logger->warn("rot_phase_inc tag offset error is too high: {:d}", error);
 
         GR_LOG_DEBUG_LEVEL(3,
                            "Rotator ctrl - Tagged Phase Inc: {:+f}; Offset Error: {:+d}; "
