@@ -975,10 +975,14 @@ def monitoring_server(top_block, port):
     httpd.serve_forever()
 
 
+def _json_dumps_spdlog(in_dict):
+    return json.dumps(in_dict).replace("{", "{{").replace("}", "}}")
+
+
 def monitoring_loop(top_block, period=1):
     """Log the receiver stats dictionary periodically"""
     while (True):
-        gr.log.info(str(top_block.get_stats()))
+        gr.log.info(_json_dumps_spdlog(top_block.get_stats()))
         time.sleep(period)
 
 
