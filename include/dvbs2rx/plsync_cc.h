@@ -47,7 +47,7 @@ public:
      *
      * \param gold_code (int) Gold code used for physical layer scrambling.
      * \param freq_est_period (int) Freq. offset estimation period in frames.
-     * \param sps (float) Oversampling ratio at the input to the upstream MF.
+     * \param sps (double) Oversampling ratio at the input to the upstream MF.
      * \param debug_level (int) Debug level.
      * \param acm_vcm (bool) Whether running in ACM/VCM mode. Determines whether the PLS
      * filter can include multiple options.
@@ -74,7 +74,7 @@ public:
      */
     static sptr make(int gold_code,
                      int freq_est_period,
-                     float sps,
+                     double sps,
                      int debug_level,
                      bool acm_vcm,
                      bool multistream,

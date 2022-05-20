@@ -68,8 +68,8 @@ class plsync_cc_impl : public plsync_cc
 {
 private:
     /* Parameters */
-    int d_debug_level; /** debug level */
-    const float d_sps; /** samples per symbol */
+    int d_debug_level;  /** debug level */
+    const double d_sps; /** samples per symbol */
     /* NOTE: the PLSYNC block requires a symbol-spaced stream at its
      * input. Hence, sps does not refer to the input stream. Instead, it
      * refers to the oversampling ratio that is adopted in the receiver
@@ -233,7 +233,7 @@ private:
 public:
     plsync_cc_impl(int gold_code,
                    int freq_est_period,
-                   float sps,
+                   double sps,
                    int debug_level,
                    bool acm_vcm,
                    bool multistream,

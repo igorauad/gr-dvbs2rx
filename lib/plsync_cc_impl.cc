@@ -21,7 +21,7 @@ namespace dvbs2rx {
 
 plsync_cc::sptr plsync_cc::make(int gold_code,
                                 int freq_est_period,
-                                float sps,
+                                double sps,
                                 int debug_level,
                                 bool acm_vcm,
                                 bool multistream,
@@ -44,7 +44,7 @@ plsync_cc::sptr plsync_cc::make(int gold_code,
  */
 plsync_cc_impl::plsync_cc_impl(int gold_code,
                                int freq_est_period,
-                               float sps,
+                               double sps,
                                int debug_level,
                                bool acm_vcm,
                                bool multistream,
@@ -298,7 +298,7 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     // operates on the sample stream (i.e. on samples, not symbols). Use the
     // known oversampling ratio and the calibrated symbol-spaced tag delay to
     // schedule the phase increment update.
-    uint64_t target_idx = (double)d_sps * (abs_next_sof_idx + d_rot_ctrl.tag_delay);
+    uint64_t target_idx = d_sps * (abs_next_sof_idx + d_rot_ctrl.tag_delay);
 
     // Prevent two frequency corrections at the same sample offset. The scenario
     // where this becomes possible is as follows:
@@ -337,7 +337,7 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     assert(d_rot_ctrl.current.idx >= d_rot_ctrl.past.idx &&
            d_rot_ctrl.next.idx > d_rot_ctrl.current.idx);
     // NOTE: the >= operator is required when comparing "current" to "past" because they
-    // will be equal on consecutive frames that don't experience any freqency correction.
+    // will be equal on consecutive frames that don't experience any frequency correction.
 
     // Send the corresponding phase increment to the rotator block
     static const pmt::pmt_t inc_key = pmt::intern("inc");
