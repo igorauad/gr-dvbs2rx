@@ -1162,10 +1162,6 @@ def argument_parser():
                            type=int,
                            default=1,
                            help="Logging periodicity in seconds")
-    mon_group.add_argument(
-        "--log-file",
-        default=None,
-        help="Record logs on this file instead of printing to the console")
     mon_group.add_argument("--mon-server",
                            action='store_true',
                            default=False,
