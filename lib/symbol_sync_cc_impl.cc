@@ -422,13 +422,23 @@ int symbol_sync_cc_impl::general_work(int noutput_items,
     if (n == 0)
         return 0;
 
+    // Consumed input samples
+    const int n_consumed = n + 1 - d_history;
+    // NOTE: if we stop at, say, n=7, it means we consumed n+1=8 samples. However, with
+    // d_history=1, the first sample n=0 is the history from the previous input buffer
+    // batch, so the total of consumed samples is only n.
+
     // Propagate tags
     const unsigned int input_port = 0;
     const unsigned int output_port = 0;
     const uint64_t n_read = nitems_read(input_port);
     const uint64_t n_written = nitems_written(output_port);
     std::vector<tag_t> tags;
-    get_tags_in_range(tags, input_port, n_read, n_read + n);
+    get_tags_in_range(tags, input_port, n_read, n_read + n_consumed);
+    tags.insert(tags.begin(), d_pending_tags.begin(), d_pending_tags.end());
+    if (!d_pending_tags.empty())
+        d_pending_tags.clear();
+
     // The incoming tag offsets are oblivious to this block's history. For instance,
     // tag offset 0 refers to the first new input sample. In contrast, the strobe
     // indexes saved on vector "d_strobe_idx" are offset by the input buffer history.
@@ -456,14 +466,14 @@ int symbol_sync_cc_impl::general_work(int noutput_items,
         if (it != last) {
             tag.offset = n_written + (it - d_strobe_idx.begin());
             add_item_tag(output_port, tag);
+        } else {
+            // The tag does not have a strobe in this work. Save it for the next call.
+            d_pending_tags.push_back(tag);
         }
     }
 
     // Tell runtime how many input items we consumed.
-    consume_each(n + 1 - d_history);
-    // NOTE: if we stop at, say, n=7, it means we consumed n+1=8 samples. However, with
-    // d_history=1, the first sample n=0 is the history from the previous input buffer
-    // batch, so the total of consumed samples is only n.
+    consume_each(n_consumed);
 
     // Tell runtime system how many output items we produced.
     return k;

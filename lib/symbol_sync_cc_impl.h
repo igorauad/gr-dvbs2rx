@@ -87,7 +87,8 @@ private:
     int d_jump;           /**< Samples to jump until the next strobe */
     bool d_init;          /**< Whether the loop is initialized (after the first work) */
     gr_complex d_last_xi; /**< Last output interpolant */
-    std::vector<int> d_strobe_idx; /**< Indexes of the output interpolants */
+    std::vector<int> d_strobe_idx;     /**< Indexes of the output interpolants */
+    std::vector<tag_t> d_pending_tags; /**< Pending tags from the previous work */
 
     // Interpolators
     //
