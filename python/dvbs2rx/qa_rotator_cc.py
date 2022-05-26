@@ -80,9 +80,15 @@ class qa_rotator_cc(gr_unittest.TestCase):
         self.assertEqual(len(tags), len(expected_tags))
 
         for idx, (val, offset) in enumerate(expected_tags):
-            self.assertAlmostEqual(pmt.to_double(tags[idx].value),
+            # The tag value is a pair with the phase increment and the
+            # originally requested update offset. The latter appears both in
+            # the tag value and the tag offset. However, the tag offset can be
+            # changed in practice by blocks that the tag traverses, whereas the
+            # information in the value should remain immutable.
+            self.assertAlmostEqual(pmt.to_double(pmt.car(tags[idx].value)),
                                    val,
                                    places=5)
+            self.assertEqual(pmt.to_long(pmt.cdr(tags[idx].value)), offset)
             self.assertEqual(tags[idx].offset, offset)
 
     def _compute_expected_samples(self, offsets, new_phase_incs):

@@ -61,6 +61,7 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
       d_closed_loop(false),
       d_payload_state(payload_state_t::searching),
       d_phase_corr(0.0),
+      d_cum_freq_offset(0.0),
       d_sof_cnt(0),
       d_frame_cnt(0),
       d_rejected_cnt(0),
@@ -226,9 +227,6 @@ void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_req
 
 void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
 {
-    // Always keep track of the state at the previous SOF
-    d_rot_ctrl.past = d_rot_ctrl.current;
-
     // Search for tags that occurred since the last search up to the current SOF
     // plus some tag delay tolerance.
     static const pmt::pmt_t tag_key = pmt::intern("rot_phase_inc");
@@ -240,52 +238,110 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
     // NOTE: get_tags_in_range searches within the interval [start,end).
     d_rot_ctrl.tag_search_start = tag_search_end;
 
+    // Filter out duplicate tags
+    //
+    // As of GR v3.9, the symbol_sync_cc block can replicate tags and produce artificial
+    // closely-spaced identical tags. Filter these out to avoid the "unexpected tag"
+    // warning that follows.
+    std::set<uint64_t> tag_set;
+    auto it = tags.begin();
+    while (it != tags.end()) {
+        // The absolute offset to which the phase increment update was originally
+        // scheduled identifies the update request, which should be unique.
+        const uint64_t requested_offset = pmt::to_double(pmt::cdr(it->value));
+        if (tag_set.count(requested_offset) > 0) {
+            it = tags.erase(it); // remove duplicate
+        } else {
+            tag_set.insert(requested_offset);
+            ++it;
+        }
+    }
+
+    // If there are no tags for the current SOF, assume the same state as before:
+    if (tags.empty()) {
+        d_rot_ctrl.past = d_rot_ctrl.current;
+    }
+
     // Process the tags
     for (unsigned j = 0; j < tags.size(); j++) {
-        // We don't expect the tag to come too often. The shortest PLFRAME has 3330
-        // symbols (32 slots + PLHEADER), and we only update the rotator frequency once
-        // per PLFRAME at maximum. However, if the symbol_sync_cc block is used upstream,
-        // as of GR v3.9, it can replicate tags and produce artificial closely-spaced
-        // tags. Ignore them here.
-        const int tag_interval = tags[j].offset - d_rot_ctrl.current.idx;
-        if (d_rot_ctrl.current.idx > 0 &&
-            tag_interval < 1000) // 1000 is arbitrary (< 3330)
-            continue;
-        // NOTE: use "d_rot_ctrl.current" instead of "d_rot_ctrl.past" because we are
-        // interested in filtering out replicated tags referring to the same frame
-        // (the current frame).
+        // Always keep track of the current and previous rotator states.
+        d_rot_ctrl.past = d_rot_ctrl.current;
+
+        // Phase increment update offset originally requested
+        const uint64_t requested_offset = pmt::to_double(pmt::cdr(tags[j].value));
+        // NOTE: the requested sample offset is not the same as the actual incoming
+        // tags[j].offset. The former is the offset requested by the control_rotator_freq
+        // function, which applies to the sample count of the rotator block (processing
+        // the sample stream). In contrast, tags[j].offset refers to the sample count on
+        // the input stream (the symbol stream), which is normally after decimation. The
+        // requested offset is useful to identify the scheduled phase increment update.
+
+        // Every phase increment update tag should match with an update scheduled by this
+        // block. Ideally, no other block should schedule phase increment updates so that
+        // they don't interfere with the PL sync.
+        auto map_it = d_rot_ctrl.update_map.find(requested_offset);
+        if (map_it == d_rot_ctrl.update_map.end()) {
+            d_logger->warn("Unexpected phase increment update tag at index {:d}",
+                           tags[j].offset);
+        }
+
+        // We have found the map entry matching the incoming tag. However, that does not
+        // mean the tag is scheduled for the current SOF at index "abs_sof_idx". The tag
+        // search range can cover multiple PLFRAMEs, so we could be processing a tag sent
+        // for a past SOF (e.g., after a brief frame lock loss). In any case, since we
+        // know the target SOF index (saved on the update map), we can still measure the
+        // tag placement error for past SOFs. Hence, go ahead and process a tag sent for a
+        // past SOF. In contrast, do not expect to see a tag for a future SOF here.
+        if (map_it->second.sof_idx > abs_sof_idx) {
+            d_logger->warn("Got tag for a future SOF index ({:d})",
+                           map_it->second.sof_idx);
+        }
+
+        // Some phase increment update messages may arrive too late on the rotator block
+        // and end up unprocessed. Clean those from the update map and warn:
+        for (auto it = d_rot_ctrl.update_map.cbegin();
+             it != d_rot_ctrl.update_map.cend();) {
+            if (it->first < requested_offset) {
+                d_logger->warn(
+                    "Dropping unprocessed rotator phase inc update (offset {:d})",
+                    it->first);
+                it = d_rot_ctrl.update_map.erase(it);
+            } else {
+                it++;
+            }
+        }
 
         // Error between the observed and expected tag offsets.
         //
-        // Since we correct this error in closed loop, the observed error is the residual
-        // after correction, not the raw tag delay. The total tag delay is the cumulative
-        // sum of the residual errors observed each time. Eventually, the error should
-        // converge to zero and oscillate around that.
+        // Since we correct this error in closed loop, the observed error is the
+        // residual after correction, not the raw tag delay. The total tag delay is
+        // the cumulative sum of the residual errors observed each time. Eventually,
+        // the error should converge to zero and oscillate around that.
         //
-        // Note the error could be very large if the tag being processed is not really
-        // associated with the current SOF but rather a previous/old PLHEADER. For
-        // example, the frame synchronizer could have unlocked for some time and just
-        // relocked. In this case, the tag search would cover the entire interval since
-        // the last SOF (before unlocking) up to the current SOF (after locking back), and
-        // it could contain old tags (e.g., the last payload before unlocking). If the old
-        // tag was processed below, the error measurement would be significantly off and
-        // could put the closed-loop tag delay estimate in an unrecoverable state. To
-        // avoid this issue, filter out the measurements exceeding the expected tolerance.
-        const int error = abs_sof_idx - tags[j].offset;
-        if (abs(error) > tolerance) {
-            d_logger->warn("rot_phase_inc tag offset error is too high: {:d}", error);
-            continue;
-        }
+        // NOTE: use "map_it->second.sof_idx" instead of "abs_sof_idx" because we could be
+        // processing a tag associated with a past SOF.
+        const int error = map_it->second.sof_idx - tags[j].offset;
         d_rot_ctrl.tag_delay += error;
 
-        // The tag confirms the frequency currently configured in the rotator
-        const double current_phase_inc = pmt::to_double(tags[j].value);
-        d_rot_ctrl.current.freq = -d_sps * current_phase_inc / (2.0 * GR_M_PI);
+        // The tag confirms the rotator's frequency and when it started
+        const double current_phase_inc = pmt::to_double(pmt::car(tags[j].value));
+        d_rot_ctrl.current.freq = d_sps * current_phase_inc / (2.0 * GR_M_PI);
         d_rot_ctrl.current.idx = tags[j].offset;
+
+        // Sanity check
+        if (d_rot_ctrl.current.idx < d_rot_ctrl.past.idx) {
+            d_logger->warn("Unexpected rotator state index order: "
+                           "current={:d}, past={:d}",
+                           d_rot_ctrl.current.idx,
+                           d_rot_ctrl.past.idx);
+        }
 
         // Flag that the frequency correction loop is now effectively closed (the
         // rotator blocks is actively helping this block).
         d_closed_loop = true;
+
+        // Remove from the map
+        d_rot_ctrl.update_map.erase(map_it);
 
         GR_LOG_DEBUG_LEVEL(3,
                            "Rotator ctrl - Tagged Phase Inc: {:+f}; Offset Error: {:+d}; "
@@ -330,39 +386,54 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     // In this case, both updates would be applicable to the same offset. By
     // preventing this scenario here, only the first update would be applied,
     // which, in this example, is the update due to the new coarse estimate.
-    if (target_idx == d_rot_ctrl.next.idx)
+    if (d_rot_ctrl.update_map.count(target_idx) > 0)
         return;
-    d_rot_ctrl.next.idx = target_idx;
-
-    // Rotator frequency that should start taking effect on the next frame:
-    //
-    // NOTE: Extra caution is required when adding the frequency offset estimate
-    // to the rotator's frequency, depending on which frame was used to generate
-    // the new frequency offset estimate. Refer to the comments on this
-    // function's declaration (on plsync_cc_impl.h).
-    d_rot_ctrl.next.freq = (ref_is_past_frame) ? (d_rot_ctrl.past.freq + rot_freq_adj)
-                                               : (d_rot_ctrl.current.freq + rot_freq_adj);
 
     // Sanity check
-    assert(d_rot_ctrl.current.idx >= d_rot_ctrl.past.idx &&
-           d_rot_ctrl.next.idx > d_rot_ctrl.current.idx);
-    // NOTE: the >= operator is required when comparing "current" to "past" because they
-    // will be equal on consecutive frames that don't experience any frequency correction.
+    if (d_rot_ctrl.current.idx < d_rot_ctrl.past.idx ||
+        target_idx < d_rot_ctrl.current.idx) {
+        d_logger->warn("Unexpected rotator control index order: target={:d}, "
+                       "current={:d}, past={:d}",
+                       target_idx,
+                       d_rot_ctrl.current.idx,
+                       d_rot_ctrl.past.idx);
+    }
+    // NOTE: the "current" and "past" indexes will be equal on consecutive frames that
+    // don't experience any frequency correction.
+
+    // Cumulative frequency offset estimate
+    //
+    // NOTE: Extra caution is required when accumulating the new frequency offset estimate
+    // to a previous estimate. The reference depends on which frame was used to generate
+    // the new frequency offset estimate. Refer to the comments on this function's
+    // declaration (on plsync_cc_impl.h). Also, note the rotator's rotating frequency is
+    // the negative of the estimated frequency offset since it corrects the offset.
+    const double ref_rot_freq =
+        (ref_is_past_frame) ? d_rot_ctrl.past.freq : d_rot_ctrl.current.freq;
+    const double prev_cum_freq_offset = -ref_rot_freq;
+    d_cum_freq_offset = prev_cum_freq_offset + rot_freq_adj;
+
+    // Rotator phase increment that should start taking effect on the next frame:
+    const double phase_inc = -d_cum_freq_offset * 2.0 * GR_M_PI / d_sps;
+    d_rot_ctrl.update_map.emplace(std::piecewise_construct,
+                                  std::forward_as_tuple(target_idx),
+                                  std::forward_as_tuple(phase_inc, abs_next_sof_idx));
 
     // Send the corresponding phase increment to the rotator block
     static const pmt::pmt_t inc_key = pmt::intern("inc");
     static const pmt::pmt_t offset_key = pmt::intern("offset");
-    const double phase_inc = -d_rot_ctrl.next.freq * 2.0 * GR_M_PI / d_sps;
     pmt::pmt_t msg = pmt::make_dict();
     msg = pmt::dict_add(msg, inc_key, pmt::from_double(phase_inc));
-    msg = pmt::dict_add(msg, offset_key, pmt::from_uint64(d_rot_ctrl.next.idx));
+    msg = pmt::dict_add(msg, offset_key, pmt::from_uint64(target_idx));
     message_port_pub(d_port_id, msg);
 
-    GR_LOG_DEBUG_LEVEL(2, "Cumulative frequency offset: {:g}", d_rot_ctrl.next.freq);
+    GR_LOG_DEBUG_LEVEL(2, "Cumulative frequency offset: {:g}", d_cum_freq_offset);
     GR_LOG_DEBUG_LEVEL(3,
-                       "Rotator ctrl - Sent New Phase Inc: {:+f}; Offset: {:d}",
+                       "Rotator ctrl - Sent New Phase Inc: {:+f}; Target SOF Index: "
+                       "{:d}; Rot Sample Offset: {:d}",
                        phase_inc,
-                       abs_next_sof_idx);
+                       abs_next_sof_idx,
+                       target_idx);
 }
 
 void plframe_idx_t::step(uint16_t n_slots, bool has_pilots)
@@ -839,5 +910,5 @@ int plsync_cc_impl::general_work(int noutput_items,
     return n_produced;
 }
 
-} /* namespace dvbs2rx */
-} /* namespace gr */
+} // namespace dvbs2rx
+} // namespace gr

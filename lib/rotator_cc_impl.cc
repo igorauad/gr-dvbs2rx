@@ -113,7 +113,8 @@ int rotator_cc_impl::work(int noutput_items,
                 add_item_tag(0,
                              next_update.offset,
                              phase_inc_tag_key,
-                             pmt::from_float(next_update.phase_inc));
+                             pmt::cons(pmt::from_float(next_update.phase_inc),
+                                       pmt::from_long(next_update.offset)));
             }
         }
 

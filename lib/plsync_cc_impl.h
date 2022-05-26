@@ -21,19 +21,27 @@
 namespace gr {
 namespace dvbs2rx {
 
-/* @brief Upstream rotator frequency */
-struct rot_freq_t {
-    double freq = 0;  /** Frequency correction value */
-    uint64_t idx = 0; /** Absolute index where it started */
+/* @brief Upstream rotator state confirmed by the incoming tags */
+struct rot_state_t {
+    double freq = 0;  /**< Rotating frequency */
+    uint64_t idx = 0; /**< Absolute sample index where the state started */
+};
+
+/* @brief Rotator phase increment adjustment request */
+struct rot_phase_adj_t {
+    double phase_inc; // desired rotator phase increment
+    uint64_t sof_idx; // target SOF index for the update
+    rot_phase_adj_t(double p, uint64_t i) : phase_inc(p), sof_idx(i) {}
 };
 
 /* @brief Upstream rotator control */
 struct rot_ctrl_t {
     int tag_delay = 0;             /** Delay of rotator's rot_phase_inc tag */
     uint64_t tag_search_start = 0; /** Starting index for the next tag search */
-    rot_freq_t past;               /** Frequency state at the past PLFRAME */
-    rot_freq_t current;            /** Frequency state at the current PLFRAME */
-    rot_freq_t next;               /** Frequency state expected for the next PLFRAME */
+    rot_state_t past;              /** Frequency state at the past PLFRAME */
+    rot_state_t current;           /** Frequency state at the current PLFRAME */
+    std::map<uint64_t, rot_phase_adj_t>
+        update_map; /** Map of scheduled phase increment updates */
 };
 
 /** @brief Index tracking for various segments of a PLFRAME */
@@ -88,6 +96,7 @@ private:
     rot_ctrl_t d_rot_ctrl;           /**< Upstream rotator control */
     plframe_idx_t d_idx;             /**< PLFRAME index state */
     gr_complex d_phase_corr;         /**< Phase correction */
+    double d_cum_freq_offset;        /**< Cumulative frequency offset estimate */
 
     /* Frame counts */
     uint64_t d_sof_cnt;      /**< Total detected SOFs (including false-positives) */
@@ -95,9 +104,8 @@ private:
     uint64_t d_rejected_cnt; /**< Rejected PLFRAMEs */
     uint64_t d_dummy_cnt;    /**< Dummy PLFRAMEs */
 
-    /* Cache structures used to hold frame metadata/information from the current
-     * PLFRAME (whose payload may be under processing if locked) and from the
-     * next PLFRAME (from the PLHEADER ahead, processed in advance). */
+    /* Frame metadata from the current PLFRAME (whose payload may be under processing if
+     * locked) and from the next PLFRAME (the PLHEADER ahead, processed in advance). */
     plframe_info_t d_curr_frame_info; /**< PLFRAME under processing */
     plframe_info_t d_next_frame_info; /**< Next PLFRAME */
 
@@ -260,7 +268,7 @@ public:
      *
      * @return (float) Cumulative frequency offset.
      */
-    float get_freq_offset() { return d_rot_ctrl.next.freq; }
+    float get_freq_offset() { return d_cum_freq_offset; }
 
     /* Other externally readable stats */
     bool get_coarse_freq_corr_state() { return d_freq_sync->is_coarse_corrected(); }
