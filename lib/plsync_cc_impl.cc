@@ -19,6 +19,8 @@
 namespace gr {
 namespace dvbs2rx {
 
+#define MAX_SCHEDULING_DELAY 5
+
 plsync_cc::sptr plsync_cc::make(int gold_code,
                                 int freq_est_period,
                                 double sps,
@@ -225,7 +227,7 @@ void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_req
     ninput_items_required[0] = std::min(ninput_items_required[0], noutput_items);
 }
 
-void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
+void plsync_cc_impl::calibrate_tag_delay(const uint64_t abs_sof_idx, int tolerance)
 {
     // Search for tags that occurred since the last search up to the current SOF
     // plus some tag delay tolerance.
@@ -297,20 +299,6 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
                            map_it->second.sof_idx);
         }
 
-        // Some phase increment update messages may arrive too late on the rotator block
-        // and end up unprocessed. Clean those from the update map and warn:
-        for (auto it = d_rot_ctrl.update_map.cbegin();
-             it != d_rot_ctrl.update_map.cend();) {
-            if (it->first < requested_offset) {
-                d_logger->warn(
-                    "Dropping unprocessed rotator phase inc update (offset {:d})",
-                    it->first);
-                it = d_rot_ctrl.update_map.erase(it);
-            } else {
-                it++;
-            }
-        }
-
         // Error between the observed and expected tag offsets.
         //
         // Since we correct this error in closed loop, the observed error is the
@@ -350,6 +338,32 @@ void plsync_cc_impl::calibrate_tag_delay(uint64_t abs_sof_idx, int tolerance)
                            error,
                            d_rot_ctrl.tag_delay);
     }
+
+    // Some phase increment update messages may arrive too late on the rotator block and
+    // end up unprocessed. Clean those from the update map and warn:
+    for (auto it = d_rot_ctrl.update_map.cbegin(); it != d_rot_ctrl.update_map.cend();) {
+        if (it->second.sof_idx < abs_sof_idx) {
+            GR_LOG_DEBUG_LEVEL(
+                3,
+                "Rotator ctrl - Timing out unprocessed update scheduled for offset {:d}",
+                it->first);
+            d_rot_ctrl.unproc_count++;
+            it = d_rot_ctrl.update_map.erase(it);
+
+            // If too many phase inc updates are lost due to arriving late on the rotator,
+            // try scheduling the updates for later (some frames ahead). Do this in CCM
+            // mode only, as in ACM/VCM the upcoming PLFRAME lengths are unpredictable.
+            if (d_rot_ctrl.unproc_count > 10 && !d_acm_vcm &&
+                d_rot_ctrl.scheduling_delay < MAX_SCHEDULING_DELAY) {
+                d_rot_ctrl.scheduling_delay++;
+                d_rot_ctrl.unproc_count = 0;
+                d_logger->warn("Increasing the phase inc update delay to {:d} PLFRAME(s)",
+                               d_rot_ctrl.scheduling_delay);
+            }
+        } else {
+            it++;
+        }
+    }
 }
 
 void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
@@ -357,14 +371,25 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
                                           double rot_freq_adj,
                                           bool ref_is_past_frame)
 {
-    // Schedule the phase increment to take place at the start of the next frame
+    // By default, schedule the phase increment change to take place at the start of the
+    // next frame. Adjust the scheduling for some extra PLFRAMEs ahead if necessary to
+    // avoid the late arrival of phase inc update requests at the rotator block.
+    //
+    // Note there is little performance penalty in scheduling rotator frequency updates
+    // with some delay. The payload handler applies a feed-forward fine frequency
+    // correction step, which takes care of the residual frequency offset disturbing the
+    // frame. Meanwhile, the correction sent to the external rotator is only meant to
+    // track the incoming carrier so that the residual frequency offset remains within the
+    // fine estimation range. See more comments on the handle_payload function.
     const uint64_t abs_next_sof_idx = abs_sof_idx + plframe_len;
+    const uint64_t target_sof_idx =
+        abs_next_sof_idx + (plframe_len * d_rot_ctrl.scheduling_delay);
 
     // Assume the upstream rotator lies before a matched filter and, hence,
     // operates on the sample stream (i.e. on samples, not symbols). Use the
     // known oversampling ratio and the calibrated symbol-spaced tag delay to
     // schedule the phase increment update.
-    uint64_t target_idx = d_sps * (abs_next_sof_idx + d_rot_ctrl.tag_delay);
+    uint64_t target_samp_idx = d_sps * (target_sof_idx + d_rot_ctrl.tag_delay);
 
     // Prevent two frequency corrections at the same sample offset. The scenario
     // where this becomes possible is as follows:
@@ -386,15 +411,15 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     // In this case, both updates would be applicable to the same offset. By
     // preventing this scenario here, only the first update would be applied,
     // which, in this example, is the update due to the new coarse estimate.
-    if (d_rot_ctrl.update_map.count(target_idx) > 0)
+    if (d_rot_ctrl.update_map.count(target_samp_idx) > 0)
         return;
 
     // Sanity check
     if (d_rot_ctrl.current.idx < d_rot_ctrl.past.idx ||
-        target_idx < d_rot_ctrl.current.idx) {
+        target_samp_idx < d_rot_ctrl.current.idx) {
         d_logger->warn("Unexpected rotator control index order: target={:d}, "
                        "current={:d}, past={:d}",
-                       target_idx,
+                       target_samp_idx,
                        d_rot_ctrl.current.idx,
                        d_rot_ctrl.past.idx);
     }
@@ -416,15 +441,15 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
     // Rotator phase increment that should start taking effect on the next frame:
     const double phase_inc = -d_cum_freq_offset * 2.0 * GR_M_PI / d_sps;
     d_rot_ctrl.update_map.emplace(std::piecewise_construct,
-                                  std::forward_as_tuple(target_idx),
-                                  std::forward_as_tuple(phase_inc, abs_next_sof_idx));
+                                  std::forward_as_tuple(target_samp_idx),
+                                  std::forward_as_tuple(phase_inc, target_sof_idx));
 
     // Send the corresponding phase increment to the rotator block
     static const pmt::pmt_t inc_key = pmt::intern("inc");
     static const pmt::pmt_t offset_key = pmt::intern("offset");
     pmt::pmt_t msg = pmt::make_dict();
     msg = pmt::dict_add(msg, inc_key, pmt::from_double(phase_inc));
-    msg = pmt::dict_add(msg, offset_key, pmt::from_uint64(target_idx));
+    msg = pmt::dict_add(msg, offset_key, pmt::from_uint64(target_samp_idx));
     message_port_pub(d_port_id, msg);
 
     GR_LOG_DEBUG_LEVEL(2, "Cumulative frequency offset: {:g}", d_cum_freq_offset);
@@ -432,8 +457,8 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
                        "Rotator ctrl - Sent New Phase Inc: {:+f}; Target SOF Index: "
                        "{:d}; Rot Sample Offset: {:d}",
                        phase_inc,
-                       abs_next_sof_idx,
-                       target_idx);
+                       target_sof_idx,
+                       target_samp_idx);
 }
 
 void plframe_idx_t::step(uint16_t n_slots, bool has_pilots)

@@ -38,8 +38,10 @@ struct rot_phase_adj_t {
 struct rot_ctrl_t {
     int tag_delay = 0;             /** Delay of rotator's rot_phase_inc tag */
     uint64_t tag_search_start = 0; /** Starting index for the next tag search */
-    rot_state_t past;              /** Frequency state at the past PLFRAME */
-    rot_state_t current;           /** Frequency state at the current PLFRAME */
+    int scheduling_delay = 0; /** PLFRAMEs to skip when scheduling a phase inc update */
+    int unproc_count = 0;     /** Count of unprocessed phase inc update requests */
+    rot_state_t past;         /** Frequency state at the past PLFRAME */
+    rot_state_t current;      /** Frequency state at the current PLFRAME */
     std::map<uint64_t, rot_phase_adj_t>
         update_map; /** Map of scheduled phase increment updates */
 };
