@@ -20,7 +20,10 @@ except ImportError:
     import sys
     dirname, filename = os.path.split(os.path.abspath(__file__))
     sys.path.append(os.path.join(dirname, "bindings"))
-    from gnuradio.dvbs2rx import rotator_cc
+    try:
+        from gnuradio.dvbs2rx import rotator_cc
+    except ImportError:
+        from python.dvbs2rx import rotator_cc
 
 
 class qa_rotator_cc(gr_unittest.TestCase):
