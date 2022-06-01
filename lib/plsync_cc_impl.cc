@@ -227,17 +227,46 @@ void plsync_cc_impl::forecast(int noutput_items, gr_vector_int& ninput_items_req
     ninput_items_required[0] = std::min(ninput_items_required[0], noutput_items);
 }
 
+void plsync_cc_impl::handle_tags(int ninput_items)
+{
+    // Search for tags in the input buffer and copy them to the local queue. Do not repeat
+    // the search over the samples already processed in a previous call.
+    static const pmt::pmt_t tag_key = pmt::intern("rot_phase_inc");
+    std::vector<tag_t> tags;
+    uint64_t abs_start = std::max(nitems_read(0), d_rot_ctrl.last_tag_search_end);
+    uint64_t abs_end = nitems_read(0) + ninput_items;
+    get_tags_in_range(tags, 0, abs_start, abs_end, tag_key);
+    for (const auto& tag : tags) {
+        d_rot_ctrl.tag_queue.push(tag);
+    }
+    d_rot_ctrl.last_tag_search_end = abs_end;
+}
+
 void plsync_cc_impl::calibrate_tag_delay(const uint64_t abs_sof_idx, int tolerance)
 {
     // Search for tags that occurred since the last search up to the current SOF
     // plus some tag delay tolerance.
-    static const pmt::pmt_t tag_key = pmt::intern("rot_phase_inc");
     const uint64_t tag_search_end = abs_sof_idx + tolerance;
     std::vector<tag_t> tags;
-    get_tags_in_range(tags, 0, d_rot_ctrl.tag_search_start, tag_search_end, tag_key);
+    while (!d_rot_ctrl.tag_queue.empty()) {
+        const auto& tag = d_rot_ctrl.tag_queue.front();
+        if (tag.offset < d_rot_ctrl.tag_search_start) {
+            // Unexpected lost tag. Do not worry about warning here. It will be warned
+            // later when searching for unprocessed tags.
+            d_rot_ctrl.tag_queue.pop();
+        } else if (tag.offset >= d_rot_ctrl.tag_search_start &&
+                   tag.offset < tag_search_end) {
+            // Tag in the search range
+            tags.push_back(tag);
+            d_rot_ctrl.tag_queue.pop();
+        } else {
+            // Tag beyond the search range (in the future)
+            break;
+        }
+    }
 
     // Prepare for the next tag search
-    // NOTE: get_tags_in_range searches within the interval [start,end).
+    // NOTE the above search is over the interval [start,end).
     d_rot_ctrl.tag_search_start = tag_search_end;
 
     // Filter out duplicate tags
@@ -794,6 +823,9 @@ int plsync_cc_impl::general_work(int noutput_items,
     const gr_complex* in = (const gr_complex*)input_items[0];
     gr_complex* out = (gr_complex*)output_items[0];
     int n_produced = 0, n_consumed = 0;
+
+    // Copy the desired tags to the local queue before anything else
+    handle_tags(ninput_items[0]);
 
     // Keep processing as long as:
     //

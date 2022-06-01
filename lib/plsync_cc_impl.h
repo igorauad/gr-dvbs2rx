@@ -17,6 +17,7 @@
 #include "pl_signaling.h"
 #include <gnuradio/dvbs2rx/plsync_cc.h>
 #include <volk/volk_alloc.hh>
+#include <queue>
 
 namespace gr {
 namespace dvbs2rx {
@@ -36,12 +37,16 @@ struct rot_phase_adj_t {
 
 /* @brief Upstream rotator control */
 struct rot_ctrl_t {
-    int tag_delay = 0;             /** Delay of rotator's rot_phase_inc tag */
-    uint64_t tag_search_start = 0; /** Starting index for the next tag search */
+    int tag_delay = 0;                /** Delay of rotator's rot_phase_inc tag */
+    uint64_t tag_search_start = 0;    /** Starting index for the next tag search */
+    uint64_t last_tag_search_end = 0; /** Ending index from the previous tag search */
+    // NOTE: tag_search_start is used on the processing search (via calibrate_tag_delay),
+    // while last_tag_search_end is used on the tag-copying search (via handle_tags).
     int scheduling_delay = 0; /** PLFRAMEs to skip when scheduling a phase inc update */
     int unproc_count = 0;     /** Count of unprocessed phase inc update requests */
     rot_state_t past;         /** Frequency state at the past PLFRAME */
     rot_state_t current;      /** Frequency state at the current PLFRAME */
+    std::queue<tag_t> tag_queue; /** Queue of rot_phase_inc tags */
     std::map<uint64_t, rot_phase_adj_t>
         update_map; /** Map of scheduled phase increment updates */
 };
@@ -121,6 +126,20 @@ private:
     freq_sync* d_freq_sync;           /**< frequency synchronizer */
     plsc_decoder* d_plsc_decoder;     /**< PLSC decoder */
     pl_descrambler* d_pl_descrambler; /**< PL descrambler */
+
+    /**
+     * @brief Save the tags in the current work range within the local queue
+     *
+     * The motivation is to avoid missing tags due to pruning. The PL sync block processes
+     * tags only when locked (via the `calibrate_tag_delay` function). Hence, when tags
+     * are placed while the block is unlocked, these tags can be occasionally lost due to
+     * GR runtime's block tag pruning. This function avoids the problem by saving all the
+     * desired tags ("rot_phase_inc" tags) locally on a queue to be processed later by the
+     * calibrate_tag_delay function.
+     *
+     * @param ninput_items (int) Number of samples available on the input buffer.
+     */
+    void handle_tags(int ninput_items);
 
     /**
      * @brief Send new frequency correction to the upstream rotator.
