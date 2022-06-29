@@ -1,5 +1,6 @@
 id: dvbs2rx_rotator_cc
 label: Rotator
+category: '[Core]/Digital Television/Utils'
 flags: [ python, cpp ]
 
 parameters:
