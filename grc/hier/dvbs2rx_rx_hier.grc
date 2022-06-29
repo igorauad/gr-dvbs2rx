@@ -139,8 +139,8 @@ blocks:
     coordinate: [72, 500.0]
     rotation: 0
     state: true
-- name: blocks_rotator_cc_0_0_0
-  id: blocks_rotator_cc
+- name: dvbs2rx_rotator_cc_0
+  id: dvbs2rx_rotator_cc
   parameters:
     affinity: ''
     alias: ''
@@ -594,17 +594,17 @@ blocks:
     state: true
 
 connections:
-- [analog_agc_xx_0, '0', blocks_rotator_cc_0_0_0, '0']
+- [analog_agc_xx_0, '0', dvbs2rx_rotator_cc_0, '0']
 - [analog_agc_xx_0, '0', pad_sink_2_0, '0']
-- [blocks_rotator_cc_0_0_0, '0', dvbs2rx_symbol_sync_cc_0, '0']
-- [blocks_rotator_cc_0_0_0, '0', pad_sink_2, '0']
+- [dvbs2rx_rotator_cc_0, '0', dvbs2rx_symbol_sync_cc_0, '0']
+- [dvbs2rx_rotator_cc_0, '0', pad_sink_2, '0']
 - [dvbs2rx_bbdeheader_bb_0, '0', pad_sink_0, '0']
 - [dvbs2rx_bbdescrambler_bb_0, '0', dvbs2rx_bbdeheader_bb_0, '0']
 - [dvbs2rx_bch_decoder_bb_0, '0', dvbs2rx_bbdescrambler_bb_0, '0']
 - [dvbs2rx_ldpc_decoder_cb_0, '0', dvbs2rx_bch_decoder_bb_0, '0']
 - [dvbs2rx_plsync_cc_0, '0', dvbs2rx_ldpc_decoder_cb_0, '0']
 - [dvbs2rx_plsync_cc_0, '0', pad_sink_1_0, '0']
-- [dvbs2rx_plsync_cc_0, rotator_phase_inc, blocks_rotator_cc_0_0_0, cmd]
+- [dvbs2rx_plsync_cc_0, rotator_phase_inc, dvbs2rx_rotator_cc_0, cmd]
 - [dvbs2rx_symbol_sync_cc_0, '0', dvbs2rx_plsync_cc_0, '0']
 - [dvbs2rx_symbol_sync_cc_0, '0', pad_sink_1, '0']
 - [pad_source_0, '0', analog_agc_xx_0, '0']

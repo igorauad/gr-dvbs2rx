@@ -321,7 +321,7 @@ blocks:
     coordinate: [1000, 712.0]
     rotation: 0
     state: true
-- name: blocks_rotator_cc_0_0
+- name: blocks_rotator_cc_foffset_sim
   id: blocks_rotator_cc
   parameters:
     affinity: ''
@@ -1262,7 +1262,7 @@ connections:
 - [analog_noise_source_x_0, '0', blocks_add_xx_0, '1']
 - [blocks_add_xx_0, '0', dvbs2rx_rx_hier_0, '0']
 - [blocks_file_source_0_0, '0', dtv_dvb_bbheader_bb_0, '0']
-- [blocks_rotator_cc_0_0, '0', blocks_add_xx_0, '0']
+- [blocks_rotator_cc_foffset_sim, '0', blocks_add_xx_0, '0']
 - [blocks_throttle_0, '0', virtual_sink_1_0, '0']
 - [dtv_dvb_bbheader_bb_0, '0', dtv_dvb_bbscrambler_bb_0, '0']
 - [dtv_dvb_bbscrambler_bb_0, '0', dtv_dvb_bch_bb_0, '0']
@@ -1278,7 +1278,7 @@ connections:
 - [dvbs2rx_rx_hier_0, '3', qtgui_freq_sink_x_0, '1']
 - [dvbs2rx_rx_hier_0, '4', qtgui_freq_sink_x_0, '0']
 - [interp_fir_filter_xxx_0, '0', blocks_throttle_0, '0']
-- [virtual_source_1_0_0, '0', blocks_rotator_cc_0_0, '0']
+- [virtual_source_1_0_0, '0', blocks_rotator_cc_foffset_sim, '0']
 
 metadata:
   file_format: 1

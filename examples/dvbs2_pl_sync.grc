@@ -324,8 +324,8 @@ blocks:
     coordinate: [16, 316.0]
     rotation: 0
     state: enabled
-- name: blocks_rotator_cc_0_0
-  id: blocks_rotator_cc
+- name: dvbs2rx_rotator_cc_foffset_corr
+  id: dvbs2rx_rotator_cc
   parameters:
     affinity: ''
     alias: ''
@@ -341,7 +341,7 @@ blocks:
     coordinate: [256, 888.0]
     rotation: 0
     state: true
-- name: blocks_rotator_cc_0_0_0
+- name: blocks_rotator_cc_foffset_sim
   id: blocks_rotator_cc
   parameters:
     affinity: ''
@@ -1157,14 +1157,14 @@ blocks:
     state: true
 
 connections:
-- [analog_agc_xx_0, '0', blocks_rotator_cc_0_0, '0']
+- [analog_agc_xx_0, '0', dvbs2rx_rotator_cc_foffset_corr, '0']
 - [analog_agc_xx_0, '0', qtgui_freq_sink_x_0, '0']
 - [analog_noise_source_x_0_0, '0', blocks_add_xx_0, '1']
 - [blocks_add_xx_0, '0', virtual_sink_1_0_0, '0']
 - [blocks_file_source_0_0, '0', dtv_dvb_bbheader_bb_0, '0']
-- [blocks_rotator_cc_0_0, '0', digital_symbol_sync_xx_1, '0']
-- [blocks_rotator_cc_0_0, '0', qtgui_freq_sink_x_0, '1']
-- [blocks_rotator_cc_0_0_0, '0', blocks_add_xx_0, '0']
+- [dvbs2rx_rotator_cc_foffset_corr, '0', digital_symbol_sync_xx_1, '0']
+- [dvbs2rx_rotator_cc_foffset_corr, '0', qtgui_freq_sink_x_0, '1']
+- [blocks_rotator_cc_foffset_sim, '0', blocks_add_xx_0, '0']
 - [blocks_throttle_0_0, '0', virtual_sink_1_0, '0']
 - [digital_symbol_sync_xx_1, '0', dvbs2rx_plsync_cc_0, '0']
 - [digital_symbol_sync_xx_1, '0', qtgui_const_sink_x_0_0, '0']
@@ -1177,9 +1177,9 @@ connections:
 - [dtv_dvbs2_physical_cc_0, '0', fft_filter_xxx_0, '0']
 - [dvbs2rx_plsync_cc_0, '0', qtgui_const_sink_x_0, '0']
 - [dvbs2rx_plsync_cc_0, '0', qtgui_time_sink_x_1, '0']
-- [dvbs2rx_plsync_cc_0, rotator_phase_inc, blocks_rotator_cc_0_0, cmd]
+- [dvbs2rx_plsync_cc_0, rotator_phase_inc, dvbs2rx_rotator_cc_foffset_corr, cmd]
 - [fft_filter_xxx_0, '0', blocks_throttle_0_0, '0']
-- [virtual_source_0, '0', blocks_rotator_cc_0_0_0, '0']
+- [virtual_source_0, '0', blocks_rotator_cc_foffset_sim, '0']
 - [virtual_source_0_0, '0', analog_agc_xx_0, '0']
 
 metadata:
