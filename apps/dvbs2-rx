@@ -17,8 +17,11 @@ from distutils.version import StrictVersion
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
-import sip
 from PyQt5 import Qt, QtCore
+try:
+    from PyQt5 import sip
+except ImportError:
+    import sip
 from gnuradio import analog
 from gnuradio import blocks
 from gnuradio import digital
