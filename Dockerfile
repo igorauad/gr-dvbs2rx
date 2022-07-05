@@ -1,3 +1,4 @@
+ARG cmake_args
 FROM igorfreire/gnuradio-oot-dev:3.10.1-ubuntu-focal
 RUN apt-get install -y libusb-1.0-0-dev libosmosdr-dev libsndfile1-dev
 RUN git clone https://github.com/osmocom/rtl-sdr.git && \
@@ -20,7 +21,7 @@ ADD . /src/gr-dvbs2rx/
 RUN cd /src/gr-dvbs2rx/ && \
     git clone https://github.com/google/cpu_features.git && \
     mkdir build && cd build && \
-    cmake -DENABLE_DOXYGEN=OFF .. && \
+    cmake -DENABLE_DOXYGEN=OFF $cmake_args .. && \
     cmake --build . -j$(nproc) && \
     cmake --install . && \
     ldconfig && \

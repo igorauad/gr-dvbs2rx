@@ -49,7 +49,7 @@ options:
   relative to the build directory. This feature requires the [libbenchmark
   library](https://github.com/google/benchmark).
 
-- `BENCHMARK_FEC`: when set to `ON`, builds an application to assess the
+- `BENCHMARK_FEC`: when set to ON, builds an application to assess the
   performance of various forward error correction (FEC) configurations. The
   current implementation focuses on the PLSC decoder and yields the `bench_plsc`
   application at the `bench/fec/` subdirectory of the build directory. This
@@ -59,11 +59,11 @@ options:
 - `DEBUG_LOGS`: when set to OFF, disables the low-level logs available by
   default to debug the physical layer operation.
 
-- `NATIVE_OPTIMIZATIONS`: when set to ON, compiles the dvbs2rx library using the
-  `-march=native` flag to enable optimizations for the local CPU. Use this
-  option to obtain improved CPU performance, as long as your goal is to run the
-  project on the same machine used for compilation. Do not use this option if
-  compiling binaries to run on other CPUs.
+- `NATIVE_OPTIMIZATIONS`: when set to ON (default), compiles the dvbs2rx library
+  using the `-march=native` flag to enable optimizations for the local CPU. Use
+  this option to obtain improved CPU performance, as long as your goal is to run
+  the project on the same machine used for compilation. Set this option to OFF
+  if compiling binaries to run on other CPUs.
 
 > Note the build options must be specified on the `cmake` step. For example, for
 > an option named `MYOPTION`, append either `-DMYOPTION=ON` or `-DMYOPTION=OFF`

@@ -49,7 +49,7 @@ target_include_directories(gnuradio-dvbs2rx
   )
 set_target_properties(gnuradio-dvbs2rx PROPERTIES DEFINE_SYMBOL "gnuradio_dvbs2rx_EXPORTS")
 
-option(NATIVE_OPTIMIZATIONS "Optimize build for the local machine" OFF)
+option(NATIVE_OPTIMIZATIONS "Optimize build for the local machine" ON)
 if (NATIVE_OPTIMIZATIONS)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall")
 else()
