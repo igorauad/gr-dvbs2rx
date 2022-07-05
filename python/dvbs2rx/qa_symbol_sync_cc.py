@@ -91,7 +91,12 @@ class qa_plsync_cc(gr_unittest.TestCase):
         """
         sps = 2
         x_syms = list(map(complex, [1.0, -1.0, 3.0, -2.0, 2.0, -2.5, 1.5]))
-        x_up = upfirdn([1], x_syms, sps)
+
+        # Upsampling
+        x_up = np.zeros(len(x_syms) * sps, dtype=np.complex)
+        for i in range(len(x_syms)):
+            x_up[2 * i] = x_syms[i]
+
         self._set_up_flowgraph(x_up, sps, damping=0)
         self.tb.run()
         # All symbols should be retained, except the first, since the symbol
