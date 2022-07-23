@@ -17,6 +17,7 @@ list(APPEND dvbs2rx_sources
     bbdeheader_bb_impl.cc
     bbdescrambler_bb_impl.cc
     bch_decoder_bb_impl.cc
+    gf.cc
     ldpc_decoder_cb_impl.cc
     pi2_bpsk.cc
     pl_descrambler.cc
@@ -86,6 +87,7 @@ list(APPEND test_dvbs2rx_sources
   qa_symbol_sync_cc.cc
   qa_cdeque.cc
   qa_delay_line.cc
+  qa_gf.cc
   qa_pi2_bpsk.cc
   qa_pl_frame_sync.cc
   qa_pl_freq_sync.cc
