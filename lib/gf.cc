@@ -16,11 +16,26 @@ namespace dvbs2rx {
 
 /********** Galois Field GF(2^m) **********/
 
-galois_field::galois_field(uint8_t m, uint16_t prim_poly)
-    : m_m(m), m_prim_poly(prim_poly), m_two_to_m_minus_one((1 << m) - 1)
+template <typename T>
+galois_field<T>::galois_field(const gf2_poly<T>& prim_poly)
+    : m_m(prim_poly.degree()),
+      m_two_to_m_minus_one((1 << m_m) - 1),
+      m_table(1 << m_m),
+      m_inv_table(1 << m_m)
 {
-    if (m > 16)
-        throw std::runtime_error("Please choose m <= 16");
+    // The field elements can be represented with m bits each. However, the minimal
+    // polynomials can have degree up to m such that they need a storage of "m + 1" bits
+    // (the highest-degree term is not omitted in gf2_poly<T>). Hence, the base type T,
+    // which is also used for the GF(2) polynomials returned by get_min_poly, should be
+    // large enough to hold "m + 1" bits. Since m comes from the degree of the primitive
+    // polynomial, and the primitive polynomial also uses storage type T, this should be
+    // guaranteed. For instance, if T=uint16_t, the max degree the prim_poly variable can
+    // have is 15, so m=15, and "m+1" is the size of uint16_t in bits.
+    assert(static_cast<size_t>(m_m + 1) <= sizeof(T) * 8);
+
+    // The computation that follows ignores the unitary coefficient of the highest-order
+    // term in the primitive polynomial.
+    const T prim_poly_exc_high_bit = prim_poly.get_poly() ^ (1 << prim_poly.degree());
 
     // Table of GF(2^m) elements
     //
@@ -31,17 +46,17 @@ galois_field::galois_field(uint8_t m, uint16_t prim_poly)
     // of the reference Python implementation.
     m_table[0] = 0;
     m_table[1] = 1;
-    for (unsigned int i = 1; i < m_two_to_m_minus_one; i++)
+    for (T i = 1; i < m_two_to_m_minus_one; i++)
         m_table[i + 1] = ((m_table[i] << 1) & m_two_to_m_minus_one) ^
-                         ((m_table[i] >> (m - 1)) * m_prim_poly);
+                         ((m_table[i] >> (m_m - 1)) * prim_poly_exc_high_bit);
 
     // Inverse LUT: maps element alpha^i to its m_table index.
     //
     // Since m_table has element alpha^0 at index=1, alpha^1 at index=2, and so on, this
     // function generates an array whose value at position "alpha^i" is the index "i+1",
     // i.e., "x[alpha^i] = i + 1".
-    for (unsigned int i = 1; i <= m_two_to_m_minus_one; i++) {
-        for (uint16_t beta = 1; beta <= m_two_to_m_minus_one; beta++) {
+    for (T i = 1; i <= m_two_to_m_minus_one; i++) {
+        for (T beta = 1; beta <= m_two_to_m_minus_one; beta++) {
             if (m_table[i] == beta) {
                 m_inv_table[beta] = i;
                 break;
@@ -50,18 +65,21 @@ galois_field::galois_field(uint8_t m, uint16_t prim_poly)
     }
 }
 
-uint16_t galois_field::operator[](int index) const
+template <typename T>
+T galois_field<T>::operator[](T index) const
 {
     assert(index <= m_two_to_m_minus_one);
     return m_table[index];
 }
 
-uint16_t galois_field::get_alpha_i(uint16_t i) const
+template <typename T>
+T galois_field<T>::get_alpha_i(T i) const
 {
     return m_table[(i % m_two_to_m_minus_one) + 1];
 }
 
-uint16_t galois_field::get_exponent(uint16_t beta) const
+template <typename T>
+T galois_field<T>::get_exponent(T beta) const
 {
     if (beta == 0)
         throw std::runtime_error("Zero element does not have an exponent");
@@ -69,7 +87,8 @@ uint16_t galois_field::get_exponent(uint16_t beta) const
     return m_inv_table[beta] - 1;
 }
 
-uint16_t galois_field::multiply(uint16_t a, uint16_t b) const
+template <typename T>
+T galois_field<T>::multiply(T a, T b) const
 {
     if (a == 0 || b == 0)
         return 0;
@@ -77,7 +96,8 @@ uint16_t galois_field::multiply(uint16_t a, uint16_t b) const
     return get_alpha_i(get_exponent(a) + get_exponent(b));
 }
 
-uint16_t galois_field::inverse(uint16_t beta) const
+template <typename T>
+T galois_field<T>::inverse(T beta) const
 {
     // We want "beta^-1" such that "beta * beta^-1 = 1". For that, we use the property
     // that any GF(2^m) element raised to the power "2^m - 1" is equal to one, i.e.,
@@ -86,22 +106,24 @@ uint16_t galois_field::inverse(uint16_t beta) const
     return get_alpha_i(m_two_to_m_minus_one - get_exponent(beta));
 }
 
-uint16_t galois_field::divide(uint16_t a, uint16_t b) const
+template <typename T>
+T galois_field<T>::divide(T a, T b) const
 {
     return multiply(a, inverse(b));
 }
 
-std::set<uint16_t> galois_field::get_conjugates(uint16_t beta) const
+template <typename T>
+std::set<T> galois_field<T>::get_conjugates(T beta) const
 {
-    std::set<uint16_t> conjugates;
+    std::set<T> conjugates;
 
     // The set of conjugates always includes the original element.
     conjugates.insert(beta);
 
     // The conjugates of alpha^i are the distinct elements "alpha^i^(2^j)".
-    uint16_t i = get_exponent(beta);
+    T i = get_exponent(beta);
     for (uint8_t j = 1; j < m_m; j++) { // alpha^i can have up to m conjugates
-        uint16_t conjugate = get_alpha_i(i * (1 << j));
+        T conjugate = get_alpha_i(i * (1 << j));
         if (conjugates.count(conjugate) > 0)
             break;
         conjugates.insert(conjugate);
@@ -110,86 +132,76 @@ std::set<uint16_t> galois_field::get_conjugates(uint16_t beta) const
     return conjugates;
 }
 
-gf2_poly galois_field::get_min_poly(uint16_t beta) const
+template <typename T>
+gf2_poly<T> galois_field<T>::get_min_poly(T beta) const
 {
     if (beta == 0) { // 0 is always a root of "f(x) = x"
-        return 0b10;
+        return gf2_poly<T>(0b10);
     }
     // The minimal polynomial is the product of the terms "(x + beta^(2^l))" for each
     // distinct conjugate of beta given by beta^(2^l).
     const auto conjugates = get_conjugates(beta);
-    auto prod = gf2m_poly(this, { 1 });
-    for (const uint16_t& beta_2_l : conjugates) {
-        prod = prod * gf2m_poly(this, { beta_2_l, 1 });
+    auto prod = gf2m_poly<T>(this, { 1 });
+    for (const T& beta_2_l : conjugates) {
+        prod = prod * gf2m_poly<T>(this, { beta_2_l, 1 });
     }
-    return gf2_poly(prod);
+    return prod.to_gf2_poly(); // the result should be a polynomial over GF(2)
 }
-
 
 /********** Polynomial over GF(2) **********/
 
-
-gf2_poly::gf2_poly(uint16_t coefs) : m_poly(coefs) { set_degree(); }
-
-gf2_poly::gf2_poly(const gf2m_poly& poly) : m_poly(0)
+template <typename T>
+gf2_poly<T>::gf2_poly(T coefs) : m_poly(coefs)
 {
-    if (poly.degree() > m_max_degree)
-        throw std::runtime_error("GF(2^m) polynomial degree exceeds max GF(2) degree");
-
-    const auto& poly_coefs = poly.get_poly();
-    for (int i = poly.degree(); i >= 0; i--) {
-        if (poly_coefs[i] > 1) {
-            throw std::runtime_error(
-                "Trying to reduce non-binary GF(2^m) polynomial to GF(2)");
-        }
-        if (poly_coefs[i])
-            m_poly ^= 1 << i;
-    }
-    set_degree();
-}
-
-void gf2_poly::set_degree()
-{
-    if (m_poly == 0) {
-        m_degree = -1; // convention for the zero polynomial
-        return;
-    }
-
-    for (int i = 0; i < 16; i++) {
-        if (m_poly & (1 << i))
+    // Polynomial degree
+    m_degree = -1; // convention for the zero polynomial
+    for (int i = m_max_degree; i >= 0; i--) {
+        if (m_poly & (1 << i)) {
             m_degree = i;
+            break;
+        }
     }
 }
 
-gf2_poly gf2_poly::operator+(const gf2_poly& x) const
+template <typename T>
+gf2_poly<T> gf2_poly<T>::operator+(const gf2_poly<T>& x) const
 {
-    return gf2_poly(m_poly ^ x.get_poly());
+    return m_poly ^ x.get_poly();
 }
 
-gf2_poly gf2_poly::operator*(bool x) const { return gf2_poly(m_poly * x); }
+template <typename T>
+gf2_poly<T> gf2_poly<T>::operator*(bool x) const
+{
+    return m_poly * x;
+}
 
-gf2_poly gf2_poly::operator*(const gf2_poly& x) const
+template <typename T>
+gf2_poly<T> gf2_poly<T>::operator*(const gf2_poly<T>& x) const
 {
     if (m_degree + x.degree() > m_max_degree)
         throw std::runtime_error("GF(2) polynomial product exceeds max degree");
 
-    uint16_t x_coefs = x.get_poly();
-    uint16_t res;
-    for (int i = 0; i < 16; i++) {
+    const T& x_coefs = x.get_poly();
+    T res = 0;
+    for (int i = 0; i <= x.degree(); i++) {
         if (x_coefs & (1 << i)) {
             res ^= m_poly << i;
         }
     }
-    return gf2_poly(res);
+    return res;
 }
 
-bool gf2_poly::operator==(const gf2_poly& x) const { return m_poly == x.get_poly(); }
+template <typename T>
+bool gf2_poly<T>::operator==(const gf2_poly<T>& x) const
+{
+    return m_poly == x.get_poly();
+}
 
 
 /********** Polynomial over GF(2^m) **********/
 
-
-gf2m_poly::gf2m_poly(const galois_field* const gf, std::vector<uint16_t>&& coefs)
+template <typename T>
+gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, std::vector<T>&& coefs)
     : m_gf(gf), m_poly(std::move(coefs))
 {
     // Remove any leading zeros and set the polynomial degree
@@ -200,7 +212,8 @@ gf2m_poly::gf2m_poly(const galois_field* const gf, std::vector<uint16_t>&& coefs
     }
 }
 
-gf2m_poly gf2m_poly::operator+(const gf2m_poly& x) const
+template <typename T>
+gf2m_poly<T> gf2m_poly<T>::operator+(const gf2m_poly<T>& x) const
 {
     auto a = m_poly;
     auto b = x.get_poly();
@@ -213,30 +226,32 @@ gf2m_poly gf2m_poly::operator+(const gf2m_poly& x) const
     }
 
     // The coefficients of same degree add to each other modulo-2
-    std::vector<uint16_t> res(pad_poly.size());
+    std::vector<T> res(pad_poly.size());
     for (size_t i = 0; i < res.size(); i++) {
         res[i] = a[i] ^ b[i];
     }
 
-    return gf2m_poly(m_gf, std::move(res));
+    return gf2m_poly<T>(m_gf, std::move(res));
 }
 
-gf2m_poly gf2m_poly::operator*(uint16_t x) const
+template <typename T>
+gf2m_poly<T> gf2m_poly<T>::operator*(T x) const
 {
     auto a = m_poly;
     for (size_t i = 0; i < a.size(); i++) {
         a[i] = m_gf->multiply(a[i], x);
     }
-    return gf2m_poly(m_gf, std::move(a));
+    return gf2m_poly<T>(m_gf, std::move(a));
 }
 
-gf2m_poly gf2m_poly::operator*(const gf2m_poly& x) const
+template <typename T>
+gf2m_poly<T> gf2m_poly<T>::operator*(const gf2m_poly& x) const
 {
     const auto& a = m_poly;
     const auto& b = x.get_poly();
 
-    uint16_t prod_len = a.size() + b.size() - 1;
-    std::vector<uint16_t> res(prod_len);
+    size_t prod_len = a.size() + b.size() - 1;
+    std::vector<T> res(prod_len);
 
     // Convolution
     for (size_t i = 0; i < a.size(); i++) {
@@ -245,11 +260,47 @@ gf2m_poly gf2m_poly::operator*(const gf2m_poly& x) const
         }
     }
 
-    return gf2m_poly(m_gf, std::move(res));
+    return gf2m_poly<T>(m_gf, std::move(res));
 }
 
-bool gf2m_poly::operator==(const gf2m_poly& x) const { return m_poly == x.get_poly(); }
+template <typename T>
+bool gf2m_poly<T>::operator==(const gf2m_poly& x) const
+{
+    return m_poly == x.get_poly();
+}
 
+template <typename T>
+gf2_poly<T> gf2m_poly<T>::to_gf2_poly() const
+{
+    if (m_degree > static_cast<int>(sizeof(T) * 8 - 1))
+        throw std::runtime_error("GF(2^m) polynomial degree exceeds max GF(2) degree");
+
+    T gf2_coefs = 0;
+    for (int i = m_degree; i >= 0; i--) {
+        if (m_poly[i] > 1) {
+            throw std::runtime_error(
+                "Trying to reduce non-binary GF(2^m) polynomial to GF(2)");
+        }
+        if (m_poly[i])
+            gf2_coefs ^= 1 << i;
+    }
+    return gf2_poly<T>(gf2_coefs);
+}
+
+
+/********** Explicit Instantiations **********/
+
+template class galois_field<uint16_t>;
+template class galois_field<uint32_t>;
+template class galois_field<int>;
+
+template class gf2_poly<uint16_t>;
+template class gf2_poly<uint32_t>;
+template class gf2_poly<int>;
+
+template class gf2m_poly<uint16_t>;
+template class gf2m_poly<uint32_t>;
+template class gf2m_poly<int>;
 
 } // namespace dvbs2rx
 } // namespace gr

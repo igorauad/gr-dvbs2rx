@@ -19,10 +19,10 @@
 namespace gr {
 namespace dvbs2rx {
 
-#define MAX_M 16
-#define MAX_FIELD_ELEMENTS 1 << MAX_M
-
+template <typename T>
 class DVBS2RX_API gf2_poly;
+
+template <typename T>
 class DVBS2RX_API gf2m_poly;
 
 /**
@@ -31,97 +31,96 @@ class DVBS2RX_API gf2m_poly;
  * @note See the reference implementation at
  * https://github.com/igorauad/bch/blob/master/gf.py.
  */
+template <typename T>
 class DVBS2RX_API galois_field
 {
 private:
-    uint8_t m_m;                   // dimension of the GF(2^m) field
-    uint16_t m_prim_poly;          // 16-bit primitive polynomial excluding the MSB
-    uint16_t m_two_to_m_minus_one; // shortcut for (2^m - 1)
-    std::array<uint16_t, MAX_FIELD_ELEMENTS> m_table; // field elements
-    std::array<uint16_t, MAX_FIELD_ELEMENTS>
-        m_inv_table; // LUT to map element alpha^i to its GF table index i+1
+    uint8_t m_m;                // dimension of the GF(2^m) field
+    T m_two_to_m_minus_one;     // shortcut for (2^m - 1)
+    std::vector<T> m_table;     // field elements
+    std::vector<T> m_inv_table; // LUT to map element alpha^i to its GF table index i+1
 
 
 public:
     /**
      * @brief Construct a new Galois field object.
      *
-     * @param m GF(2^m) field dimension up to 16.
-     * @param prim_poly Primitive polynomial with the lowest order term on the right (lsb)
-     * and excluding the highest order term x^m. For instance, a polynomial "x^4 + x + 1"
-     * should be given as "0011" instead of "10011".
+     * @param prim_poly Primitive polynomial that generates the field.
      */
-    galois_field(uint8_t m, uint16_t prim_poly);
+    galois_field(const gf2_poly<T>& prim_poly);
 
     /**
      * @brief Get the GF(2^m) element at a given index on the elements table.
      *
      * @param index Target index.
-     * @return uint16_t GF(2^m) element.
+     * @return T GF(2^m) element.
      */
-    uint16_t operator[](int index) const;
+    T operator[](T index) const;
 
     /**
      * @brief Get the i-th power of the primitive element (alpha^i).
      *
      * @param i Exponent i of the target element alpha^i for i from 0 to "2**m - 2".
-     * @return uint16_t Element alpha^i.
+     * @return T Element alpha^i.
+     * @note This function cannot obtain the zero (additive identity) element, given the
+     * zero element cannot be expressed as a power of the primitive element. To access the
+     * zero element, use the operator[] instead.
      */
-    uint16_t get_alpha_i(uint16_t i) const;
+    T get_alpha_i(T i) const;
 
     /**
      * @brief Get the exponent i of a given element beta = alpha^i.
      *
      * @param beta Element beta that is a power of the primitive element alpha.
-     * @return uint16_t Exponent i.
+     * @return T Exponent i.
      */
-    uint16_t get_exponent(uint16_t beta) const;
+    T get_exponent(T beta) const;
 
     /**
      * @brief Multiply two elements from GF(2^m).
      *
      * @param a First multiplicand.
      * @param b Second multiplicand.
-     * @return uint16_t Product a*b.
+     * @return T Product a*b.
      */
-    uint16_t multiply(uint16_t a, uint16_t b) const;
+    T multiply(T a, T b) const;
 
     /**
      * @brief Get the inverse beta^-1 from a GF(2^m) element beta.
      *
      * @param beta Element to invert.
-     * @return uint16_t Inverse beta^-1.
+     * @return T Inverse beta^-1.
      */
-    uint16_t inverse(uint16_t beta) const;
+    T inverse(T beta) const;
 
     /**
      * @brief Divide two elements from GF(2^m).
      *
      * @param a Dividend.
      * @param b Divisor.
-     * @return uint16_t Quotient a/b.
+     * @return T Quotient a/b.
      */
-    uint16_t divide(uint16_t a, uint16_t b) const;
+    T divide(T a, T b) const;
 
     /**
      * @brief Get the conjugates of element beta.
      *
      * @param beta The element whose conjugates are to be computed.
-     * @return std::set<uint16_t> The set of distinct conjugates alpha^(i^(2^l)) in
-     * GF(2^m) associated with element beta=alpha^i.
+     * @return std::set<T> The set of distinct conjugates alpha^(i^(2^l)) in GF(2^m)
+     * associated with element beta=alpha^i.
      */
-    std::set<uint16_t> get_conjugates(uint16_t beta) const;
+    std::set<T> get_conjugates(T beta) const;
 
     /**
      * @brief Compute the minimal polynomial associated with element beta.
      *
-     * Computes the polynomial phi(x) over GF(2) of smallest degree having beta as
-     * root. See the notes in the reference Python implementation.
+     * Computes the polynomial phi(x) over GF(2) of smallest degree having beta as root.
+     * See the notes in the reference Python implementation.
      *
      * @param beta GF(2^m) element.
      * @return gf2_poly Minimal polynomial of beta as a polynomial over GF(2).
      */
-    gf2_poly get_min_poly(uint16_t beta) const;
+    gf2_poly<T> get_min_poly(T beta) const;
 };
 
 /**
@@ -129,21 +128,18 @@ public:
  *
  * A polynomial whose coefficients are elements from GF(2), i.e., binary.
  */
+template <typename T>
 class DVBS2RX_API gf2_poly
 {
 private:
-    uint16_t m_poly; // Polynomial coefficients
+    static constexpr int m_max_degree = (sizeof(T) * 8 - 1);
+
+    T m_poly; // Polynomial coefficients
     // NOTE: the LSB (bit 0) has the zero-degree coefficient, bit 1 has the coefficient of
-    // x, bit 2 of x^2, and so on.
+    // x, bit 2 of x^2, and so on. For instance, a polynomial "x^4 + x + 1" should be
+    // stored as "10011"/
     int m_degree; // Polynomial degree
     // NOTE: by convention, the zero polynomial has degree -1.
-
-    static constexpr int m_max_degree = 15; // uint16_t storage can support up to x^15
-
-    /**
-     * @brief Set the polynomial degree.
-     */
-    void set_degree();
 
 public:
     /**
@@ -151,16 +147,7 @@ public:
      *
      * @param coefs Binary coefficients.
      */
-    gf2_poly(uint16_t coefs);
-
-    /**
-     * @brief Construct a GF(2) polynomial from a GF(2^m) polynomial.
-     *
-     * @param poly Polynomial over GF(2^m) whose coefficients are either unit or zero such
-     * that it can be reduced to a polynomial over GF(2).
-     * @note Throws runtime error if the given polynomial over GF(2^m) is not binary.
-     */
-    gf2_poly(const gf2m_poly& poly);
+    gf2_poly(T coefs);
 
     /**
      * @brief GF(2) polynomial addition.
@@ -168,7 +155,7 @@ public:
      * @param x Polynomial to add.
      * @return gf2_poly Addition result.
      */
-    gf2_poly operator+(const gf2_poly& x) const;
+    gf2_poly<T> operator+(const gf2_poly<T>& x) const;
 
     /**
      * @brief Multiplication by a GF(2) scalar.
@@ -176,7 +163,7 @@ public:
      * @param x Binary scalar to multiply.
      * @return gf2_poly Multiplication result.
      */
-    gf2_poly operator*(bool x) const;
+    gf2_poly<T> operator*(bool x) const;
 
     /**
      * @brief Multiplication by another GF(2) polynomial.
@@ -184,7 +171,7 @@ public:
      * @param x Polynomial to multiply.
      * @return gf2_poly Multiplication result.
      */
-    gf2_poly operator*(const gf2_poly& x) const;
+    gf2_poly<T> operator*(const gf2_poly<T>& x) const;
 
     /**
      * @brief Equal comparator.
@@ -192,14 +179,14 @@ public:
      * @param x The other GF(2^m) polynomial.
      * @return bool Whether they are equal.
      */
-    bool operator==(const gf2_poly& x) const;
+    bool operator==(const gf2_poly<T>& x) const;
 
     /**
      * @brief Get the polynomial coefficients.
      *
-     * @return uint16_t 16-bit storage of polynomial coefficients.
+     * @return T storage of polynomial coefficients.
      */
-    uint16_t get_poly() const { return m_poly; }
+    const T& get_poly() const { return m_poly; }
 
     /**
      * @brief Get the polynomial degree.
@@ -215,11 +202,12 @@ public:
  *
  * A polynomial whose coefficients are elements from a GF(2^m) extension field.
  */
+template <typename T>
 class DVBS2RX_API gf2m_poly
 {
 private:
-    const galois_field* m_gf;     // Galois field
-    std::vector<uint16_t> m_poly; // Polynomial coefficients
+    const galois_field<T>* m_gf; // Galois field
+    std::vector<T> m_poly;       // Polynomial coefficients
     // NOTE: index 0 has the zero-degree coefficient, index 1 has the coefficient of x,
     // index 2 of x^2, and so on.
     int m_degree; // Polynomial degree
@@ -231,31 +219,31 @@ public:
      * @param gf Reference Galois field.
      * @param coefs Polynomial coefficients.
      */
-    gf2m_poly(const galois_field* const gf, std::vector<uint16_t>&& coefs);
+    gf2m_poly(const galois_field<T>* const gf, std::vector<T>&& coefs);
 
     /**
      * @brief GF(2^m) polynomial addition.
      *
      * @param x Polynomial to add.
-     * @return gf2m_poly Addition result.
+     * @return gf2m_poly<T> Addition result.
      */
-    gf2m_poly operator+(const gf2m_poly& x) const;
+    gf2m_poly<T> operator+(const gf2m_poly<T>& x) const;
 
     /**
      * @brief Multiplication by a scalar.
      *
      * @param x Scalar to multiply.
-     * @return gf2m_poly Multiplication result.
+     * @return gf2m_poly<T> Multiplication result.
      */
-    gf2m_poly operator*(uint16_t x) const;
+    gf2m_poly<T> operator*(T x) const;
 
     /**
      * @brief Multiplication by another GF(2^m) polynomial.
      *
      * @param x Polynomial to multiply.
-     * @return gf2m_poly Multiplication result.
+     * @return gf2m_poly<T> Multiplication result.
      */
-    gf2m_poly operator*(const gf2m_poly& x) const;
+    gf2m_poly<T> operator*(const gf2m_poly<T>& x) const;
 
     /**
      * @brief Equal comparator.
@@ -263,15 +251,14 @@ public:
      * @param x The other GF(2^m) polynomial.
      * @return bool Whether they are equal.
      */
-    bool operator==(const gf2m_poly& x) const;
+    bool operator==(const gf2m_poly<T>& x) const;
 
     /**
      * @brief Get the polynomial coefficients.
      *
-     * @return const std::vector<uint16_t>& Reference to vector of polynomial
-     * coefficients.
+     * @return const std::vector<T>& Reference to vector of polynomial coefficients.
      */
-    const std::vector<uint16_t>& get_poly() const { return m_poly; }
+    const std::vector<T>& get_poly() const { return m_poly; }
 
     /**
      * @brief Get the polynomial degree.
@@ -280,7 +267,21 @@ public:
      * @note By convention, the zero polynomial has degree -1.
      */
     int degree() const { return m_degree; }
+
+    /**
+     * @brief Convert the polynomial to a GF(2) polynomial.
+     *
+     * Works when all coefficients of the local polynomial are either unit or zero such
+     * that it can be reduced to a polynomial over GF(2). Otherwise, throws runtime error.
+     *
+     * @return gf2_poly<T> Polynomial over GF(2).
+     */
+    gf2_poly<T> to_gf2_poly() const;
 };
+
+// Type definitions
+typedef gf2_poly<uint16_t> gf2_poly_u16;
+typedef gf2_poly<uint32_t> gf2_poly_u32;
 
 } // namespace dvbs2rx
 } // namespace gr

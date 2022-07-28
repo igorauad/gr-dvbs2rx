@@ -17,9 +17,8 @@ namespace dvbs2rx {
 
 BOOST_AUTO_TEST_CASE(test_gf2m_construction)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
     BOOST_CHECK_EQUAL(gf[0], 0);
     BOOST_CHECK_EQUAL(gf[1], 0b0001);
     BOOST_CHECK_EQUAL(gf[2], 0b0010);
@@ -40,9 +39,8 @@ BOOST_AUTO_TEST_CASE(test_gf2m_construction)
 
 BOOST_AUTO_TEST_CASE(test_gf2m_get_alpha_i_and_exponent)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     // Given an exponent i, get alpha^i
     BOOST_CHECK_EQUAL(gf.get_alpha_i(0), 0b0001);
@@ -91,9 +89,8 @@ BOOST_AUTO_TEST_CASE(test_gf2m_get_alpha_i_and_exponent)
 
 BOOST_AUTO_TEST_CASE(test_gf2m_multiplication)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     std::vector<std::pair<uint16_t, uint16_t>> multiplicand_exponents = {
         { 0, 4 }, { 1, 4 }, { 1, 5 }, { 1, 6 }, { 5, 7 }, { 12, 7 },
@@ -111,9 +108,8 @@ BOOST_AUTO_TEST_CASE(test_gf2m_multiplication)
 
 BOOST_AUTO_TEST_CASE(test_gf2m_inverse)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     // Try a couple of elements:
     // - The inverse of alpha^12 is alpha^3.
@@ -131,9 +127,8 @@ BOOST_AUTO_TEST_CASE(test_gf2m_inverse)
 
 BOOST_AUTO_TEST_CASE(test_gf2m_division)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     // Try a couple of examples using the inversions from the previous test:
     // - alpha^4 divided by alpha^12 is equal to alpha^7 because the inverse of alpha^12
@@ -156,9 +151,8 @@ BOOST_AUTO_TEST_CASE(test_gf2m_division)
 
 BOOST_AUTO_TEST_CASE(test_gf2m_conjugates)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     // Examples:
     // - The only conjugate of alpha^0 is alpha^0 itself.
@@ -181,13 +175,13 @@ BOOST_AUTO_TEST_CASE(test_gf2m_conjugates)
 
 BOOST_AUTO_TEST_CASE(test_gf2m_min_poly)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     // Trivial minimal polynomials
-    BOOST_CHECK(gf.get_min_poly(0) == gf2_poly(0b10)); // 0 is a root of phi(x) = x
-    BOOST_CHECK(gf.get_min_poly(1) == gf2_poly(0b11)); // 1 is a root of phi(x) = x + 1
+    BOOST_CHECK(gf.get_min_poly(0) == gf2_poly_u16(0b10)); // 0 is a root of phi(x) = x
+    BOOST_CHECK(gf.get_min_poly(1) ==
+                gf2_poly_u16(0b11)); // 1 is a root of phi(x) = x + 1
 
     // By definition, the elements with the same set of conjugates have the same
     // associated minimal polynomials.
@@ -197,11 +191,11 @@ BOOST_AUTO_TEST_CASE(test_gf2m_min_poly)
         { 5, 10 },        // conjugates set 2
         { 7, 11, 13, 14 } // conjugates set 3
     };
-    std::vector<gf2_poly> expected_min_poly = {
-        gf2_poly(0b10011), // x^4 + x + 1
-        gf2_poly(0b11111), // x^4 + x^3 + x^2 + x + 1
-        gf2_poly(0b111),   // x^2 + x + 1
-        gf2_poly(0b11001)  // x^4 + x^3 + 1
+    std::vector<gf2_poly_u16> expected_min_poly = {
+        gf2_poly_u16(0b10011), // x^4 + x + 1
+        gf2_poly_u16(0b11111), // x^4 + x^3 + x^2 + x + 1
+        gf2_poly_u16(0b111),   // x^2 + x + 1
+        gf2_poly_u16(0b11001)  // x^4 + x^3 + 1
     };
 
     for (size_t k = 0; k < beta_exponents_per_conjugate_set.size(); k++) {
@@ -252,40 +246,42 @@ BOOST_AUTO_TEST_CASE(test_gf2_poly_multiplication)
     BOOST_CHECK(a * 2 == gf2_poly(a)); // 2 is treated as a bool
 
     // The * operator must check if the product fits in 16 bits
-    auto d = gf2_poly(0x101); // x^8 + 1
+    auto d = gf2_poly_u16(0x101); // x^8 + 1
     BOOST_CHECK_THROW(d * d, std::runtime_error);
+
+    // Try the same multiplication with a wider storage
+    auto e = gf2_poly_u32(0x101);                // x^8 + 1
+    BOOST_CHECK(e * e == gf2_poly_u32(0x10001)); // x^16 + 1
 }
 
-BOOST_AUTO_TEST_CASE(test_gf2_poly_constructor_from_gf2m_poly)
+BOOST_AUTO_TEST_CASE(test_gf2m_poly_to_gf2_poly)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     // Construction from a binary polynomial over GF(2^m) should work
     uint16_t gf2m_unit = gf.get_alpha_i(0);
     auto poly_ext_field = gf2m_poly(&gf, { gf2m_unit, 0, gf2m_unit }); // x^2 + 1
-    auto poly_bin_field = gf2_poly(poly_ext_field);
-    BOOST_CHECK(poly_bin_field == gf2_poly(0b101));
+    auto poly_bin_field = poly_ext_field.to_gf2_poly();
+    BOOST_CHECK(poly_bin_field == gf2_poly_u16(0b101));
     BOOST_CHECK(poly_bin_field.degree() == 2);
 
     // Construction from a non-binary polynomial over GF(2^m) should NOT work
     uint16_t alpha_1 = gf.get_alpha_i(1);
     auto poly_ext_field2 = gf2m_poly(&gf, { gf2m_unit, 0, alpha_1 }); // alpha * x^2 + 1
-    BOOST_CHECK_THROW(gf2_poly poly_bin_field2(poly_ext_field2), std::runtime_error);
+    BOOST_CHECK_THROW(poly_ext_field2.to_gf2_poly(), std::runtime_error);
 
     // The constructor must check if the incoming gf2m poly has degree <= 15
     auto poly_ext_field3 = gf2m_poly(
         &gf, { gf2m_unit, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, gf2m_unit });
     BOOST_CHECK_EQUAL(poly_ext_field3.degree(), 16);
-    BOOST_CHECK_THROW(gf2_poly poly_bin_field3(poly_ext_field3), std::runtime_error);
+    BOOST_CHECK_THROW(poly_ext_field3.to_gf2_poly(), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_gf2m_poly_addition)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     uint16_t alpha_0 = gf.get_alpha_i(0);
     uint16_t alpha_1 = gf.get_alpha_i(1);
@@ -306,9 +302,8 @@ BOOST_AUTO_TEST_CASE(test_gf2m_poly_addition)
 
 BOOST_AUTO_TEST_CASE(test_gf2m_poly_multiplication)
 {
-    uint16_t prim_poly = 0b0011; // "x^4 + x + 1" (excluding the x^4 term)
-    uint8_t m = 4;
-    galois_field gf(m, prim_poly);
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
 
     uint16_t alpha_1 = gf.get_alpha_i(1);
     uint16_t alpha_4 = gf.get_alpha_i(4);
