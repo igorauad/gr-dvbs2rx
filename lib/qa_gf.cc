@@ -206,6 +206,81 @@ BOOST_AUTO_TEST_CASE(test_gf2m_min_poly)
     }
 }
 
+BOOST_AUTO_TEST_CASE(test_gf2m_dvbs2_min_poly)
+{
+
+    // From Table 6a (Normal FECFRAME) - based on GF(2^16)
+    gf2_poly_u32 prim_poly1(0b10000000000101101); // x^16 + x^5 + x^3 + x^2 + 1
+    galois_field gf1(prim_poly1);
+    std::vector<gf2_poly_u32> expected_min_poly1 = {
+        gf2_poly_u32(0b10000000000101101), // g1
+        gf2_poly_u32(0b10000000101110011), // g2
+        gf2_poly_u32(0b10000111110111101), // g3
+        gf2_poly_u32(0b10101101001010101), // g4
+        gf2_poly_u32(0b10001111100101111), // g5
+        gf2_poly_u32(0b11111011110110101), // g6
+        gf2_poly_u32(0b11010111101100101), // g7
+        gf2_poly_u32(0b10111001101100111), // g8
+        gf2_poly_u32(0b10000111010100001), // g9
+        gf2_poly_u32(0b10111010110100111), // g10
+        gf2_poly_u32(0b10011101000101101), // g11
+        gf2_poly_u32(0b10001101011100011), // g12
+    };
+
+    // The t-error-correcting BCH code uses the minimal polynomials associated with the
+    // elements alpha^1, alpha^3, ..., alpha^(2*t - 1). DVB-S2 uses t up to 12.
+    for (size_t i = 1; i <= 12; i++) {
+        uint16_t beta = gf1.get_alpha_i(2 * i - 1);
+        BOOST_CHECK(gf1.get_min_poly(beta) == expected_min_poly1[i - 1]);
+    }
+
+    // From Table 6b (Short FECFRAME) - based on GF(2^14)
+    gf2_poly_u32 prim_poly2(0b100000000101011); // x^14 + x^5 + x^3 + x + 1
+    galois_field gf2(prim_poly2);
+    std::vector<gf2_poly_u32> expected_min_poly2 = {
+        gf2_poly_u32(0b100000000101011), // g1
+        gf2_poly_u32(0b100100101000001), // g2
+        gf2_poly_u32(0b100011001000111), // g3
+        gf2_poly_u32(0b101010110010001), // g4
+        gf2_poly_u32(0b110101101010101), // g5
+        gf2_poly_u32(0b110001110001001), // g6
+        gf2_poly_u32(0b110110011100101), // g7
+        gf2_poly_u32(0b100111100100001), // g8
+        gf2_poly_u32(0b100011000001111), // g9
+        gf2_poly_u32(0b101101001001001), // g10
+        gf2_poly_u32(0b101100000010001), // g11
+        gf2_poly_u32(0b110010111101111), // g12
+    };
+
+    for (size_t i = 1; i <= 12; i++) {
+        uint16_t beta = gf2.get_alpha_i(2 * i - 1);
+        BOOST_CHECK(gf2.get_min_poly(beta) == expected_min_poly2[i - 1]);
+    }
+
+    // Medium FECFRAME from Table 7 in the DVB-S2X standard
+    gf2_poly_u32 prim_poly3(0b1000000000101101); // x^15 + x^5 + x^3 + x^2 + 1
+    galois_field gf3(prim_poly3);
+    std::vector<gf2_poly_u32> expected_min_poly3 = {
+        gf2_poly_u32(0b1000000000101101), // g1
+        gf2_poly_u32(0b1000110010010011), // g2
+        gf2_poly_u32(0b1011010101010101), // g3
+        gf2_poly_u32(0b1000110101101101), // g4
+        gf2_poly_u32(0b1001010011010111), // g5
+        gf2_poly_u32(0b1011000011010001), // g6
+        gf2_poly_u32(0b1101100010110101), // g7
+        gf2_poly_u32(0b1100101101010101), // g8
+        gf2_poly_u32(0b1011101010110111), // g9
+        gf2_poly_u32(0b1011110010011111), // g10
+        gf2_poly_u32(0b1000101000010111), // g11
+        gf2_poly_u32(0b1110110100010101), // g12
+    };
+
+    for (size_t i = 1; i <= 12; i++) {
+        uint16_t beta = gf3.get_alpha_i(2 * i - 1);
+        BOOST_CHECK(gf3.get_min_poly(beta) == expected_min_poly3[i - 1]);
+    }
+}
+
 BOOST_AUTO_TEST_CASE(test_gf2_poly_degrees)
 {
     auto a = gf2_poly(0b101);  // x^2 + 1
