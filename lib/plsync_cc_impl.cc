@@ -19,7 +19,7 @@
 namespace gr {
 namespace dvbs2rx {
 
-#define MAX_SCHEDULING_DELAY 5
+#define MAX_SCHEDULING_DELAY 2
 
 plsync_cc::sptr plsync_cc::make(int gold_code,
                                 int freq_est_period,

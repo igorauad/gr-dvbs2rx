@@ -196,7 +196,7 @@ uint8_t reed_muller::decode(const float* soft_dec)
     // which requires real multiplications only.
     //
     // In the end, the codeword that minimizes ||r - s(x)||^2 can be obtained by
-    // searching for the codeword that maximimizes the real inner product
+    // searching for the codeword that maximizes the real inner product
     // between the real part of the input symbols (even if they are originally
     // complex) and the real Euclidean-space s(x) of each codeword x, provided
     // that the above two assumptions hold.

@@ -42,11 +42,11 @@ struct rot_ctrl_t {
     uint64_t last_tag_search_end = 0; /** Ending index from the previous tag search */
     // NOTE: tag_search_start is used on the processing search (via calibrate_tag_delay),
     // while last_tag_search_end is used on the tag-copying search (via handle_tags).
-    int scheduling_delay = 0; /** PLFRAMEs to skip when scheduling a phase inc update */
-    int unproc_count = 0;     /** Count of unprocessed phase inc update requests */
-    rot_state_t past;         /** Frequency state at the past PLFRAME */
-    rot_state_t current;      /** Frequency state at the current PLFRAME */
-    std::queue<tag_t> tag_queue; /** Queue of rot_phase_inc tags */
+    uint32_t scheduling_delay = 0; /** PLFRAMEs to skip on phase inc update scheduling */
+    uint32_t unproc_count = 0;     /** Count of unprocessed phase inc update requests */
+    rot_state_t past;              /** Frequency state at the past PLFRAME */
+    rot_state_t current;           /** Frequency state at the current PLFRAME */
+    std::queue<tag_t> tag_queue;   /** Queue of rot_phase_inc tags */
     std::map<uint64_t, rot_phase_adj_t>
         update_map; /** Map of scheduled phase increment updates */
 };
