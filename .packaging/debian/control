@@ -1,0 +1,39 @@
+Source: gr-dvbs2rx
+Maintainer: Igor Freire <igor@ifcomm.com.br>
+Section: hamradio
+Priority: optional
+Build-Depends: cmake,
+               debhelper (>= 12),
+               dh-python,
+               doxygen,
+               gnuradio-dev (>= 3.10),
+               graphviz,
+               libsndfile1-dev,
+               libspdlog-dev,
+               pkg-config,
+               python3-dev
+Standards-Version: 4.5.0
+Homepage: https://igorauad.github.io/gr-dvbs2rx/
+Vcs-Git: git://github.com/igorauad/gr-dvbs2rx.git
+Vcs-Browser: https://github.com/igorauad/gr-dvbs2rx/
+
+Package: gr-dvbs2rx
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, gnuradio
+Description: DVB-S2 Receiver GNU Radio Module
+ A GNU Radio out-of-tree module containing signal processing blocks and full
+ transmitter/receiver applications for DVB-S2 over software-defined radio.
+
+Package: gr-dvbs2rx-dev
+Section: libdevel
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, gnuradio
+Description: Blockstream Satellite Receiver GR Module - Development
+ Development files of the gr-dvbs2rx GNU Radio out-of-tree module.
+
+Package: gr-dvbs2rx-doc
+Section: doc
+Architecture: all
+Depends: ${misc:Depends}
+Description: Blockstream Satellite Receiver GR Module Documentation
+ gr-dvbs2rx GNU Radio out-of-tree module documentation.

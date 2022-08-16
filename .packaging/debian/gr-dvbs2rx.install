@@ -1,0 +1,4 @@
+usr/bin/*
+usr/lib/python*
+usr/share/gnuradio*
+usr/lib/**/*libgnuradio*.so.*

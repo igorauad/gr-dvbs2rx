@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+%:
+	dh $@ --with python3
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_LIBRARY_ARCHITECTURE="$(DEB_TARGET_MULTIARCH)" \
+		-DNATIVE_OPTIMIZATIONS=OFF
