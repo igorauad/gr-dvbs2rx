@@ -16,5 +16,3 @@ install(FILES
     dvbs2rx_symbol_sync_cc.block.yml
     DESTINATION share/gnuradio/grc/blocks
 )
-
-add_subdirectory(hier)
