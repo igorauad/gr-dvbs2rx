@@ -10,6 +10,7 @@
 # Include python install macros
 ########################################################################
 include(GrPython)
+include(GrPythonLocal) # Overwrite GR_PYTHON_DIR from GrPython
 if(NOT PYTHONINTERP_FOUND)
     return()
 endif()
