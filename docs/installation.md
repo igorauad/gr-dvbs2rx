@@ -8,7 +8,8 @@ packages and
 [PyBOMBS](https://www.gnuradio.org/blog/2016-06-19-pybombs-the-what-the-how-and-the-why/)
 will be provided in the future.
 
-To build from source, run:
+To build from source, make sure to install the [build
+dependencies](#build-dependencies) first. After that, run:
 ```
 git clone --recursive https://github.com/igorauad/gr-dvbs2rx.git
 cd gr-dvbs2rx/
@@ -68,6 +69,38 @@ options:
 > Note the build options must be specified on the `cmake` step. For example, for
 > an option named `MYOPTION`, append either `-DMYOPTION=ON` or `-DMYOPTION=OFF`
 > to the `cmake ..` step.
+
+
+### Build Dependencies
+
+Fedora:
+
+```
+dnf install \
+  cmake \
+  doxygen \
+  fftw-devel \
+  gmp-devel \
+  gnuradio-devel \
+  graphviz \
+  libsndfile-devel \
+  pybind11-devel \
+  spdlog-devel
+```
+
+Ubuntu/Debian:
+
+```
+apt install \
+  cmake \
+  doxygen \
+  gnuradio-dev \
+  graphviz \
+  libsndfile1-dev \
+  libspdlog-dev \
+  pkg-config \
+  pybind11-dev
+```
 
 ---
 Prev: [Supported Modes](support.md)  -  Next: [Usage](usage.md)
