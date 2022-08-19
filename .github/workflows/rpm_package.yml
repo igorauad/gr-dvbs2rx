@@ -1,0 +1,37 @@
+name: Build RPM Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:36
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - name: Install rpmbuild dependencies
+      run: |
+        dnf install -y \
+          coreutils \
+          dnf-utils \
+          rpm-build \
+          rpm-devel \
+          rpmdevtools
+    - name: Install gr-dvbs2rx build dependencies
+      run: |
+        dnf install -y \
+          doxygen \
+          fftw-devel \
+          g++ \
+          git \
+          gmp-devel \
+          gnuradio-devel \
+          graphviz \
+          libsndfile-devel \
+          pybind11-devel \
+          spdlog-devel
+    - name: Build RPM package
+      run: .packaging/scripts/pkg-rpm.sh
