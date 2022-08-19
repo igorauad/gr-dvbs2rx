@@ -13,8 +13,8 @@ import signal
 import sys
 import time
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from distutils.version import StrictVersion
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from packaging.version import Version as StrictVersion
 from threading import Thread
 
 from PyQt5 import Qt, QtCore

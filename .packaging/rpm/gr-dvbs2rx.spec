@@ -19,6 +19,7 @@ BuildRequires:  pybind11-devel
 BuildRequires:  spdlog-devel
 Requires: gnuradio >= 3.10
 Requires: python3
+Requires: python3-packaging
 
 %description
 

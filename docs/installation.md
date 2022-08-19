@@ -85,6 +85,7 @@ dnf install \
   graphviz \
   libsndfile-devel \
   pybind11-devel \
+  python3-packaging \
   spdlog-devel
 ```
 
@@ -99,7 +100,8 @@ apt install \
   libsndfile1-dev \
   libspdlog-dev \
   pkg-config \
-  pybind11-dev
+  pybind11-dev \
+  python3-packaging
 ```
 
 ---

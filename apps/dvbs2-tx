@@ -13,8 +13,8 @@ import sys
 import time
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from datetime import datetime
-from distutils.version import StrictVersion
 from math import pi, sqrt
+from packaging.version import Version as StrictVersion
 from threading import Thread
 
 import pmt
