@@ -1,0 +1,21 @@
+.TH DVBS2-TX "1" "@BUILD_DATE_SHORT@" "dvbs2-tx @VERSION@" "User Commands"
+.SH NAME
+dvbs2-tx \- A DVB-S2 transmitter application based on the GNU Radio framework.
+.SH DESCRIPTION
+dvbs2-tx is an open-source DVB-S2 transmitter application based on the GNU Radio
+Digital TV (DTV) in-tree module and the gr-dvbs2rx out-of-tree module. It
+provides a wide range of customizable DVB-S2 parameters, such as the MODCOD,
+frame size, physical layer pilots, roll-off factor, and much more. The
+application takes an MPEG Transport Stream on its input and ouputs the baseband
+modulated IQ stream to either the stdout, a file, or directly to a USRP. It also
+provides a GUI for runtime control and monitoring.
+.SH OPTIONS
+See dvbs2-tx \-\-help for the list of command-line options.
+.SH EXAMPLES
+See
+.UR https://igorauad.github.io/gr-dvbs2rx/docs/usage.html
+the documentation page
+.UE
+for usage examples.
+.SH "SEE ALSO"
+dvbs2-rx(1)

@@ -139,9 +139,11 @@ else(DOXYGEN_FOUND)
     option(ENABLE_DOXYGEN "Build docs using Doxygen" OFF)
 endif(DOXYGEN_FOUND)
 
+
 ########################################################################
 # Other build options/definitions
 ########################################################################
+option(ENABLE_MANPAGES "Build man pages" ON)
 option(DEBUG_LOGS "Enable low-level debug logs" ON)
 message(STATUS "Low-level debug logs ${DEBUG_LOGS}")
 if (DEBUG_LOGS)

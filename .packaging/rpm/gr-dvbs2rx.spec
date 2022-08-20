@@ -61,6 +61,7 @@ gr-dvbs2rx GNU Radio out-of-tree module documentation.
 %{_libdir}/lib*.so.*
 %{_datadir}/gnuradio
 %{python3_sitearch}/gnuradio/dvbs2rx/
+%{_mandir}/man1/*
 
 %files devel
 %{_includedir}/*

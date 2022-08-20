@@ -1,0 +1,41 @@
+.TH DVBS2-RX "1" "@BUILD_DATE_SHORT@" "dvbs2-rx @VERSION@" "User Commands"
+.SH NAME
+dvbs2-rx \- A DVB-S2 receiver application based on the GNU Radio framework.
+.SH DESCRIPTION
+dvbs2-rx is an open-source DVB-S2 software-defined receiver application based on
+the gr-dvbs2rx GNU Radio out-of-tree module. It provides a wide range of
+customizable DVB-S2 parameters, such as the MODCOD, frame size, physical layer
+pilots, roll-off factor, and much more. The application takes a baseband DVB-S2
+modulated IQ streqm on its input and ouputs the decoded MPEG Transport Stream.
+.SH OPTIONS
+See dvbs2-rx \-\-help for the full list of command-line options.
+.PP
+The main options are the ones determining the primary DVB-S2 reception
+parameters. More specifically, the sample rate (option --samp-rate), the symbol
+rate (--sym-rate), the center frequency (--freq), the MODCOD (--modcod), the
+frame size (--frame-size), the roll-off factor (--rolloff), and the Gold code
+(--gold-code). Also, when the presence or absence of physical layer pilots is
+known a priori, it is recommended to specify it using the --pilots option.
+.PP
+Other than reception parameters, it is essential to determine the input and
+output interfaces. By default, the dvbs2-rx application expects the incoming
+baseband IQ stream on its stdin (option --source=fd) with IQ samples represented
+as interleaved 32-bit floating-point numbers for I and Q, respectively. However,
+it also supports other IQ formats and sources. It can read the IQ stream
+directly from a file (--source=file) or interface directly to an SDR device. For
+the latter, it supports both RTL-SDRs and USRPs using options --source=rtl and
+--source=usrp, respectively, with a number of device-specific options for them.
+.PP
+For monitoring, dvbs2-rx provides three options. First, it features an optional
+GUI (option --gui), which can be used for for runtime control and monitoring.
+Secondly, it can optionally launch a server for on-demand probing of receiver
+metrics over HTTP (option --mon-server). Third, it can be configured to
+periodically print receiver metrics to the console (option --log-stats).
+.SH EXAMPLES
+See
+.UR https://igorauad.github.io/gr-dvbs2rx/docs/usage.html
+the documentation page
+.UE
+for usage examples.
+.SH "SEE ALSO"
+dvbs2-tx(1)
