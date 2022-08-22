@@ -11,14 +11,14 @@ jobs:
     container:
       image: igorfreire/gnuradio-oot-dev:3.10.1-ubuntu-focal
     steps:
-    - uses: actions/checkout@v2
-      with:
-        submodules: 'recursive'
-    - name: Install dependencies
-      run: apt update && apt install -y libsndfile1-dev
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-    - name: Test
-      run: cd ${{github.workspace}}/build && ctest -C ${{env.BUILD_TYPE}} -VV
+      - uses: actions/checkout@v2
+        with:
+          submodules: "recursive"
+      - name: Install dependencies
+        run: apt update && apt install -y libsndfile1-dev
+      - name: Configure CMake
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      - name: Test
+        run: cd ${{github.workspace}}/build && ctest -C ${{env.BUILD_TYPE}} -VV

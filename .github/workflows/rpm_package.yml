@@ -9,37 +9,37 @@ jobs:
     container:
       image: fedora:36
     steps:
-    - name: Install git
-      run: |
-        dnf install -y git
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - name: Install rpmbuild dependencies
-      run: |
-        dnf install -y \
-          coreutils \
-          dnf-utils \
-          rpm-build \
-          rpm-devel \
-          rpmdevtools
-    - name: Workaround for unsafe repo git error
-      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-    - name: Checkout submodules
-      run: |
-        git submodule update --init --recursive
-    - name: Install gr-dvbs2rx build dependencies
-      run: |
-        dnf install -y \
-          doxygen \
-          fftw-devel \
-          g++ \
-          git \
-          gmp-devel \
-          gnuradio-devel \
-          graphviz \
-          libsndfile-devel \
-          pybind11-devel \
-          spdlog-devel
-    - name: Build RPM package
-      run: .packaging/scripts/pkg-rpm.sh
+      - name: Install git
+        run: |
+          dnf install -y git
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install rpmbuild dependencies
+        run: |
+          dnf install -y \
+            coreutils \
+            dnf-utils \
+            rpm-build \
+            rpm-devel \
+            rpmdevtools
+      - name: Workaround for unsafe repo git error
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Checkout submodules
+        run: |
+          git submodule update --init --recursive
+      - name: Install gr-dvbs2rx build dependencies
+        run: |
+          dnf install -y \
+            doxygen \
+            fftw-devel \
+            g++ \
+            git \
+            gmp-devel \
+            gnuradio-devel \
+            graphviz \
+            libsndfile-devel \
+            pybind11-devel \
+            spdlog-devel
+      - name: Build RPM package
+        run: .packaging/scripts/pkg-rpm.sh

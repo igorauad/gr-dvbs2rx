@@ -9,18 +9,18 @@ jobs:
     container:
       image: igorfreire/gnuradio-oot-dev:3.10.3-ubuntu-focal
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: 'recursive'
-        fetch-depth: 0
-    - name: Workaround for unsafe repo git error
-      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-    - name: Install build dependencies
-      run: |
-        apt update && apt install -y \
-            debhelper \
-            devscripts \
-            dh-python \
-            libsndfile1-dev
-    - name: Build deb package
-      run: .packaging/scripts/pkg-debian.sh
+      - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+          fetch-depth: 0
+      - name: Workaround for unsafe repo git error
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Install build dependencies
+        run: |
+          apt update && apt install -y \
+              debhelper \
+              devscripts \
+              dh-python \
+              libsndfile1-dev
+      - name: Build deb package
+        run: .packaging/scripts/pkg-debian.sh
