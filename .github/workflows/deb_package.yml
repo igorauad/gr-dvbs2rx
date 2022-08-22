@@ -7,31 +7,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ubuntu:focal
+      image: igorfreire/gnuradio-oot-dev:3.10.3-ubuntu-focal
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: 'recursive'
-    - name: Install debuild dependencies
+        fetch-depth: 0
+    - name: Workaround for unsafe repo git error
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+    - name: Install build dependencies
       run: |
-        apt update && \
-          DEBIAN_FRONTEND="noninteractive" apt install -y \
+        apt update && apt install -y \
             debhelper \
             devscripts \
             dh-python \
-            git \
-            software-properties-common
-    - name: Install gr-dvbs2rx build dependencies
-      run: |
-        add-apt-repository -y ppa:gnuradio/gnuradio-releases && \
-        DEBIAN_FRONTEND="noninteractive" apt install -y \
-          cmake \
-          doxygen \
-          gnuradio-dev \
-          graphviz \
-          libsndfile1-dev \
-          libspdlog-dev \
-          pkg-config \
-          pybind11-dev
+            libsndfile1-dev
     - name: Build deb package
       run: .packaging/scripts/pkg-debian.sh
