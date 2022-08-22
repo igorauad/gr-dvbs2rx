@@ -43,3 +43,8 @@ jobs:
             spdlog-devel
       - name: Build RPM package
         run: .packaging/scripts/pkg-rpm.sh
+      - name: Upload results
+        uses: actions/upload-artifact@v3
+        with:
+          name: RPM Packages
+          path: ~/rpmbuild/RPMS/**/*.rpm

@@ -24,3 +24,8 @@ jobs:
               libsndfile1-dev
       - name: Build deb package
         run: .packaging/scripts/pkg-debian.sh
+      - name: Upload results
+        uses: actions/upload-artifact@v3
+        with:
+          name: Deb Packages
+          path: /build/gr-dvbs2rx-pkgs/**/*.deb
