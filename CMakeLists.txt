@@ -167,6 +167,8 @@ add_custom_target(uninstall
 ########################################################################
 SET(BUILD_TESTING OFF CACHE BOOL "Build libcpu_features without tests")
 add_subdirectory(cpu_features EXCLUDE_FROM_ALL)
+set_property(TARGET cpu_features PROPERTY POSITION_INDEPENDENT_CODE ON)
+
 add_subdirectory(include/gnuradio/dvbs2rx)
 add_subdirectory(lib)
 add_subdirectory(apps)

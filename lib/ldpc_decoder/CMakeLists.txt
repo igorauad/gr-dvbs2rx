@@ -18,4 +18,8 @@ endif()
 add_library(ldpc_decoder_generic STATIC ldpc_decoder_generic.cc)
 list(APPEND LDPC_LIBS ldpc_decoder_generic)
 
+foreach(LDPC_LIB ${LDPC_LIBS})
+  set_property(TARGET ${LDPC_LIB} PROPERTY POSITION_INDEPENDENT_CODE ON)
+endforeach()
+
 set(LDPC_LIBS ${LDPC_LIBS} PARENT_SCOPE)
