@@ -28,4 +28,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: Deb Packages
-          path: /build/gr-dvbs2rx-pkgs/**/*.deb
+          path: .packaging/build/**/*.deb

@@ -7,3 +7,4 @@ apps/*.py
 examples/*.py
 grc/hier/*.py
 grc/hier/*.block.yml
+.packaging/build/

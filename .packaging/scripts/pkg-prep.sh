@@ -1,11 +1,12 @@
 #!/bin/bash
 set -ex
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 NAME=gr-dvbs2rx
 ARCH=$(dpkg --print-architecture || rpmbuild --eval %{_arch})
 DATESTR=$(date +"%a, %d %b %Y %T %z")
 DIST=$(lsb_release -s -c || rpmbuild --eval %{dist})
-BUILD_DIR=/build/gr-dvbs2rx-pkgs/$DIST-$ARCH/
+BUILD_DIR=$SCRIPT_DIR/../build/$DIST-$ARCH/
 
 # Cleanup
 rm -rf $BUILD_DIR
