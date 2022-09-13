@@ -86,6 +86,7 @@ include(GrTest)
 list(APPEND test_dvbs2rx_sources
   qa_symbol_sync_cc.cc
   qa_cdeque.cc
+  qa_crc.cc
   qa_delay_line.cc
   qa_gf.cc
   qa_pi2_bpsk.cc
