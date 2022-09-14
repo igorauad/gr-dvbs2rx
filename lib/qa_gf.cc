@@ -329,6 +329,18 @@ BOOST_AUTO_TEST_CASE(test_gf2_poly_multiplication)
     BOOST_CHECK(e * e == gf2_poly_u32(0x10001)); // x^16 + 1
 }
 
+BOOST_AUTO_TEST_CASE(test_gf2_poly_to_gf2m_poly)
+{
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+
+    auto poly_gf2 = gf2_poly_u16(0b101); // x^2 + 1
+    auto poly_gf2m = gf2m_poly(&gf, poly_gf2);
+    auto expected = gf2m_poly(&gf, { gf[1], gf[0], gf[1] });
+    BOOST_CHECK(poly_gf2m == expected);
+    BOOST_CHECK_EQUAL(poly_gf2.get_poly(), poly_gf2m.to_gf2_poly().get_poly());
+}
+
 BOOST_AUTO_TEST_CASE(test_gf2m_poly_to_gf2_poly)
 {
     gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1

@@ -141,7 +141,7 @@ gf2_poly<T> galois_field<T>::get_min_poly(T beta) const
     // The minimal polynomial is the product of the terms "(x + beta^(2^l))" for each
     // distinct conjugate of beta given by beta^(2^l).
     const auto conjugates = get_conjugates(beta);
-    auto prod = gf2m_poly<T>(this, { 1 });
+    auto prod = gf2m_poly<T>(this, std::vector<T>({ 1 }));
     for (const T& beta_2_l : conjugates) {
         prod = prod * gf2m_poly<T>(this, { beta_2_l, 1 });
     }
@@ -203,6 +203,27 @@ bool gf2_poly<T>::operator==(const gf2_poly<T>& x) const
 template <typename T>
 gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, std::vector<T>&& coefs)
     : m_gf(gf), m_poly(std::move(coefs))
+{
+    set_degree();
+}
+
+template <typename T>
+gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, const gf2_poly<T>& gf2_poly)
+    : m_gf(gf)
+{
+    const T& coefs = gf2_poly.get_poly();
+    for (int i = 0; i <= gf2_poly.degree(); i++) {
+        if (coefs & (1U << i)) {
+            m_poly.push_back((*gf)[1]);
+        } else {
+            m_poly.push_back((*gf)[0]);
+        }
+    }
+    set_degree();
+}
+
+template <typename T>
+void gf2m_poly<T>::set_degree()
 {
     // Remove any leading zeros and set the polynomial degree
     m_degree = m_poly.size() - 1;

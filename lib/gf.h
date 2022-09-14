@@ -212,6 +212,11 @@ private:
     // index 2 of x^2, and so on.
     int m_degree; // Polynomial degree
 
+    /**
+     * @brief Set the polynomial degree.
+     */
+    void set_degree();
+
 public:
     /**
      * @brief Construct a new polynomial over GF(2^m).
@@ -220,6 +225,14 @@ public:
      * @param coefs Polynomial coefficients.
      */
     gf2m_poly(const galois_field<T>* const gf, std::vector<T>&& coefs);
+
+    /**
+     * @brief Construct a polynomial over GF(2^m) from a polynomial over GF(2).
+     *
+     * @param gf Reference Galois field.
+     * @param gf2_poly Reference polynomial over GF(2).
+     */
+    gf2m_poly(const galois_field<T>* const gf, const gf2_poly<T>& gf2_poly);
 
     /**
      * @brief GF(2^m) polynomial addition.
