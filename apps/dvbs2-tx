@@ -36,9 +36,9 @@ from gnuradio.filter import firdes
 
 from gnuradio import dvbs2rx
 
-MAX_USRP_TX_GAIN = 65
-MAX_USRP_FREQ = 6e9
-MIN_USRP_FREQ = 10e6
+MAX_TX_GAIN = {'usrp': 65, 'bladeRF': 60}
+MAX_FREQ = {'usrp': 6e9, 'bladeRF': 6e9}
+MIN_FREQ = {'usrp': 10e6, 'bladeRF': 47e6}
 
 
 def parse_version():
@@ -138,6 +138,18 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
             'subdev': options.usrp_subdev,
             'sync': options.usrp_sync,
             'time_source': options.usrp_time_source,
+        }
+        self.blade_rf = {
+            'bandwidth': options.bladerf_bw,
+            'bias_tee': {
+                0: options.bladerf_bias_tee and options.bladerf_chan == 0,
+                1: options.bladerf_bias_tee and options.bladerf_chan == 1,
+            },
+            'channel': options.bladerf_chan,
+            'dev': options.bladerf_dev,
+            'if_gain': options.bladerf_if_gain,
+            'ref_clk': options.bladerf_ref_clk,
+            'rf_gain': options.bladerf_rf_gain
         }
 
         ##################################################
@@ -345,7 +357,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                                 self._get_freq_sink(qtgui, "Output PSD"), pos)
 
         # Optional SDR controls
-        if (self.sink == 'usrp'):
+        if (self.sink in ['usrp', 'bladeRF']):
             if n_columns >= 2:
                 n_rows += 1
                 pos = [(1, 0), (1, 1)]
@@ -354,8 +366,13 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                 pos = [(1, 0), (2, 0)]
 
             # Gain
-            qt_gain_range = qtgui.Range(0, MAX_USRP_TX_GAIN, 1,
-                                        self.usrp['gain'], 200)
+            if self.sink == 'usrp':
+                initial_gain = self.usrp['gain']
+            elif self.sink == 'bladeRF':
+                initial_gain = self.blade_rf['rf_gain']
+
+            qt_gain_range = qtgui.Range(0, MAX_TX_GAIN[self.sink], 1,
+                                        initial_gain, 200)
             gui_gain_widget = qtgui.RangeWidget(qt_gain_range,
                                                 self.set_gui_gain, "Gain",
                                                 "counter_slider", float,
@@ -363,8 +380,9 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
             self.top_grid_layout.addWidget(gui_gain_widget, *pos[0])
 
             # Center Frequency
-            qt_freq_range = qtgui.Range(MIN_USRP_FREQ, MAX_USRP_FREQ, 100e3,
-                                        self.freq, 200)
+            qt_freq_range = qtgui.Range(MIN_FREQ[self.sink],
+                                        MAX_FREQ[self.sink], 100e3, self.freq,
+                                        200)
             gui_freq_widget = qtgui.RangeWidget(qt_freq_range,
                                                 self.set_gui_freq,
                                                 "Center Frequency",
@@ -434,6 +452,34 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
 
         return usrp_sink
 
+    def setup_blade_rf_sink(self):
+        import bladeRF
+
+        self.blade_rf_sink = blade_rf_sink = bladeRF.sink(
+            args="numchan=" + str(1) + ",metadata=" + 'False' + ",bladerf=" +
+            self.blade_rf['dev'] + ",verbosity=" + 'verbose' + ",feature=" +
+            'default' + ",sample_format=" + '16bit' + ",fpga=" + str('') +
+            ",fpga-reload=" + 'False' + ",use_ref_clk=" + 'False' +
+            ",ref_clk=" + str(int(self.blade_rf['ref_clk'])) + ",in_clk=" +
+            'ONBOARD' + ",out_clk=" + str(False) + ",use_dac=" + 'False' +
+            ",dac=" + str(10000) + ",xb200=" + 'none' + ",tamer=" +
+            'internal' + ",sampling=" + 'internal' + ",lpf_mode=" +
+            'disabled' + ",smb=" + str(int(0)) + ",dc_calibration=" +
+            'LPF_TUNING' + ",trigger0=" + 'False' + ",trigger_role0=" +
+            'master' + ",trigger_signal0=" + 'J51_1' + ",trigger1=" + 'False' +
+            ",trigger_role1=" + 'master' + ",trigger_signal1=" + 'J51_1' +
+            ",bias_tee0=" + str(self.blade_rf['bias_tee'][0]) + ",bias_tee1=" +
+            str(self.blade_rf['bias_tee'][1]))
+
+        chan = self.blade_rf['channel']
+        blade_rf_sink.set_sample_rate(self.samp_rate)
+        blade_rf_sink.set_center_freq(self.freq, chan)
+        blade_rf_sink.set_bandwidth(self.blade_rf['bandwidth'], chan)
+        blade_rf_sink.set_gain(self.blade_rf['rf_gain'], chan)
+        blade_rf_sink.set_if_gain(self.blade_rf['if_gain'], chan)
+
+        return blade_rf_sink
+
     def connect_source(self):
         """Connect the MPEG TS source
 
@@ -500,8 +546,10 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                 else:
                     sink = file_or_fd_sink
 
-        elif (self.sink == "usrp"):
+        elif self.sink == "usrp":
             sink = self.setup_usrp_sink()
+        elif self.sink == "bladeRF":
+            sink = self.setup_blade_rf_sink()
 
         # Simulation options
         # 1) Noise
@@ -652,14 +700,21 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
         return True
 
     def set_gui_gain(self, new_gain):
-        if (self.sink == 'usrp'):
+        if self.sink == 'usrp':
             self.usrp['gain'] = new_gain
             self.usrp_sink.set_gain(self.usrp['gain'], 0)
+        elif self.sink == 'bladeRF':
+            self.blade_rf['rf_gain'] = new_gain
+            self.blade_rf_sink.set_gain(self.blade_rf['rf_gain'],
+                                        self.blade_rf['channel'])
 
     def set_gui_freq(self, new_freq):
         self.freq = new_freq
-        if (self.sink == 'usrp'):
+        if self.sink == 'usrp':
             self.usrp_sink.set_center_freq(self.freq, 0)
+        elif self.sink == 'bladeRF':
+            self.blade_rf_sink.set_center_freq(self.freq,
+                                               self.blade_rf['channel'])
 
         for gui_block in ['freq_sink_iq_out']:
             if gui_block in self.gui_blocks:
@@ -779,7 +834,7 @@ def argument_parser():
 
     snk_group = parser.add_argument_group('Sink Options')
     snk_group.add_argument("--sink",
-                           choices=["fd", "file", "usrp"],
+                           choices=["fd", "file", "usrp", "bladeRF"],
                            default="fd",
                            help="Sink for the output IQ sample stream")
     snk_group.add_argument("--out-fd",
@@ -844,6 +899,41 @@ def argument_parser():
                             choices=['external', 'mimo', 'gpsdo'],
                             help="USRP time source")
 
+    brf_group = parser.add_argument_group('bladeRF Options')
+    brf_group.add_argument('--bladerf-rf-gain',
+                           type=float,
+                           default=10,
+                           help="RF gain in dB")
+    brf_group.add_argument('--bladerf-if-gain',
+                           type=float,
+                           default=20,
+                           help="Intermediate frequency gain in dB")
+    brf_group.add_argument(
+        '--bladerf-bw',
+        type=eng_float,
+        default=2e6,
+        help="Bandwidth in Hz of the radio frontend's bandpass filter. "
+        "Set to zero to use the default (automatic) setting.")
+    brf_group.add_argument(
+        '--bladerf-dev',
+        type=str,
+        default='0',
+        help="Device serial id. When not specified, the first "
+        "available device is used.")
+    brf_group.add_argument('--bladerf-bias-tee',
+                           action='store_true',
+                           default=False,
+                           help="Enable the Tx bias tee")
+    brf_group.add_argument('--bladerf-chan',
+                           type=int,
+                           choices=[0, 1],
+                           default=0,
+                           help='Channel')
+    brf_group.add_argument('--bladerf-ref-clk',
+                           type=eng_float,
+                           default=10e6,
+                           help="Reference clock in Hz")
+
     sim_group = parser.add_argument_group('Simulation Options')
     sim_group.add_argument(
         "--snr",
@@ -858,6 +948,13 @@ def argument_parser():
 
     if (options.sink == "usrp" and options.usrp_args is None):
         parser.error("argument --usrp-args is required when --sink=\"usrp\"")
+
+    min_bw = (1 + options.rolloff) * options.sym_rate
+    if (options.sink == "bladeRF" and options.bladerf_bw != 0
+            and options.bladerf_bw < min_bw):
+        parser.error(
+            "argument --bladerf-bw should be greater than {} Hz".format(
+                min_bw))
 
     return options
 

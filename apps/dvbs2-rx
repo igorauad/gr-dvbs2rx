@@ -35,9 +35,9 @@ from gnuradio.filter import firdes
 
 from gnuradio import dvbs2rx
 
-MAX_RX_GAIN = {'usrp': 75, 'rtl': 50}
-MAX_FREQ = {'usrp': 6e9, 'rtl': 2.2e9}
-MIN_FREQ = {'usrp': 10e6, 'rtl': 22e6}
+MAX_RX_GAIN = {'usrp': 75, 'rtl': 50, 'bladeRF': 60}
+MAX_FREQ = {'usrp': 6e9, 'rtl': 2.2e9, 'bladeRF': 6e9}
+MIN_FREQ = {'usrp': 10e6, 'rtl': 22e6, 'bladeRF': 47e6}
 
 
 def parse_version():
@@ -116,6 +116,18 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             'subdev': options.usrp_subdev,
             'sync': options.usrp_sync,
             'time_source': options.usrp_time_source,
+        }
+        self.blade_rf = {
+            'bandwidth': options.bladerf_bw,
+            'bias_tee': {
+                0: options.bladerf_bias_tee and options.bladerf_chan == 0,
+                1: options.bladerf_bias_tee and options.bladerf_chan == 1,
+            },
+            'channel': options.bladerf_chan,
+            'dev': options.bladerf_dev,
+            'if_gain': options.bladerf_if_gain,
+            'ref_clk': options.bladerf_ref_clk,
+            'rf_gain': options.bladerf_rf_gain
         }
 
         ##################################################
@@ -491,12 +503,17 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             n_columns += 1
 
         # Optional SDR controls
-        if (self.source == 'usrp' or self.source == 'rtl'):
+        if self.source in ['usrp', 'rtl', 'bladeRF']:
             n_rows += 1  # Place them at the bottom on a new row
 
             # Gain
-            initial_gain = self.usrp['gain'] if self.source == 'usrp' \
-                else self.rtl['gain']
+            if self.source == 'usrp':
+                initial_gain = self.usrp['gain']
+            elif self.source == 'rtl':
+                initial_gain = self.rtl['gain']
+            elif self.source == 'bladeRF':
+                initial_gain = self.blade_rf['rf_gain']
+
             qt_gain_range = qtgui.Range(0, MAX_RX_GAIN[self.source], 1,
                                         initial_gain, 200)
             gui_gain_widget = qtgui.RangeWidget(qt_gain_range,
@@ -590,6 +607,37 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
         return usrp_source
 
+    def setup_blade_rf_source(self):
+        import bladeRF
+
+        self.blade_rf_source = blade_rf_source = bladeRF.source(
+            args="numchan=" + str(1) + ",metadata=" + 'False' + ",bladerf=" +
+            self.blade_rf['dev'] + ",verbosity=" + 'verbose' + ",feature=" +
+            'default' + ",sample_format=" + '16bit' + ",fpga=" + str('') +
+            ",fpga-reload=" + 'False' + ",use_ref_clk=" + 'False' +
+            ",ref_clk=" + str(int(self.blade_rf['ref_clk'])) + ",in_clk=" +
+            'ONBOARD' + ",out_clk=" + str(False) + ",use_dac=" + 'False' +
+            ",dac=" + str(10000) + ",xb200=" + 'none' + ",tamer=" +
+            'internal' + ",sampling=" + 'internal' + ",lpf_mode=" +
+            'disabled' + ",smb=" + str(int(0)) + ",dc_calibration=" +
+            'LPF_TUNING' + ",trigger0=" + 'False' + ",trigger_role0=" +
+            'master' + ",trigger_signal0=" + 'J51_1' + ",trigger1=" + 'False' +
+            ",trigger_role1=" + 'master' + ",trigger_signal1=" + 'J51_1' +
+            ",bias_tee0=" + str(self.blade_rf['bias_tee'][0]) + ",bias_tee1=" +
+            str(self.blade_rf['bias_tee'][1]))
+
+        chan = self.blade_rf['channel']
+        blade_rf_source.set_sample_rate(self.samp_rate)
+        blade_rf_source.set_center_freq(self.freq, chan)
+        blade_rf_source.set_bandwidth(self.blade_rf['bandwidth'], chan)
+        blade_rf_source.set_dc_offset_mode(0, chan)
+        blade_rf_source.set_iq_balance_mode(0, chan)
+        blade_rf_source.set_gain_mode(False, chan)
+        blade_rf_source.set_gain(self.blade_rf['rf_gain'], chan)
+        blade_rf_source.set_if_gain(self.blade_rf['if_gain'], chan)
+
+        return blade_rf_source
+
     def connect_source(self):
         """Connect the IQ sample source
 
@@ -660,8 +708,10 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             rtlsdr.set_antenna('', 0)
             rtlsdr.set_bandwidth(0, 0)
             source = rtlsdr
-        elif (self.source == "usrp"):
+        elif self.source == "usrp":
             source = self.setup_usrp_source()
+        elif self.source == 'bladeRF':
+            source = self.setup_blade_rf_source()
 
         return source
 
@@ -952,20 +1002,27 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         }
 
     def set_gui_gain(self, new_gain):
-        if (self.source == 'usrp'):
+        if self.source == 'usrp':
             self.usrp['gain'] = new_gain
             self.usrp_source.set_gain(self.usrp['gain'], 0)
-        elif (self.source == 'rtl'):
+        elif self.source == 'rtl':
             self.rtl['gain'] = new_gain
             self.rtlsdr_source.set_gain(self.rtl['gain'], 0)
+        elif self.source == 'bladeRF':
+            self.blade_rf['rf_gain'] = new_gain
+            self.blade_rf_source.set_gain(self.blade_rf['rf_gain'],
+                                          self.blade_rf['channel'])
 
     def set_gui_freq(self, new_freq):
         self.freq = new_freq
-        if (self.source == 'usrp'):
+        if self.source == 'usrp':
             self.usrp_source.set_center_freq(
                 uhd.tune_request(self.freq, self.usrp['lo_offset']), 0)
-        elif (self.source == 'rtl'):
+        elif self.source == 'rtl':
             self.rtlsdr_source.set_center_freq(self.freq, 0)
+        elif self.source == 'bladeRF':
+            self.blade_rf_source.set_center_freq(self.freq,
+                                                 self.blade_rf['channel'])
 
         for gui_block in ['waterfall_sink', 'freq_sink_agc_rotator_out']:
             if gui_block in self.gui_blocks:
@@ -1208,7 +1265,7 @@ def argument_parser():
 
     src_group = parser.add_argument_group('Source Options')
     src_group.add_argument("--source",
-                           choices=["fd", "file", "rtl", "usrp"],
+                           choices=["fd", "file", "rtl", "usrp", "bladeRF"],
                            default="fd",
                            help="Source of the input IQ sample stream")
     src_group.add_argument("--in-fd",
@@ -1321,10 +1378,52 @@ def argument_parser():
                             choices=['external', 'mimo', 'gpsdo'],
                             help="USRP time source")
 
+    brf_group = parser.add_argument_group('bladeRF Options')
+    brf_group.add_argument('--bladerf-rf-gain',
+                           type=float,
+                           default=10,
+                           help="RF gain in dB")
+    brf_group.add_argument('--bladerf-if-gain',
+                           type=float,
+                           default=20,
+                           help="Intermediate frequency gain in dB")
+    brf_group.add_argument(
+        '--bladerf-bw',
+        type=eng_float,
+        default=2e6,
+        help="Bandwidth in Hz of the radio frontend's bandpass filter. "
+        "Set to zero to use the default (automatic) setting.")
+    brf_group.add_argument(
+        '--bladerf-dev',
+        type=str,
+        default='0',
+        help="Device serial id. When not specified, the first "
+        "available device is used.")
+    brf_group.add_argument('--bladerf-bias-tee',
+                           action='store_true',
+                           default=False,
+                           help="Enable the Rx bias tee")
+    brf_group.add_argument('--bladerf-chan',
+                           type=int,
+                           choices=[0, 1],
+                           default=0,
+                           help='Channel')
+    brf_group.add_argument('--bladerf-ref-clk',
+                           type=eng_float,
+                           default=10e6,
+                           help="Reference clock in Hz")
+
     options = parser.parse_args()
 
     if (options.source == "usrp" and options.usrp_args is None):
         parser.error("argument --usrp-args is required when --source=\"usrp\"")
+
+    min_bw = (1 + options.rolloff) * options.sym_rate
+    if (options.source == "bladeRF" and options.bladerf_bw != 0
+            and options.bladerf_bw < min_bw):
+        parser.error(
+            "argument --bladerf-bw should be greater than {} Hz".format(
+                min_bw))
 
     return options
 
