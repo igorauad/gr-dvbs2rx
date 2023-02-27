@@ -91,8 +91,8 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
         self.frame_size = options.frame_size
         self.freq = options.freq
         self.freq_offset = options.freq_offset
-        self.fullscale = 1.0 if options.fullscale is None and \
-            options.sink == "usrp" else options.fullscale
+        self.fullscale = None if options.fullscale_no_limit else \
+            options.fullscale
         self.gold_code = options.gold_code
         self.gui = options.gui
         self.gui_out_time = options.gui_out_time or options.gui_all
@@ -702,11 +702,15 @@ def argument_parser():
                         type=eng_float,
                         default=eng_notation.num_to_str(float(1000000)),
                         help="Symbol rate in bauds")
+    parser.add_argument("--fullscale",
+                        type=float,
+                        default=1.0,
+                        help="Target full-scale amplitude for the output IQ")
     parser.add_argument(
-        "--fullscale",
-        type=float,
-        help="Target full-scale amplitude for the output IQ. If undefined, "
-        "defaults to unlimited for sink=fd/file and 1.0 for sink=usrp")
+        "--fullscale-no-limit",
+        action='store_true',
+        default=False,
+        help="Ignore the --fullscale option and do not limit the IQ amplitude")
 
     gui_group = parser.add_argument_group('GUI Options')
     gui_group.add_argument("--gui",
