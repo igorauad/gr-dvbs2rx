@@ -15,11 +15,14 @@
   ```
 
 - SDR compatibility:
-    - `dvbs2-tx` can currently transmit using USRP and bladeRF radios only.
-    - `dvbs2-rx` can currently receive with RTL-SDR, USRP and bladeRF devices.
-    - Please feel free to get in touch if you would like to use another SDR device/board. Adding support should be straightforward if the device already has GNU Radio support. Pull requests are also welcome.
+  | Application | USRP               | bladeRF            | ADALM-PLUTO (PlutoSDR) | RTL-SDR            |
+  | ----------- | ------------------ | ------------------ | ---------------------- | ------------------ |
+  | `dvbs2-tx`  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:     |                    |
+  | `dvbs2-rx`  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:     | :heavy_check_mark: |
 
-> NOTE: The current support for bladeRF radios is subject to experimental validation.
+> Please feel free to get in touch if you would like to use another SDR device/board. Adding support should be straightforward if the device already has GNU Radio support. Pull requests are also welcome.
+
+> NOTE: The current implementations for the bladeRF and PlutoSDR are subject to experimental validation.
 
 - The Tx application takes an MPEG transport stream on the input, and the RX application likewise outputs a transport stream. None of them offer any mechanism to process the MPEG transport stream itself. Processing of MPEG TS is beyond the scope of this project.
 

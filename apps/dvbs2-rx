@@ -35,9 +35,9 @@ from gnuradio.filter import firdes
 
 from gnuradio import dvbs2rx
 
-MAX_RX_GAIN = {'usrp': 75, 'rtl': 50, 'bladeRF': 60}
-MAX_FREQ = {'usrp': 6e9, 'rtl': 2.2e9, 'bladeRF': 6e9}
-MIN_FREQ = {'usrp': 10e6, 'rtl': 22e6, 'bladeRF': 47e6}
+MAX_RX_GAIN = {'usrp': 75, 'rtl': 50, 'bladeRF': 60, 'plutosdr': 71}
+MAX_FREQ = {'usrp': 6e9, 'rtl': 2.2e9, 'bladeRF': 6e9, 'plutosdr': 6e9}
+MIN_FREQ = {'usrp': 10e6, 'rtl': 22e6, 'bladeRF': 47e6, 'plutosdr': 70e6}
 
 
 def parse_version():
@@ -128,6 +128,12 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             'if_gain': options.bladerf_if_gain,
             'ref_clk': options.bladerf_ref_clk,
             'rf_gain': options.bladerf_rf_gain
+        }
+        self.plutosdr = {
+            'address': options.plutosdr_addr,
+            'buffer_size': options.plutosdr_buf_size,
+            'gain_mode': options.plutosdr_gain_mode,
+            'manual_gain': options.plutosdr_gain
         }
 
         ##################################################
@@ -503,7 +509,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             n_columns += 1
 
         # Optional SDR controls
-        if self.source in ['usrp', 'rtl', 'bladeRF']:
+        if self.source in ['usrp', 'rtl', 'bladeRF', 'plutosdr']:
             n_rows += 1  # Place them at the bottom on a new row
 
             # Gain
@@ -513,14 +519,19 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                 initial_gain = self.rtl['gain']
             elif self.source == 'bladeRF':
                 initial_gain = self.blade_rf['rf_gain']
+            elif self.source == 'plutosdr':
+                initial_gain = self.plutosdr['manual_gain']
 
-            qt_gain_range = qtgui.Range(0, MAX_RX_GAIN[self.source], 1,
-                                        initial_gain, 200)
-            gui_gain_widget = qtgui.RangeWidget(qt_gain_range,
-                                                self.set_gui_gain, "Gain",
-                                                "counter_slider", float,
-                                                QtCore.Qt.Horizontal)
-            self.top_grid_layout.addWidget(gui_gain_widget, 3, 0)
+            # With the PlutoSDR, show the gain widget only in manual gain mode
+            if not (self.source == 'plutosdr'
+                    and self.plutosdr['gain_mode'] != 'manual'):
+                qt_gain_range = qtgui.Range(0, MAX_RX_GAIN[self.source], 1,
+                                            initial_gain, 200)
+                gui_gain_widget = qtgui.RangeWidget(qt_gain_range,
+                                                    self.set_gui_gain, "Gain",
+                                                    "counter_slider", float,
+                                                    QtCore.Qt.Horizontal)
+                self.top_grid_layout.addWidget(gui_gain_widget, 3, 0)
 
             # Center Frequency
             qt_freq_range = qtgui.Range(MIN_FREQ[self.source],
@@ -638,6 +649,25 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
         return blade_rf_source
 
+    def setup_plutosdr_source(self):
+        from gnuradio import iio
+
+        self.iio_pluto_source = iio_pluto_source = iio.fmcomms2_source_fc32(
+            self.plutosdr['address'] if self.plutosdr['address'] else
+            iio.get_pluto_uri(), [True, True], self.plutosdr['buffer_size'])
+
+        iio_pluto_source.set_len_tag_key('packet_len')
+        iio_pluto_source.set_frequency(self.freq)
+        iio_pluto_source.set_samplerate(self.samp_rate)
+        iio_pluto_source.set_gain_mode(0, self.plutosdr['gain_mode'])
+        iio_pluto_source.set_gain(0, self.plutosdr['manual_gain'])
+        iio_pluto_source.set_quadrature(True)
+        iio_pluto_source.set_rfdc(True)
+        iio_pluto_source.set_bbdc(True)
+        iio_pluto_source.set_filter_params('Auto', '', 0, 0)
+
+        return iio_pluto_source
+
     def connect_source(self):
         """Connect the IQ sample source
 
@@ -712,6 +742,8 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             source = self.setup_usrp_source()
         elif self.source == 'bladeRF':
             source = self.setup_blade_rf_source()
+        elif self.source == 'plutosdr':
+            source = self.setup_plutosdr_source()
 
         return source
 
@@ -1012,6 +1044,10 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             self.blade_rf['rf_gain'] = new_gain
             self.blade_rf_source.set_gain(self.blade_rf['rf_gain'],
                                           self.blade_rf['channel'])
+        elif self.source == 'plutosdr' and \
+                self.plutosdr['gain_mode'] == 'manual':
+            self.plutosdr['manual_gain'] = new_gain
+            self.iio_pluto_source.set_gain(0, self.plutosdr['manual_gain'])
 
     def set_gui_freq(self, new_freq):
         self.freq = new_freq
@@ -1023,6 +1059,8 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         elif self.source == 'bladeRF':
             self.blade_rf_source.set_center_freq(self.freq,
                                                  self.blade_rf['channel'])
+        elif self.source == 'plutosdr':
+            self.iio_pluto_source.set_frequency(self.freq)
 
         for gui_block in ['waterfall_sink', 'freq_sink_agc_rotator_out']:
             if gui_block in self.gui_blocks:
@@ -1264,10 +1302,11 @@ def argument_parser():
                            help="Port served by the monitoring server")
 
     src_group = parser.add_argument_group('Source Options')
-    src_group.add_argument("--source",
-                           choices=["fd", "file", "rtl", "usrp", "bladeRF"],
-                           default="fd",
-                           help="Source of the input IQ sample stream")
+    src_group.add_argument(
+        "--source",
+        choices=["fd", "file", "rtl", "usrp", "bladeRF", "plutosdr"],
+        default="fd",
+        help="Source of the input IQ sample stream")
     src_group.add_argument("--in-fd",
                            type=intx,
                            default=0,
@@ -1412,6 +1451,25 @@ def argument_parser():
                            type=eng_float,
                            default=10e6,
                            help="Reference clock in Hz")
+
+    pluto_group = parser.add_argument_group('PlutoSDR Options')
+    pluto_group.add_argument('--plutosdr-addr',
+                             type=str,
+                             help="IP address of the unit")
+    pluto_group.add_argument('--plutosdr-buf-size',
+                             type=int,
+                             default=32768,
+                             help="Size of the internal buffer in samples")
+    pluto_group.add_argument(
+        '--plutosdr-gain-mode',
+        type=str,
+        choices=['manual', 'slow_attack', 'fast_attack', 'hybrid'],
+        default='slow_attack',
+        help="Gain mode")
+    pluto_group.add_argument('--plutosdr-gain',
+                             type=int,
+                             default=64,
+                             help="Gain in dB used in manual mode")
 
     options = parser.parse_args()
 

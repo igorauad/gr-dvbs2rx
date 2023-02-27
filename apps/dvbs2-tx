@@ -36,9 +36,9 @@ from gnuradio.filter import firdes
 
 from gnuradio import dvbs2rx
 
-MAX_TX_GAIN = {'usrp': 65, 'bladeRF': 60}
-MAX_FREQ = {'usrp': 6e9, 'bladeRF': 6e9}
-MIN_FREQ = {'usrp': 10e6, 'bladeRF': 47e6}
+MAX_TX_GAIN = {'usrp': 65, 'bladeRF': 60, 'plutosdr': 89.75}
+MAX_FREQ = {'usrp': 6e9, 'bladeRF': 6e9, 'plutosdr': 6e9}
+MIN_FREQ = {'usrp': 10e6, 'bladeRF': 47e6, 'plutosdr': 70e6}
 
 
 def parse_version():
@@ -150,6 +150,11 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
             'if_gain': options.bladerf_if_gain,
             'ref_clk': options.bladerf_ref_clk,
             'rf_gain': options.bladerf_rf_gain
+        }
+        self.plutosdr = {
+            'address': options.plutosdr_addr,
+            'buffer_size': options.plutosdr_buf_size,
+            'attenuation': options.plutosdr_attn,
         }
 
         ##################################################
@@ -357,7 +362,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                                 self._get_freq_sink(qtgui, "Output PSD"), pos)
 
         # Optional SDR controls
-        if (self.sink in ['usrp', 'bladeRF']):
+        if (self.sink in ['usrp', 'bladeRF', 'plutosdr']):
             if n_columns >= 2:
                 n_rows += 1
                 pos = [(1, 0), (1, 1)]
@@ -370,6 +375,9 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                 initial_gain = self.usrp['gain']
             elif self.sink == 'bladeRF':
                 initial_gain = self.blade_rf['rf_gain']
+            elif self.sink == 'plutosdr':
+                initial_gain = MAX_TX_GAIN['plutosdr'] - self.plutosdr[
+                    'attenuation']
 
             qt_gain_range = qtgui.Range(0, MAX_TX_GAIN[self.sink], 1,
                                         initial_gain, 200)
@@ -480,6 +488,25 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
 
         return blade_rf_sink
 
+    def setup_plutosdr_sink(self):
+        from gnuradio import iio
+
+        cyclic = False
+        self.iio_pluto_sink = iio_pluto_sink = iio.fmcomms2_sink_fc32(
+            self.plutosdr['address']
+            if self.plutosdr['address'] else iio.get_pluto_uri(), [True, True],
+            self.plutosdr['buffer_size'], cyclic)
+
+        iio_pluto_sink.set_len_tag_key('')
+        iio_pluto_sink.set_bandwidth(
+            20000000)  # TODO confirm if required in auto mode
+        iio_pluto_sink.set_frequency(self.freq)
+        iio_pluto_sink.set_samplerate(self.samp_rate)
+        iio_pluto_sink.set_attenuation(0, self.plutosdr['attenuation'])
+        iio_pluto_sink.set_filter_params('Auto', '', 0, 0)
+
+        return iio_pluto_sink
+
     def connect_source(self):
         """Connect the MPEG TS source
 
@@ -550,6 +577,8 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
             sink = self.setup_usrp_sink()
         elif self.sink == "bladeRF":
             sink = self.setup_blade_rf_sink()
+        elif self.sink == "plutosdr":
+            sink = self.setup_plutosdr_sink()
 
         # Simulation options
         # 1) Noise
@@ -707,6 +736,11 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
             self.blade_rf['rf_gain'] = new_gain
             self.blade_rf_sink.set_gain(self.blade_rf['rf_gain'],
                                         self.blade_rf['channel'])
+        elif self.sink == 'plutosdr':
+            # The PlutoSDR Tx gain is defined as an attenuation
+            self.plutosdr['attenuation'] = MAX_TX_GAIN['plutosdr'] - new_gain
+            self.iio_pluto_sink.set_attenuation(0,
+                                                self.plutosdr['attenuation'])
 
     def set_gui_freq(self, new_freq):
         self.freq = new_freq
@@ -715,6 +749,8 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
         elif self.sink == 'bladeRF':
             self.blade_rf_sink.set_center_freq(self.freq,
                                                self.blade_rf['channel'])
+        elif self.sink == 'plutosdr':
+            self.iio_pluto_sink.set_frequency(self.freq)
 
         for gui_block in ['freq_sink_iq_out']:
             if gui_block in self.gui_blocks:
@@ -833,10 +869,11 @@ def argument_parser():
         help="Read repeatedly from the input file if source=file")
 
     snk_group = parser.add_argument_group('Sink Options')
-    snk_group.add_argument("--sink",
-                           choices=["fd", "file", "usrp", "bladeRF"],
-                           default="fd",
-                           help="Sink for the output IQ sample stream")
+    snk_group.add_argument(
+        "--sink",
+        choices=["fd", "file", "usrp", "bladeRF", "plutosdr"],
+        default="fd",
+        help="Sink for the output IQ sample stream")
     snk_group.add_argument("--out-fd",
                            type=intx,
                            default=1,
@@ -933,6 +970,19 @@ def argument_parser():
                            type=eng_float,
                            default=10e6,
                            help="Reference clock in Hz")
+
+    pluto_group = parser.add_argument_group('PlutoSDR Options')
+    pluto_group.add_argument('--plutosdr-addr',
+                             type=str,
+                             help="IP address of the unit")
+    pluto_group.add_argument('--plutosdr-buf-size',
+                             type=int,
+                             default=32768,
+                             help="Size of the internal buffer in samples")
+    pluto_group.add_argument('--plutosdr-attn',
+                             type=int,
+                             default=10,
+                             help="TX1 attenuation in dB")
 
     sim_group = parser.add_argument_group('Simulation Options')
     sim_group.add_argument(
