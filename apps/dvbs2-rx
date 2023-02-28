@@ -71,6 +71,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.gui_plsync_time = options.gui_plsync_time or options.gui_all
         self.gui_fft_size = options.gui_fft_size
         self.gui_ctrl_panel = options.gui_ctrl_panel
+        self.gui_fosphor = options.gui_fosphor
         self.in_fd = options.in_fd
         self.in_file = options.in_file
         self.in_iq_format = options.in_iq_format
@@ -164,6 +165,13 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             self.setup_gui()
         sink_block = self.connect_sink()
         self.connect_dvbs2rx(source_block, sink_block)
+
+    def _get_fosphor_sink(self):
+        from gnuradio import fosphor
+        fosphor_qt_sink = fosphor.qt_sink_c()
+        fosphor_qt_sink.set_fft_window(window.WIN_BLACKMAN_hARRIS)
+        fosphor_qt_sink.set_frequency_range(self.freq, self.samp_rate)
+        return fosphor_qt_sink
 
     def _get_waterfall_sink(self, qtgui, name, fftsize):
         waterfall_sink = qtgui.waterfall_sink_c(
@@ -466,10 +474,13 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         n_columns = 2
 
         # Waterfall sink observing the signal directly out of the source
-        self._add_gui_block(
-            'waterfall_sink',
-            self._get_waterfall_sink(qtgui, "Input Signal", self.gui_fft_size),
-            (0, 0, 1, 1))
+        if self.gui_fosphor:
+            waterfall_sink = self._get_fosphor_sink()
+        else:
+            waterfall_sink = self._get_waterfall_sink(qtgui, "Input Signal",
+                                                      self.gui_fft_size)
+
+        self._add_gui_block('waterfall_sink', waterfall_sink, (0, 0, 1, 1))
 
         # Frequency sink observing the IQ streams output by the AGC and the
         # rotator blocks. Useful for inspection of the frequency correction.
@@ -1282,6 +1293,10 @@ def argument_parser():
                            action='store_true',
                            default=False,
                            help="Enable the available widget control panels")
+    gui_group.add_argument("--gui-fosphor",
+                           action='store_true',
+                           default=False,
+                           help="View the spectrum using gr-fosphor.")
 
     mon_group = parser.add_argument_group('Monitoring Options')
     mon_group.add_argument("--log-stats",
