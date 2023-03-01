@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /*
- * Copyright (c) 2019-2021 Igor Freire.
+ * Copyright (c) 2019-2023 Igor Freire.
  *
  * This file is part of gr-dvbs2rx.
  *
@@ -293,9 +293,6 @@ void plsync_cc_impl::calibrate_tag_delay(const uint64_t abs_sof_idx, int toleran
 
     // Process the tags
     for (unsigned j = 0; j < tags.size(); j++) {
-        // Always keep track of the current and previous rotator states.
-        d_rot_ctrl.past = d_rot_ctrl.current;
-
         // Phase increment update offset originally requested
         const uint64_t requested_offset = pmt::to_double(pmt::cdr(tags[j].value));
         // NOTE: the requested sample offset is not the same as the actual incoming
@@ -310,9 +307,15 @@ void plsync_cc_impl::calibrate_tag_delay(const uint64_t abs_sof_idx, int toleran
         // they don't interfere with the PL sync.
         auto map_it = d_rot_ctrl.update_map.find(requested_offset);
         if (map_it == d_rot_ctrl.update_map.end()) {
-            d_logger->warn("Unexpected phase increment update tag at index {:d}",
-                           tags[j].offset);
+            d_logger->warn(
+                "Unexpected phase inc update tag at offset {:d} (requested offset {:d})",
+                tags[j].offset,
+                requested_offset);
+            continue;
         }
+
+        // Always keep track of the current and previous rotator states.
+        d_rot_ctrl.past = d_rot_ctrl.current;
 
         // We have found the map entry matching the incoming tag. However, that does not
         // mean the tag is scheduled for the current SOF at index "abs_sof_idx". The tag

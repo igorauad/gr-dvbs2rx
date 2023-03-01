@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /*
- * Copyright (c) 2019-2021 Igor Freire.
+ * Copyright (c) 2019-2023 Igor Freire.
  *
  * This file is part of gr-dvbs2rx.
  *
