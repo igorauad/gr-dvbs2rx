@@ -11,6 +11,7 @@ import os
 import signal
 import sys
 import time
+import subprocess
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from datetime import datetime
 from math import pi, sqrt
@@ -38,6 +39,17 @@ from gnuradio import dvbs2rx
 MAX_USRP_TX_GAIN = 65
 MAX_USRP_FREQ = 6e9
 MIN_USRP_FREQ = 10e6
+
+
+def parse_version():
+    cpython_lib = dvbs2rx.dvbs2rx_python.__file__
+    ldd_out = subprocess.check_output(['ldd', cpython_lib]).decode()
+    dvbs2rx_lib_version = "Not Found"
+    for line in ldd_out.splitlines():
+        if "libgnuradio-dvbs2rx" in line:
+            dvbs2rx_lib_version = line.split()[0].replace(
+                "libgnuradio-dvbs2rx.so.", "")
+    return dvbs2rx_lib_version
 
 
 def scale_rrc_taps(taps: list, sps: int, fullscale: float) -> list:
@@ -660,6 +672,10 @@ def argument_parser():
     parser = ArgumentParser(prog="dvbs2-tx",
                             description=description,
                             formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-v',
+                        '--version',
+                        action='version',
+                        version=parse_version())
     parser.add_argument("--frame-size",
                         type=str,
                         choices=['normal', 'short'],

@@ -12,6 +12,7 @@ import os
 import signal
 import sys
 import time
+import subprocess
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from packaging.version import Version as StrictVersion
@@ -37,6 +38,17 @@ from gnuradio import dvbs2rx
 MAX_RX_GAIN = {'usrp': 75, 'rtl': 50}
 MAX_FREQ = {'usrp': 6e9, 'rtl': 2.2e9}
 MIN_FREQ = {'usrp': 10e6, 'rtl': 22e6}
+
+
+def parse_version():
+    cpython_lib = dvbs2rx.dvbs2rx_python.__file__
+    ldd_out = subprocess.check_output(['ldd', cpython_lib]).decode()
+    dvbs2rx_lib_version = "Not Found"
+    for line in ldd_out.splitlines():
+        if "libgnuradio-dvbs2rx" in line:
+            dvbs2rx_lib_version = line.split()[0].replace(
+                "libgnuradio-dvbs2rx.so.", "")
+    return dvbs2rx_lib_version
 
 
 class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
@@ -1010,6 +1022,10 @@ def argument_parser():
                         type=int,
                         default=0,
                         help="Debugging level")
+    parser.add_argument('-v',
+                        '--version',
+                        action='version',
+                        version=parse_version())
     parser.add_argument('-f',
                         "--freq",
                         type=eng_float,
