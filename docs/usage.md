@@ -47,10 +47,10 @@ In this example, note the receiver logs are still printed to the console, but th
 
 In addition to the default file descriptor (`fd`) interface for input and output, the Tx and Rx applications offer flexible source and sink options, which can be modified using the `--source` and `--sink` command-line switches. Currently, they have the following options:
 
-| Application | Source                      | Sink                 |
-| ----------- | --------------------------- | -------------------- |
-| `dvbs2-tx`  | `fd`, `file`                | `fd`, `file`, `usrp` |
-| `dvbs2-rx`  | `fd`, `file`, `rtl`, `usrp` | `fd`, `file`         |
+| Application | Source                                             | Sink                                        |
+| ----------- | -------------------------------------------------- | ------------------------------------------- |
+| `dvbs2-tx`  | `fd`, `file`                                       | `fd`, `file`, `usrp`, `bladeRF`, `plutosdr` |
+| `dvbs2-rx`  | `fd`, `file`, `rtl`, `usrp`, `bladeRF`, `plutosdr` | `fd`, `file`                                |
 
 For example, the configuration from [Example 3](#example-3) can be reproduced using `file` source/sinks instead of `fd` source/sinks, as follows:
 
@@ -95,11 +95,37 @@ dvbs2-tx --sink usrp --freq 1316.9e6 --sym-rate 1e6 --usrp-args "serial=xyz"
 
 See the help menu (`dvbs2-tx --help` or `dvbs2-rx --help`) for further USRP options like gain, antenna, clock/time source, and more.
 
+Moreover, as indicated in the above table, it is also possible to transmit and receive with a bladeRF or PlutoSDR device, like so:
+
+### Example 8
+
+bladeRF transmission:
+```
+tsp -I craft --pid 100 | dvbs2-tx --sink bladeRF --freq 1316.9e6 --sym-rate 1e6
+```
+
+bladeRF reception:
+```
+dvbs2-rx --source bladeRF --freq 1316.9e6 --sym-rate 1e6
+```
+
+PlutoSDR transmission:
+```
+tsp -I craft --pid 100 | dvbs2-tx --sink plutosdr --freq 1316.9e6 --sym-rate 1e6
+```
+
+PlutoSDR reception:
+```
+dvbs2-rx --source plutosdr --freq 1316.9e6 --sym-rate 1e6
+```
+
+Again, the help menu shows further device-specific options for these devices, like gain, device identification/address, and more.
+
 ## Experimenting with Parameters
 
 Both the `dvbs2-tx` and `dvbs2-rx` applications provide a range of configurable DVB-S2 parameters. For instance, the previous Tx-Rx loopback example can be adapted to test a different MODCOD, FEC frame size, roll-off factor, symbol rate, and pilot configuration:
 
-### Example 8
+### Example 9
 ```
 dvbs2-tx \
     --source file \
@@ -130,7 +156,7 @@ The Tx application also supports noise and frequency offset simulation. For inst
 
 A graphical user interface (GUI) is available on the transmitter and receiver applications. You can optionally enable it by running with the `--gui` option on either the Tx or Rx application. For instance, [Example 5](#example-5) can be altered to include the GUI as follows:
 
-### Example 9
+### Example 10
 
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --gui
@@ -146,7 +172,7 @@ The MPEG Transport Stream layer is beyond the scope of this project. The DVB-S2 
 
 A recommended application to handle the MPEG TS layer is the `tsp` tool from the [TSDuck](https://tsduck.io) toolkit. The following examples demonstrate how you can pipe the output of `tsp` into `dvbs2-tx` or the output from `dvbs2-rx` into `tsp`.
 
-### Example 10
+### Example 11
 
 The `craft` plugin used earlier is handy for generating a test TS stream. The example below uses it on the Tx side, while the `bitrate_monitor` plugin is used on the Rx side to measure the bitrate of the decoded MPEG TS stream:
 
@@ -158,7 +184,7 @@ tsp --realtime --buffer-size-mb 1 -P bitrate_monitor -p 1 -O drop
 
 This example uses noteworthy descriptor redirection options on `dvbs2-rx` to ensure it only feeds the MPEG TS output into `tsp`, not its logs. At first, the `dvbs2-rx` application outputs the decoded TS stream into descriptor 3 through option `-out-fd 3`. At the same time, descriptor three is redirected to stdout through option `3>&1`, while the original stdout (containing the receiver logs) goes to stderr due to `1>&2`. In the end, only the TS output is piped into `tsp`, and the logs are preserved on the console via stderr. The same trick is adopted in the other `tsp` examples that follow.
 
-### Example 11
+### Example 12
 
 A common application for DVB-S2 is sending UDP/IP traffic within a link-layer protocol like the [Multiprotocol Encapsulation (MPE)](https://en.wikipedia.org/wiki/Multiprotocol_Encapsulation) protocol. In this case, the UDP/IP packets go on the payload of MPE frames, and the MPE frames are carried by MPEG TS packets, which in turn are carried by the DVB-S2 frames. In other words, the encapsulation chain is as follows:
 
@@ -201,7 +227,7 @@ And send the test UDP message from another terminal window:
 echo "Test message" > /dev/udp/127.0.0.1/9005
 ```
 
-### Example 12
+### Example 13
 
 The `tsp` tool can also help with real-time video streaming. For example, the following command uses the `play` output plugin from `tsp` to play the decoded MPEG TS video stream in real time on VLC (provided that VLC is installed):
 
@@ -209,7 +235,7 @@ The `tsp` tool can also help with real-time video streaming. For example, the fo
 cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsp --realtime --buffer-size-mb 1 -O play
 ```
 
-### Example 13
+### Example 14
 
 Lastly, another useful application from the TSDuck toolkit is the `tsdump` tool, which dumps all the incoming TS packets into the console in real time. You can use it as follows:
 
@@ -225,7 +251,7 @@ While the DVB-S2 receiver is running, it is often helpful to observe the underly
 
 The example below illustrates the monitoring server launched for on-demand access via HTTP requests:
 
-### Example 14
+### Example 15
 
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --mon-server
@@ -239,7 +265,7 @@ curl -s http://localhost:9004 | python3 -m json.tool
 
 Alternatively, you may want to print the performance metrics continuously to the console. To do so, run with option `--log-stats`, as follows:
 
-### Example 15
+### Example 16
 
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --log-stats
