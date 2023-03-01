@@ -630,11 +630,13 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                     break
             if (not found):
                 gr.log.error("Failed to locate theme {}".format(theme))
-                return
+                return False
             with open(filename) as ss:
                 self.setStyleSheet(ss.read())
         except Exception as e:
             gr.log.error(str(e))
+            return False
+        return True
 
     def set_gui_gain(self, new_gain):
         if (self.sink == 'usrp'):
@@ -862,7 +864,8 @@ def main():
 
     if (gui_mode):
         if (options.gui_dark):
-            tb.setStyleSheetFromFile("dark.qss")
+            if not tb.setStyleSheetFromFile("dvbs2_dark.qss"):
+                tb.setStyleSheetFromFile("dark.qss")
         tb.show()
     else:
         tb.wait()

@@ -176,6 +176,7 @@ add_subdirectory(docs)
 add_subdirectory(python/dvbs2rx)
 add_subdirectory(grc)
 add_subdirectory(bench)
+add_subdirectory(themes)
 
 ########################################################################
 # Install cmake search helper for this library

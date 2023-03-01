@@ -228,14 +228,14 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
         labels = ['', '', '', '', '', '', '', '', '', '']
         units = ['', '', '', '', '', '', '', '', '', '']
-        colors = [("black", "black"), ("black", "black"), ("black", "black"),
+        colors = [("#1F3A98", "#1F3A98"), ("black", "black"),
                   ("black", "black"), ("black", "black"), ("black", "black"),
                   ("black", "black"), ("black", "black"), ("black", "black"),
-                  ("black", "black")]
+                  ("black", "black"), ("black", "black")]
         factor = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
         for i in range(1):
-            number_sink.set_min(i, -1)
+            number_sink.set_min(i, 0)
             number_sink.set_max(i, 1)
             number_sink.set_color(i, colors[i][0], colors[i][1])
             if len(labels[i]) == 0:
@@ -880,11 +880,13 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                     break
             if (not found):
                 gr.log.error("Failed to locate theme {}".format(theme))
-                return
+                return False
             with open(filename) as ss:
                 self.setStyleSheet(ss.read())
         except Exception as e:
             gr.log.error(str(e))
+            return False
+        return True
 
     def get_stats(self):
         """Get relevant statistics from the receiver blocks"""
@@ -1343,7 +1345,8 @@ def main():
 
     if (gui_mode):
         if (options.gui_dark):
-            tb.setStyleSheetFromFile("dark.qss")
+            if not tb.setStyleSheetFromFile("dvbs2_dark.qss"):
+                tb.setStyleSheetFromFile("dark.qss")
         tb.show()
     else:
         tb.wait()
