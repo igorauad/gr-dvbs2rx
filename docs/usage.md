@@ -16,68 +16,84 @@ The `dvbs2-tx` and `dvbs2-rx` applications are designed to interface with file d
 ### Example 1
 
 ```
-cat example.ts | dvbs2-tx | dvbs2-rx > /dev/null
+cat example.ts | dvbs2-tx | dvbs2-rx
 ```
 
-In this case, the Tx reads the MPEG transport stream (TS) file (`example.ts`) from its standard input (stdin) and transmits the corresponding IQ stream into the Rx app. Meanwhile, the Rx app outputs the decoded MPEG TS stream directly into its standard output (stdout), which is redirected to the null device.
+In this case, the Tx reads the MPEG transport stream (TS) file (`example.ts`) from its standard input (stdin) and transmits the corresponding IQ stream into the Rx app. Meanwhile, the Rx app outputs the decoded MPEG TS stream directly into its standard output (stdout).
 
-If you don't have an MPEG TS file for testing, you can download an [example TS file](http://www.w6rz.net/thefuryclip.ts). Alternatively, you can use a transport stream generator. The `tsp` tool from the [TSDuck](https://tsduck.io) toolkit provides such a generator (see the [installation instructions](#tsduck-installation)), which can be used as follows:
+If you don't have an MPEG TS file for testing, you can download an [example TS file](https://www.w6rz.net/thefuryclip.ts) by running the following:
+
+```
+wget https://www.w6rz.net/thefuryclip.ts -O example.ts
+```
+
+Alternatively, you can use a transport stream generator. The `tsp` tool from the [TSDuck](https://tsduck.io) toolkit provides such a generator (see the [installation instructions](#tsduck-installation)), which can be used as follows:
 
 ### Example 2
 ```
-tsp -I craft --pid 100 | dvbs2-tx | dvbs2-rx > /dev/null
+tsp -I craft --pid 100 | dvbs2-tx | dvbs2-rx
 ```
 
-In this case, it is the `craft` plugin from `tsp` that is generating a fake MPEG transport stream with packet ID (PID) 100 on the input to the `dvbs2-tx` app.
+In this case, the `craft` plugin from `tsp` generates an MPEG transport stream with packet ID (PID) 100 and feeds it into the `dvbs2-tx` app for modulation and transmission. Then, the `dvbs2-rx` application decodes the TS stream and outputs it to stdout. More examples based on `tsp` are presented [later in this guide](#processing-the-mpeg-transport-stream).
 
-So far, both examples have adopted the file descriptor interface for input and output. However, the applications offer flexible source and sink options, which can be modified using the `--source` and `--sink` command-line switches. For example, you can specify source and sink files directly, as follows:
+The Rx configuration presented so far is not generally recommended because its output printed to stdout has both logs and TS data. This approach can cause problems when piping the output from `dvbs2-rx` into an application that processes the decoded TS stream. For this and other use cases, the Tx and Rx applications offer flexible configurations for the input and file descriptors, which only affect the TS input/output, not the logs. For example, the MPEG TS output can be fed into a separate file descriptor instead of the stdout (descriptor 1), while the logs are preserved on the stdout, as follows:
 
 ### Example 3
-```
-dvbs2-tx --source file --in-file example.ts | \
-    dvbs2-rx --sink file --out-file /dev/null
-```
-
-When using file descriptors, it is also possible to configure which descriptors take the input and output. One problem in [Example 1](#example-1) is that the output from `dvbs2-rx` is entirely redirected to the null device, including the receiver logs. As an alternative, the MPEG TS output can be fed into a separate file descriptor instead of the stdout (descriptor 1), as follows:
-
-### Example 4
 ```
 cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3> /dev/null
 ```
 
-In this example, only the decoded TS output is fed into descriptor 3, whereas the receiver logs continue to be printed to the console via the standard output. Hence, this command is equivalent to that of [Example 3](#example-2), since `--out-file` regulates the file for the TS output only, excluding the receiver logs.
+In this example, note the receiver logs are still printed to the console, but the TS output is omitted due to being redirected to `/dev/null`.
 
-Next, if your goal is to receive using an RTL-SDR interface, you can run a command like the following:
+In addition to the default file descriptor (`fd`) interface for input and output, the Tx and Rx applications offer flexible source and sink options, which can be modified using the `--source` and `--sink` command-line switches. Currently, they have the following options:
+
+| Application | Source                      | Sink                 |
+| ----------- | --------------------------- | -------------------- |
+| `dvbs2-tx`  | `fd`, `file`                | `fd`, `file`, `usrp` |
+| `dvbs2-rx`  | `fd`, `file`, `rtl`, `usrp` | `fd`, `file`         |
+
+For example, the configuration from [Example 3](#example-3) can be reproduced using `file` source/sinks instead of `fd` source/sinks, as follows:
+
+### Example 4
+```
+dvbs2-tx --source file --in-file example.ts | \
+dvbs2-rx --sink file --out-file /dev/null
+```
+
+Alternatively, you can specify SDR interfaces as Tx sink or Rx sources. For example, to receive using an RTL-SDR interface, you can run a command like the following:
 
 ### Example 5
+
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6
 ```
 
 Where:
 
-- Option `--source` configures the application to read IQ samples from an RTL-SDR interface.
+- Option `--source` configures the application to read IQ samples from the RTL-SDR.
 - Option `--freq` determines the RTL-SDR's tuner frequency.
 - Option `--sym-rate` specifies the symbol rate (also known as baud rate) in symbols per second (or bauds).
 
-Similarly, using a USRP device, you can receive with:
+Similarly, you can receive with a USRP by running a command like:
 
 ### Example 6
+
 ```
-dvbs2-rx -f 1316.9e6 -s 1e6 --source usrp --usrp-args "serial=xyz"
+dvbs2-rx --source usrp --freq 1316.9e6 --sym-rate 1e6 --usrp-args "serial=xyz"
 ```
 
 where option `--usrp-args` specifies the [address identifier](https://files.ettus.com/manual/page_identification.html) of the target USRP device.
 
-The same holds for the Tx application. A USRP device can be used for transmission as follows:
+And similar options are available on the Tx application. For instance, you can transmit using a USRP device as follows:
 
 ### Example 7
+
 ```
 tsp -I craft --pid 100 | \
-  dvbs2-tx --sink usrp --usrp-args "serial=xyz" --freq 1316.9e6 --sym-rate 1e6
+dvbs2-tx --sink usrp --freq 1316.9e6 --sym-rate 1e6 --usrp-args "serial=xyz"
 ```
 
-See the help menu (`dvbs2-tx --help` and `dvbs2-rx --help`) for further USRP options like gain, antenna, clock/time source, and more.
+See the help menu (`dvbs2-tx --help` or `dvbs2-rx --help`) for further USRP options like gain, antenna, clock/time source, and more.
 
 ## Experimenting with Parameters
 
@@ -112,9 +128,10 @@ The Tx application also supports noise and frequency offset simulation. For inst
 
 ## Graphical User Interface
 
-A graphical user interface (GUI) is available on the receiver application. You can optionally enable it by running with the `--gui` option, as follows:
+A graphical user interface (GUI) is available on the transmitter and receiver applications. You can optionally enable it by running with the `--gui` option on either the Tx or Rx application. For instance, [Example 5](#example-5) can be altered to include the GUI as follows:
 
 ### Example 9
+
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --gui
 ```
@@ -127,27 +144,75 @@ Note, however, that the GUI increases the CPU utilization. Hence, if you are loo
 
 The MPEG Transport Stream layer is beyond the scope of this project. The DVB-S2 Rx application only aims to output the MPEG TS stream for an external application instead of handling the MPEG stream itself. Likewise, the Tx application takes a fully-formatted TS stream on its input and does not modify the TS stream at all.
 
-A recommended application to handle the MPEG TS layer is the `tsp` tool from the [TSDuck](https://tsduck.io) toolkit. The following example demonstrates how you can pipe the output from `dvbs2-rx` into `tsp`.
+A recommended application to handle the MPEG TS layer is the `tsp` tool from the [TSDuck](https://tsduck.io) toolkit. The following examples demonstrate how you can pipe the output of `tsp` into `dvbs2-tx` or the output from `dvbs2-rx` into `tsp`.
 
 ### Example 10
+
+The `craft` plugin used earlier is handy for generating a test TS stream. The example below uses it on the Tx side, while the `bitrate_monitor` plugin is used on the Rx side to measure the bitrate of the decoded MPEG TS stream:
+
 ```
-cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | \
-  tsp -P mpe --pid 32 --udp-forward --local-address 127.0.0.1 -O drop
+tsp -I craft --pid 100 | dvbs2-tx | \
+dvbs2-rx --out-fd 3 3>&1 1>&2 | \
+tsp --realtime --buffer-size-mb 1 -P bitrate_monitor -p 1 -O drop
 ```
 
-In this example, it is assumed that the incoming signal contains UDP packets encapsulated as follows:
+This example uses noteworthy descriptor redirection options on `dvbs2-rx` to ensure it only feeds the MPEG TS output into `tsp`, not its logs. At first, the `dvbs2-rx` application outputs the decoded TS stream into descriptor 3 through option `-out-fd 3`. At the same time, descriptor three is redirected to stdout through option `3>&1`, while the original stdout (containing the receiver logs) goes to stderr due to `1>&2`. In the end, only the TS output is piped into `tsp`, and the logs are preserved on the console via stderr. The same trick is adopted in the other `tsp` examples that follow.
+
+### Example 11
+
+A common application for DVB-S2 is sending UDP/IP traffic within a link-layer protocol like the [Multiprotocol Encapsulation (MPE)](https://en.wikipedia.org/wiki/Multiprotocol_Encapsulation) protocol. In this case, the UDP/IP packets go on the payload of MPE frames, and the MPE frames are carried by MPEG TS packets, which in turn are carried by the DVB-S2 frames. In other words, the encapsulation chain is as follows:
 
 ```
 DVB-S2 frames > MPEG TS packets > MPE frames > IP packets > UDP packets
 ```
 
-The `tsp` application first extracts the [Multiprotocol Encapsulation (MPE)](https://en.wikipedia.org/wiki/Multiprotocol_Encapsulation) frames contained within the MPEG TS packets identified by PID (packet identifier) 32. Subsequently, the `mpe` plugin unpacks the UDP/IP packets within the MPE layer and forwards these packets towards the loopback interface with address `127.0.0.1`.
+The `tsp` application can help with MPE transmission and extraction on the Rx side. On the Tx side, the following command generates a null TS stream constrained to a bitrate of 500 kbps and injects MPE-encapsulated UDP/IP packets with PID 32 into the stream. More specifically, the `mpeinject` plugin listens to UDP packets sent to port 9005 and injects those packets into the TS stream with PID 32.
 
-This example uses noteworthy descriptor redirection options, which ensure only the MPEG TS output is fed into `tsp` and not the receiver logs. At first, the TS output is fed into descriptor 3 through option `-out-fd 3`. However, descriptor three is later redirected to stdout through option `3>&1`. At the same time, the original stdout (containing the receiver logs) goes to stderr using `1>&2`. In the end, only the TS output is piped into `tsp`, and the logs are preserved on the console via stderr.
+```
+tsp -I null -P regulate --bitrate 500000 -P mpeinject --pid 32 9005
+```
 
-Another useful application from the TSDuck toolkit is the `tsdump` tool, which dumps all the incoming TS packets into the console in real-time. You can use it as follows:
+On the Rx side, the following command extracts MPE frames with PID 32 from the decoded MPEG TS stream and redirects those packets to the localhost's port 9006:
 
-### Example 11
+```
+tsp --realtime --buffer-size-mb 1 --max-flushed-packets 10 \
+    -P mpe --pid 32 --udp-forward --local-address 127.0.0.1 --local-port 9006 -O drop
+```
+
+Then, connecting everything, the following command implements the entire chain from Tx to Rx:
+
+```
+tsp -I null -P regulate --bitrate 500000 -P mpeinject --pid 32 9005 | \
+dvbs2-tx | \
+dvbs2-rx --out-fd 3 3>&1 1>&2 | \
+tsp --realtime --buffer-size-mb 1 --max-flushed-packets 10 \
+    -P mpe --pid 32 --udp-forward --local-address 127.0.0.1 --local-port 9006 -O drop
+```
+
+To test, you can send an arbitrary UDP message to port 9005 and observe it arriving on port 9006. While the above command is running, open `tcpdump` in one terminal window:
+
+```
+tcpdump -i any -X port 9006
+```
+
+And send the test UDP message from another terminal window:
+
+```
+echo "Test message" > /dev/udp/127.0.0.1/9005
+```
+
+### Example 12
+
+The `tsp` tool can also help with real-time video streaming. For example, the following command uses the `play` output plugin from `tsp` to play the decoded MPEG TS video stream in real time on VLC (provided that VLC is installed):
+
+```
+cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsp --realtime --buffer-size-mb 1 -O play
+```
+
+### Example 13
+
+Lastly, another useful application from the TSDuck toolkit is the `tsdump` tool, which dumps all the incoming TS packets into the console in real time. You can use it as follows:
+
 ```
 cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsdump --no-pager --headers-only
 ```
@@ -160,7 +225,8 @@ While the DVB-S2 receiver is running, it is often helpful to observe the underly
 
 The example below illustrates the monitoring server launched for on-demand access via HTTP requests:
 
-### Example 12
+### Example 14
+
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --mon-server
 ```
@@ -173,7 +239,8 @@ curl -s http://localhost:9004 | python3 -m json.tool
 
 Alternatively, you may want to print the performance metrics continuously to the console. To do so, run with option `--log-stats`, as follows:
 
-### Example 13
+### Example 15
+
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --log-stats
 ```
