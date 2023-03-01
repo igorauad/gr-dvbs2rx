@@ -1,0 +1,21 @@
+FROM ubuntu:jammy
+
+# Debian packaging dependencies
+RUN apt update && apt install -y \
+    debhelper \
+    devscripts \
+    dh-python
+
+# gr-dvbs2rx dependencies
+RUN apt update && \
+    DEBIAN_FRONTEND="noninteractive" apt install -y \
+    cmake \
+    doxygen \
+    g++ \
+    git \
+    gnuradio-dev \
+    graphviz \
+    libsndfile1-dev \
+    libspdlog-dev \
+    pkg-config \
+    pybind11-dev

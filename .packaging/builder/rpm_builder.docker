@@ -1,0 +1,23 @@
+FROM fedora:36
+
+# RPM packaging dependencies
+RUN dnf install -y \
+    coreutils \
+    dnf-utils \
+    rpm-build \
+    rpm-devel \
+    rpmdevtools \
+    rpmlint
+
+# gr-dvbs2rx dependencies
+RUN dnf install -y \
+    doxygen \
+    fftw-devel \
+    g++ \
+    git \
+    gmp-devel \
+    gnuradio-devel \
+    graphviz \
+    libsndfile-devel \
+    pybind11-devel \
+    spdlog-devel
