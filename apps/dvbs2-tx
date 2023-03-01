@@ -351,7 +351,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
             self.top_grid_layout.addWidget(gui_gain_widget, *pos[0])
 
             # Center Frequency
-            qt_freq_range = qtgui.Range(MIN_USRP_FREQ, MAX_USRP_FREQ, 10e6,
+            qt_freq_range = qtgui.Range(MIN_USRP_FREQ, MAX_USRP_FREQ, 100e3,
                                         self.freq, 200)
             gui_freq_widget = qtgui.RangeWidget(qt_freq_range,
                                                 self.set_gui_freq,

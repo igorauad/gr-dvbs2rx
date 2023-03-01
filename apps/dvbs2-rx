@@ -495,8 +495,8 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
             # Center Frequency
             qt_freq_range = qtgui.Range(MIN_FREQ[self.source],
-                                        MAX_FREQ[self.source], 10e6, self.freq,
-                                        200)
+                                        MAX_FREQ[self.source], 100e3,
+                                        self.freq, 200)
             gui_freq_widget = qtgui.RangeWidget(qt_freq_range,
                                                 self.set_gui_freq,
                                                 "Center Frequency",
