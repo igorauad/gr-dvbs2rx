@@ -36,4 +36,4 @@ This project is licensed under GPLv3 and was developed primarily for non-commerc
 
 ## Further Information
 
-- [Igor Freire's talk at GRCon22: "gr-dvbs2rx: An Overview of the project state and path forward."](https://www.youtube.com/watch?v=qcqvfElQUVk&t=549s)
+- [Igor Freire's talk at GRCon22: "gr-dvbs2rx: An Overview of the project state and path forward."](https://www.youtube.com/watch?v=qcqvfElQUVk&t)
