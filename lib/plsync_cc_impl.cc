@@ -19,8 +19,6 @@
 namespace gr {
 namespace dvbs2rx {
 
-#define MAX_SCHEDULING_DELAY 2
-
 plsync_cc::sptr plsync_cc::make(int gold_code,
                                 int freq_est_period,
                                 double sps,
@@ -376,19 +374,7 @@ void plsync_cc_impl::calibrate_tag_delay(const uint64_t abs_sof_idx, int toleran
                 3,
                 "Rotator ctrl - Timing out unprocessed update scheduled for offset {:d}",
                 it->first);
-            d_rot_ctrl.unproc_count++;
             it = d_rot_ctrl.update_map.erase(it);
-
-            // If too many phase inc updates are lost due to arriving late on the rotator,
-            // try scheduling the updates for later (some frames ahead). Do this in CCM
-            // mode only, as in ACM/VCM the upcoming PLFRAME lengths are unpredictable.
-            if (d_rot_ctrl.unproc_count > 10 && !d_acm_vcm &&
-                d_rot_ctrl.scheduling_delay < MAX_SCHEDULING_DELAY) {
-                d_rot_ctrl.scheduling_delay++;
-                d_rot_ctrl.unproc_count = 0;
-                d_logger->warn("Increasing the phase inc update delay to {:d} PLFRAME(s)",
-                               d_rot_ctrl.scheduling_delay);
-            }
         } else {
             it++;
         }
@@ -401,23 +387,19 @@ void plsync_cc_impl::control_rotator_freq(uint64_t abs_sof_idx,
                                           bool ref_is_past_frame)
 {
     // By default, schedule the phase increment change to take place at the start of the
-    // next frame. Adjust the scheduling for some extra PLFRAMEs ahead if necessary to
-    // avoid the late arrival of phase inc update requests at the rotator block.
-    //
-    // Note there is little performance penalty in scheduling rotator frequency updates
-    // with some delay. The payload handler applies a feed-forward fine frequency
-    // correction step, which takes care of the residual frequency offset disturbing the
-    // frame. Meanwhile, the correction sent to the external rotator is only meant to
+    // next frame (the next SOF). This increment change may arrive at the rotator after
+    // the target sample index has already been processed, in which case the rotator skips
+    // the update, but this should be fine. There is little performance penalty in missing
+    // some phase increment changes. The payload handler applies a feed-forward fine
+    // frequency correction, which takes care of the residual frequency offset disturbing
+    // the frame. Meanwhile, the correction sent to the external rotator is only meant to
     // track the incoming carrier so that the residual frequency offset remains within the
     // fine estimation range. See more comments on the handle_payload function.
-    const uint64_t abs_next_sof_idx = abs_sof_idx + plframe_len;
-    const uint64_t target_sof_idx =
-        abs_next_sof_idx + (plframe_len * d_rot_ctrl.scheduling_delay);
+    const uint64_t target_sof_idx = abs_sof_idx + plframe_len;
 
-    // Assume the upstream rotator lies before a matched filter and, hence,
-    // operates on the sample stream (i.e. on samples, not symbols). Use the
-    // known oversampling ratio and the calibrated symbol-spaced tag delay to
-    // schedule the phase increment update.
+    // Assume the upstream rotator lies before a matched filter and, hence, operates on
+    // the sample stream (i.e. on samples, not symbols). Use the known oversampling ratio
+    // and the calibrated symbol-spaced tag delay to schedule the phase increment update.
     uint64_t target_samp_idx = d_sps * (target_sof_idx + d_rot_ctrl.tag_delay);
 
     // Prevent two frequency corrections at the same sample offset. The scenario
