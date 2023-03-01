@@ -95,6 +95,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
                                   is not None) else options.fullscale
         self.gold_code = options.gold_code
         self.gui = options.gui
+        self.gui_ctrl_panel = options.gui_ctrl_panel
         self.gui_out_time = options.gui_out_time or options.gui_all
         self.gui_out_freq = options.gui_out_freq or options.gui_all
         self.in_fd = options.in_fd
@@ -177,7 +178,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
         time_sink.enable_autoscale(True)
         time_sink.enable_grid(True)
         time_sink.enable_axis_labels(True)
-        time_sink.enable_control_panel(False)
+        time_sink.enable_control_panel(self.gui_ctrl_panel)
         time_sink.enable_stem_plot(False)
 
         labels = [
@@ -227,7 +228,7 @@ class dvbs2_tx(gr.top_block, Qt.QWidget):
         freq_sink.enable_grid(True)
         freq_sink.set_fft_average(0.05)
         freq_sink.enable_axis_labels(True)
-        freq_sink.enable_control_panel(False)
+        freq_sink.enable_control_panel(self.gui_ctrl_panel)
         freq_sink.set_fft_window_normalized(False)
 
         labels = ['Before', 'After', '', '', '', '', '', '', '', '']
@@ -737,6 +738,10 @@ def argument_parser():
                            action='store_true',
                            default=False,
                            help="Launch the GUI in dark mode.")
+    gui_group.add_argument('--gui-ctrl-panel',
+                           action='store_true',
+                           default=False,
+                           help="Enable the available widget control panels")
 
     src_group = parser.add_argument_group('Source Options')
     src_group.add_argument("--source",
