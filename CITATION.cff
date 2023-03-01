@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Freire"
+  given-names: "Igor"
+  orcid: "https://orcid.org/0000-0003-0229-8210"
+- family-names: "Economos"
+  given-names: "Ron"
+title: "gr-dvbs2rx: a Software-Defined DVB-S2 Receiver based on GNU Radio"
+version: 1.0.0
+date-released: 2022-09-03
+url: "https://github.com/igorauad/gr-dvbs2rx"
