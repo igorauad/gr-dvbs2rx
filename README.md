@@ -1,6 +1,6 @@
 # GNU Radio DVB-S2 Receiver
 
-[![Formatting](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/check_formatting.yml/badge.svg)](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/check_formatting.yml)
+[![Formatting](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/formatting.yml/badge.svg)](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/formatting.yml)
 [![Tests](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/test.yml/badge.svg)](https://github.com/igorauad/gr-dvbs2rx/actions/workflows/test.yml)
 
 ## Overview
