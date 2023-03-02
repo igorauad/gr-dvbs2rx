@@ -14,5 +14,5 @@ override_dh_auto_configure:
 # should not write to the home dir at all, so fix this in the future.
 override_dh_auto_test:
 	mkdir -p /tmp/debian/gr-test-home
-	- if case "$(DEB_BUILD_ARCH)" in *"i386"*) false;; *) true;; esac; then ARGS='--timeout 10' HOME=/tmp/debian/gr-test-home dh_auto_test ; fi
+	HOME=/tmp/debian/gr-test-home dh_auto_test
 	rm -rf /tmp/debian/gr-test-home
