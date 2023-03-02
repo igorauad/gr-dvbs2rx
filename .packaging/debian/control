@@ -21,7 +21,7 @@ Vcs-Browser: https://github.com/igorauad/gr-dvbs2rx/
 Package: gr-dvbs2rx
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, gnuradio
-Recommends: python3-packaging
+Recommends: python3-packaging, gr-osmosdr
 Description: DVB-S2 Receiver GNU Radio Module
  A GNU Radio out-of-tree module containing signal processing blocks and full
  transmitter/receiver applications for DVB-S2 over software-defined radio.

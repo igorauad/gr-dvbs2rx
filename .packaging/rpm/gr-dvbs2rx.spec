@@ -20,6 +20,7 @@ BuildRequires:  spdlog-devel
 Requires: gnuradio >= 3.10
 Requires: python3
 Requires: python3-packaging
+Recommends: gr-osmosdr
 
 %description
 
