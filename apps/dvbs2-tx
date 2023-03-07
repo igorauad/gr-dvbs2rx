@@ -65,8 +65,9 @@ def scale_rrc_taps(taps: list, sps: int, fullscale: float) -> list:
     configured at the device (via stream args).
 
     This function conveniently scales the RRC filter taps to achieve a target
-    amplitude range. This approach is equivalent to placing a "multiply by
-    constant" block after the RRC filter.
+    amplitude range. The resulting filtered I and Q amplitudes are expected to
+    be within +-fullscale, where fullscale is a parameter. This approach is
+    equivalent to placing a "multiply by constant" block after the RRC filter.
 
     TODO: adjust the normalization when 16APSK and 32APSK are implemented, if
     the constellation symbols are designed to exceed unit magnitude.
@@ -80,7 +81,7 @@ def scale_rrc_taps(taps: list, sps: int, fullscale: float) -> list:
         list: List of scaled RRC taps.
     """
 
-    # The peak amplitude due to RRC filtering can be predicted by an
+    # The peak complex IQ magnitude due to RRC filtering can be predicted by an
     # upper-bound. The following is based on the method described in
     # https://dsp.stackexchange.com/a/28808:
     mag_taps = list(map(abs, taps))
@@ -89,7 +90,11 @@ def scale_rrc_taps(taps: list, sps: int, fullscale: float) -> list:
         sum_i = sum(mag_taps[i::sps])
         if sum_i > max_sum:
             max_sum = sum_i
-    return [fullscale * x / max_sum for x in taps]
+    # max_sum is the maximum expected complex IQ magnitude. However, we want
+    # each I and Q within +-fullscale, not the complex magnitude. Assume I and
+    # Q have the same amplitude range so that the peak IQ magnitude is higher
+    # than the individual peak I and Q amplitudes by a factor of sqrt(2).
+    return [sqrt(2) * fullscale * x / max_sum for x in taps]
 
 
 class dvbs2_tx(gr.top_block, Qt.QWidget):
