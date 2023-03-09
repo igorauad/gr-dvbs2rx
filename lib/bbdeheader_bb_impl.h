@@ -37,6 +37,7 @@ namespace dvbs2rx {
 class bbdeheader_bb_impl : public bbdeheader_bb
 {
 private:
+    const int d_debug_level;
     unsigned int kbch;
     unsigned int max_dfl;
     unsigned int dvb_standard;
@@ -58,7 +59,8 @@ private:
 public:
     bbdeheader_bb_impl(dvb_standard_t standard,
                        dvb_framesize_t framesize,
-                       dvb_code_rate_t rate);
+                       dvb_code_rate_t rate,
+                       int debug_level);
     ~bbdeheader_bb_impl();
 
     // Where all the action really happens

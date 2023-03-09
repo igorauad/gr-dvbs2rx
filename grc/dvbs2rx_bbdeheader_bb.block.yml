@@ -14,6 +14,10 @@ parameters:
 -   id: rate
     label: Code rate
     dtype: string
+-   id: debug_level
+    label: Debug Level
+    dtype: int
+    default: 0
 
 inputs:
 -   domain: stream
@@ -29,7 +33,8 @@ templates:
         dvbs2rx.bbdeheader_bb(
             *dvbs2rx.params.translate(${standard},
                 ${framesize},
-                ${rate}
+                ${rate},
+                ${debug_level}
             )
         )
 

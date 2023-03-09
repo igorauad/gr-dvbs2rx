@@ -11,6 +11,7 @@
 #include "config.h"
 #endif
 
+#include "debug_level.h"
 #include "plsync_cc_impl.h"
 #include <gnuradio/expj.h>
 #include <gnuradio/io_signature.h>

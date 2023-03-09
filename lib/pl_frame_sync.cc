@@ -7,6 +7,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "debug_level.h"
 #include "pl_frame_sync.h"
 #include "util.h"
 #include <boost/format.hpp>

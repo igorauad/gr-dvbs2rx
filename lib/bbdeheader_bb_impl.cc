@@ -12,6 +12,7 @@
 #endif
 
 #include "bbdeheader_bb_impl.h"
+#include "debug_level.h"
 #include <gnuradio/io_signature.h>
 #include <gnuradio/logger.h>
 #include <boost/format.hpp>
@@ -24,9 +25,11 @@ namespace dvbs2rx {
 
 bbdeheader_bb::sptr bbdeheader_bb::make(dvb_standard_t standard,
                                         dvb_framesize_t framesize,
-                                        dvb_code_rate_t rate)
+                                        dvb_code_rate_t rate,
+                                        int debug_level)
 {
-    return gnuradio::get_initial_sptr(new bbdeheader_bb_impl(standard, framesize, rate));
+    return gnuradio::get_initial_sptr(
+        new bbdeheader_bb_impl(standard, framesize, rate, debug_level));
 }
 
 /*
@@ -34,10 +37,12 @@ bbdeheader_bb::sptr bbdeheader_bb::make(dvb_standard_t standard,
  */
 bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
                                        dvb_framesize_t framesize,
-                                       dvb_code_rate_t rate)
+                                       dvb_code_rate_t rate,
+                                       int debug_level)
     : gr::block("bbdeheader_bb",
                 gr::io_signature::make(1, 1, sizeof(unsigned char)),
                 gr::io_signature::make(1, 1, sizeof(unsigned char))),
+      d_debug_level(debug_level),
       d_packet_cnt(0),
       d_error_cnt(0)
 {
@@ -344,7 +349,7 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
 
         if (check != TRUE) {
             synched = FALSE;
-            d_logger->warn("Baseband header crc failed.");
+            GR_LOG_DEBUG_LEVEL(1, "Baseband header crc failed.");
             in += kbch;
             continue;
         }
@@ -423,7 +428,7 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
 
         // Skip the initial SYNCD bits of the DATAFIELD if re-synchronizing
         if (synched == FALSE) {
-            d_logger->info("Baseband header resynchronizing.");
+            GR_LOG_DEBUG_LEVEL(1, "Baseband header resynchronizing.");
             if (mode == INPUTMODE_NORMAL) {
                 in += h->syncd + 8;
                 df_remaining -= h->syncd + 8;
@@ -437,6 +442,17 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
             spanning = FALSE;
             distance = h->syncd;
         }
+
+        GR_LOG_DEBUG_LEVEL(3,
+                           "MATYPE: TS/GS={:b}; SIS/MIS={}; CCM/ACM={}; ISSYI={}; "
+                           "NPD={}; RO={:b}; ISI={}",
+                           h->ts_gs,
+                           h->sis_mis,
+                           h->ccm_acm,
+                           h->issyi,
+                           h->npd,
+                           h->ro,
+                           h->isi);
 
         // Process the DATAFIELD
         if (mode == INPUTMODE_NORMAL) {
@@ -565,9 +581,10 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
     }
 
     if (errors != 0) {
-        d_logger->info("TS packet crc errors = {:d} (PER = {:g})",
-                       errors,
-                       ((double)d_error_cnt / d_packet_cnt));
+        GR_LOG_DEBUG_LEVEL(1,
+                           "TS packet crc errors = {:d} (PER = {:g})",
+                           errors,
+                           ((double)d_error_cnt / d_packet_cnt));
     }
 
     // Tell runtime system how many input items we consumed on

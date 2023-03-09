@@ -7,6 +7,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "debug_level.h"
 #include "pi2_bpsk.h"
 #include "pl_signaling.h"
 #include <volk/volk.h>

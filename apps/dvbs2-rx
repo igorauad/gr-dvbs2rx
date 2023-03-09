@@ -869,7 +869,8 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                                              dvbs2rx.OM_MESSAGE)
         bbdescrambler = dvbs2rx.bbdescrambler_bb(standard, frame_size,
                                                  code_rate)
-        bbdeheader = dvbs2rx.bbdeheader_bb(standard, frame_size, code_rate)
+        bbdeheader = dvbs2rx.bbdeheader_bb(standard, frame_size, code_rate,
+                                           self.debug)
 
         self.connect((ldpc_decoder, 0), (bch_decoder, 0), (bbdescrambler, 0))
 

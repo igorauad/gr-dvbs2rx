@@ -37,8 +37,10 @@ public:
      * class. dvbs2rx::bbdeheader_bb::make is the public interface for
      * creating new instances.
      */
-    static sptr
-    make(dvb_standard_t standard, dvb_framesize_t framesize, dvb_code_rate_t rate);
+    static sptr make(dvb_standard_t standard,
+                     dvb_framesize_t framesize,
+                     dvb_code_rate_t rate,
+                     int debug_level = 0);
 
     /*!
      * \brief Get count of MPEG TS packets extracted from BBFRAMEs.
