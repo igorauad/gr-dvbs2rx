@@ -21,6 +21,7 @@ namespace dvbs2rx {
 class bch_decoder_bb_impl : public bch_decoder_bb
 {
 private:
+    const int d_debug_level;
     unsigned int kbch;
     unsigned int nbch;
     unsigned int bch_code;
@@ -50,7 +51,8 @@ public:
     bch_decoder_bb_impl(dvb_standard_t standard,
                         dvb_framesize_t framesize,
                         dvb_code_rate_t rate,
-                        dvb_outputmode_t outputmode);
+                        dvb_outputmode_t outputmode,
+                        int debug_level);
     ~bch_decoder_bb_impl();
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required);

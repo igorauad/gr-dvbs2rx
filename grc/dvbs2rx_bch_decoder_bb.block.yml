@@ -19,6 +19,10 @@ parameters:
     dtype: enum
     options: [OM_CODEWORD, OM_MESSAGE]
     option_labels: [Codeword, Message]
+-   id: debug_level
+    label: Debug Level
+    dtype: int
+    default: 0
 
 inputs:
 -   domain: stream

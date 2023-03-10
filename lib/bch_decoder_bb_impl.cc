@@ -12,6 +12,7 @@
 #endif
 
 #include "bch_decoder_bb_impl.h"
+#include "debug_level.h"
 #include <gnuradio/io_signature.h>
 #include <gnuradio/logger.h>
 #include <functional>
@@ -28,10 +29,11 @@ namespace dvbs2rx {
 bch_decoder_bb::sptr bch_decoder_bb::make(dvb_standard_t standard,
                                           dvb_framesize_t framesize,
                                           dvb_code_rate_t rate,
-                                          dvb_outputmode_t outputmode)
+                                          dvb_outputmode_t outputmode,
+                                          int debug_level)
 {
     return gnuradio::get_initial_sptr(
-        new bch_decoder_bb_impl(standard, framesize, rate, outputmode));
+        new bch_decoder_bb_impl(standard, framesize, rate, outputmode, debug_level));
 }
 
 /*
@@ -40,10 +42,12 @@ bch_decoder_bb::sptr bch_decoder_bb::make(dvb_standard_t standard,
 bch_decoder_bb_impl::bch_decoder_bb_impl(dvb_standard_t standard,
                                          dvb_framesize_t framesize,
                                          dvb_code_rate_t rate,
-                                         dvb_outputmode_t outputmode)
+                                         dvb_outputmode_t outputmode,
+                                         int debug_level)
     : gr::block("bch_decoder_bb",
                 gr::io_signature::make(1, 1, sizeof(unsigned char)),
                 gr::io_signature::make(1, 1, sizeof(unsigned char))),
+      d_debug_level(debug_level),
       d_frame_cnt(0),
       d_frame_error_cnt(0)
 {
@@ -460,13 +464,17 @@ int bch_decoder_bb_impl::general_work(int noutput_items,
             break;
         }
         if (corrections > 0) {
-            d_logger->info(
-                "frame = {:d}, BCH decoder corrections = {:d}", d_frame_cnt, corrections);
+            GR_LOG_DEBUG_LEVEL(1,
+                               "frame = {:d}, BCH decoder corrections = {:d}",
+                               d_frame_cnt,
+                               corrections);
         } else if (corrections == -1) {
             d_frame_error_cnt++;
-            d_logger->info("frame = {:d}, BCH decoder too many bit errors (FER = {:g})",
-                           d_frame_cnt,
-                           ((double)d_frame_error_cnt / (d_frame_cnt + 1)));
+            GR_LOG_DEBUG_LEVEL(
+                1,
+                "frame = {:d}, BCH decoder too many bit errors (FER = {:g})",
+                d_frame_cnt,
+                ((double)d_frame_error_cnt / (d_frame_cnt + 1)));
         }
         d_frame_cnt++;
         for (unsigned int j = 0; j < kbch; j++) {

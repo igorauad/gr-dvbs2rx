@@ -39,7 +39,8 @@ public:
     static sptr make(dvb_standard_t standard,
                      dvb_framesize_t framesize,
                      dvb_code_rate_t rate,
-                     dvb_outputmode_t outputmode);
+                     dvb_outputmode_t outputmode,
+                     int debug_level = 0);
 
     /*!
      * \brief Get count of processed FECFRAMEs.
