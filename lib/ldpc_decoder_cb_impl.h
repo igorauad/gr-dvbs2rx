@@ -25,6 +25,7 @@ namespace dvbs2rx {
 class ldpc_decoder_cb_impl : public ldpc_decoder_cb
 {
 private:
+    const int d_debug_level;
     unsigned int frame_size;
     unsigned int signal_constellation;
     unsigned int code_rate;
@@ -96,7 +97,8 @@ public:
                          dvb_constellation_t constellation,
                          dvb_outputmode_t outputmode,
                          dvb_infomode_t infomode,
-                         int max_trials);
+                         int max_trials,
+                         int debug_level);
     ~ldpc_decoder_cb_impl();
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required);

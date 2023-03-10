@@ -42,7 +42,8 @@ public:
                      dvb_constellation_t constellation,
                      dvb_outputmode_t outputmode,
                      dvb_infomode_t infomode,
-                     int max_trials);
+                     int max_trials,
+                     int debug_level = 0);
 
     /*!
      * \brief Get the measured SNR.

@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(ldpc_decoder_cb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(84d156a5fff532606c23a17c3e9ca9c0)                     */
+/* BINDTOOL_HEADER_FILE_HASH(7fe8b54798a6b1593484f03d4aa6caa5)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -46,6 +46,7 @@ void bind_ldpc_decoder_cb(py::module& m)
              py::arg("outputmode"),
              py::arg("infomode"),
              py::arg("max_trials"),
+             py::arg("debug_level") = 0,
              D(ldpc_decoder_cb, make))
 
         .def("get_snr", &ldpc_decoder_cb::get_snr, D(ldpc_decoder_cb, get_snr))

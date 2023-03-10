@@ -31,6 +31,10 @@ parameters:
     label: Max Iterations
     dtype: int
     default: 25
+-   id: debug_level
+    label: Debug Level
+    dtype: int
+    default: 0
 
 inputs:
 -   domain: stream
@@ -51,6 +55,7 @@ templates:
             ),
             dvbs2rx.${outputmode},
             dvbs2rx.${infomode},
-            ${max_trials})
+            ${max_trials},
+            ${debug_level})
 
 file_format: 1

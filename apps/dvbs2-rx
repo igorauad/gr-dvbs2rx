@@ -860,11 +860,9 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         standard, frame_size, code_rate, constellation = translated_params
 
         # Upper layer (FEC + BB Processing)
-        ldpc_decoder = dvbs2rx.ldpc_decoder_cb(standard, frame_size, code_rate,
-                                               constellation,
-                                               dvbs2rx.OM_MESSAGE,
-                                               dvbs2rx.INFO_OFF,
-                                               self.ldpc_iterations)
+        ldpc_decoder = dvbs2rx.ldpc_decoder_cb(
+            standard, frame_size, code_rate, constellation, dvbs2rx.OM_MESSAGE,
+            dvbs2rx.INFO_OFF, self.ldpc_iterations, self.debug)
         bch_decoder = dvbs2rx.bch_decoder_bb(standard, frame_size, code_rate,
                                              dvbs2rx.OM_MESSAGE)
         bbdescrambler = dvbs2rx.bbdescrambler_bb(standard, frame_size,

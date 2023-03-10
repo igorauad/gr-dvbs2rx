@@ -12,6 +12,7 @@
 #endif
 
 #include "cpu_features_macros.h"
+#include "debug_level.h"
 #include "ldpc_decoder_cb_impl.h"
 #include <gnuradio/io_signature.h>
 #include <gnuradio/logger.h>
@@ -292,10 +293,17 @@ ldpc_decoder_cb::sptr ldpc_decoder_cb::make(dvb_standard_t standard,
                                             dvb_constellation_t constellation,
                                             dvb_outputmode_t outputmode,
                                             dvb_infomode_t infomode,
-                                            int max_trials)
+                                            int max_trials,
+                                            int debug_level)
 {
-    return gnuradio::get_initial_sptr(new ldpc_decoder_cb_impl(
-        standard, framesize, rate, constellation, outputmode, infomode, max_trials));
+    return gnuradio::get_initial_sptr(new ldpc_decoder_cb_impl(standard,
+                                                               framesize,
+                                                               rate,
+                                                               constellation,
+                                                               outputmode,
+                                                               infomode,
+                                                               max_trials,
+                                                               debug_level));
 }
 
 /*
@@ -307,10 +315,12 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
                                            dvb_constellation_t constellation,
                                            dvb_outputmode_t outputmode,
                                            dvb_infomode_t infomode,
-                                           int max_trials)
+                                           int max_trials,
+                                           int debug_level)
     : gr::block("ldpc_decoder_cb",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
-                gr::io_signature::make(1, 1, sizeof(unsigned char)))
+                gr::io_signature::make(1, 1, sizeof(unsigned char))),
+      d_debug_level(debug_level)
 {
     unsigned int rows;
     if (framesize == FECFRAME_NORMAL) {
@@ -1291,16 +1301,18 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
         int count = decode(aligned_buffer, code, trials);
         if (count < 0) {
             total_trials += trials;
-            d_logger->info("frame = {:d}, snr = {:.2f}, trials = {:d} (max)",
-                           (chunk * d_simd_size),
-                           snr,
-                           trials);
+            GR_LOG_DEBUG_LEVEL(1,
+                               "frame = {:d}, snr = {:.2f}, trials = {:d} (max)",
+                               (chunk * d_simd_size),
+                               snr,
+                               trials);
         } else {
             total_trials += (trials - count);
-            d_logger->info("frame = {:d}, snr = {:.2f}, trials = {:d}",
-                           (chunk * d_simd_size),
-                           snr,
-                           (trials - count));
+            GR_LOG_DEBUG_LEVEL(1,
+                               "frame = {:d}, snr = {:.2f}, trials = {:d}",
+                               (chunk * d_simd_size),
+                               snr,
+                               (trials - count));
         }
         chunk++;
         precision_sum = 0;
@@ -1438,12 +1450,13 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             precision_sum += FACTOR / (sigma * sigma);
             total_snr += snr;
             if (info_mode) {
-                d_logger->info("frame = {:d}, snr = {:.2f}, average trials = {:d}, "
-                               "average snr =,.2f",
-                               frame,
-                               snr,
-                               (total_trials / chunk),
-                               (total_snr / (frame + 1)));
+                GR_LOG_DEBUG_LEVEL(1,
+                                   "frame = {:d}, snr = {:.2f}, average trials = {:d}, "
+                                   "average snr =,.2f",
+                                   frame,
+                                   snr,
+                                   (total_trials / chunk),
+                                   (total_snr / (frame + 1)));
             }
             insnr += frame_size / MOD_BITS;
             frame++;
