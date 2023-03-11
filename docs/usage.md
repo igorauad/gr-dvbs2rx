@@ -1,15 +1,18 @@
 # Usage
 
+The `dvbs2-tx` and `dvbs2-rx` applications implement full DVB-S2 transmitter and receiver stacks. They consist of Python applications connecting the DVB-S2 blocks and offering various command-line options for different use cases. This section clarifies the main configurations and how to use these applications in general.
+
 - [Usage](#usage)
+  - [Application Interface](#application-interface)
   - [Input and Output Options](#input-and-output-options)
   - [Experimenting with Parameters](#experimenting-with-parameters)
   - [Graphical User Interface](#graphical-user-interface)
   - [Processing the MPEG Transport Stream](#processing-the-mpeg-transport-stream)
-  - [Receiver Monitoring](#receiver-monitoring)
+  - [Logging and Receiver Monitoring](#logging-and-receiver-monitoring)
   - [Further Information](#further-information)
 
 
-## Input and Output Options
+## Application Interface
 
 The `dvbs2-tx` and `dvbs2-rx` applications are designed to interface with file descriptors, regular files, and SDR boards. By default, they read the input from stdin (file descriptor 0) and output to stdout (file descriptor 1). Hence, for testing purposes, the Tx output can be piped into the Rx input as follows:
 
@@ -34,16 +37,18 @@ Alternatively, you can use a transport stream generator. The `tsp` tool from the
 tsp -I craft --pid 100 | dvbs2-tx | dvbs2-rx
 ```
 
-In this case, the `craft` plugin from `tsp` generates an MPEG transport stream with packet ID (PID) 100 and feeds it into the `dvbs2-tx` app for modulation and transmission. Then, the `dvbs2-rx` application decodes the TS stream and outputs it to stdout. More examples based on `tsp` are presented [later in this guide](#processing-the-mpeg-transport-stream).
+In this case, the `craft` plugin from `tsp` generates an MPEG transport stream with packet ID (PID) 100 and feeds it into the `dvbs2-tx` app for modulation and transmission. Then, the `dvbs2-rx` application demodulates the signal and outputs the decoded TS stream to stdout. More examples based on `tsp` are presented [later in this guide](#processing-the-mpeg-transport-stream).
 
 The Rx configuration presented so far is not generally recommended because its output printed to stdout has both logs and TS data. This approach can cause problems when piping the output from `dvbs2-rx` into an application that processes the decoded TS stream. For this and other use cases, the Tx and Rx applications offer flexible configurations for the input and file descriptors, which only affect the TS input/output, not the logs. For example, the MPEG TS output can be fed into a separate file descriptor instead of the stdout (descriptor 1), while the logs are preserved on the stdout, as follows:
 
 ### Example 3
 ```
-cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3> /dev/null
+cat example.ts | dvbs2-tx | dvbs2-rx --log --out-fd 3 3> /dev/null
 ```
 
-In this example, note the receiver logs are still printed to the console, but the TS output is omitted due to being redirected to `/dev/null`.
+In this example, note the receiver logs are printed to the console, while the TS output is omitted due to being redirected to `/dev/null`. Also, this example uses option `--log` so that the receiver prints relevant metrics periodically.
+
+## Input and Output Options
 
 In addition to the default file descriptor (`fd`) interface for input and output, the Tx and Rx applications offer flexible source and sink options, which can be modified using the `--source` and `--sink` command-line switches. Currently, they have the following options:
 
@@ -57,7 +62,7 @@ For example, the configuration from [Example 3](#example-3) can be reproduced us
 ### Example 4
 ```
 dvbs2-tx --source file --in-file example.ts | \
-dvbs2-rx --sink file --out-file /dev/null
+dvbs2-rx --log --sink file --out-file /dev/null
 ```
 
 Alternatively, you can specify SDR interfaces as Tx sink or Rx sources. For example, to receive using an RTL-SDR interface, you can run a command like the following:
@@ -130,12 +135,14 @@ Both the `dvbs2-tx` and `dvbs2-rx` applications provide a range of configurable 
 dvbs2-tx \
     --source file \
     --in-file example.ts \
+    --in-repeat \
     --modcod 8psk3/5 \
     --frame short \
     --rolloff 0.35 \
     --sym-rate 2000000 \
     --pilots | \
 dvbs2-rx \
+    --log \
     --sink file \
     --out-file /dev/null \
     --modcod 8psk3/5 \
@@ -245,31 +252,33 @@ cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsdump --no-pager --
 
 Please refer to TSDuck's [user guide](https://tsduck.io/download/docs/tsduck.pdf) for further information.
 
-## Receiver Monitoring
+## Logging and Receiver Monitoring
 
-While the DVB-S2 receiver is running, it is often helpful to observe the underlying low-level performance metrics and statistics. For example, metrics such as the frequency offset estimated at the physical layer, the frame synchronization lock status, the average number of LDPC correction iterations, the MPEG TS packet counts, and so on. The receiver application can provide such metrics either through periodic logs printed to the console or on-demand via HTTP requests. In both cases, it returns the information in JSON format.
-
-The example below illustrates the monitoring server launched for on-demand access via HTTP requests:
+While the DVB-S2 receiver is running, it is often helpful to observe the underlying low-level performance metrics and statistics. For example, metrics such as the frequency offset estimated at the physical layer, the frame synchronization lock status, the average number of LDPC correction iterations, the MPEG TS packet counts, and so on. The receiver application can provide such metrics either through periodic logs printed to the console or on-demand via HTTP requests.
 
 ### Example 15
+
+The example below uses the `--mon-server` option to launch a monitoring server for on-demand access of metrics via HTTP requests:
 
 ```
 dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --mon-server
 ```
 
-In this case, you can probe the receiver at any time by sending a request to it via port 9004 (configurable through option `--mon-port`). For example, using the following command:
+In this case, you can probe the receiver anytime by sending an HTTP request to port 9004 (configurable through option `--mon-port`). Then, the monitoring server returns the receiver metrics in JSON format. For example, using the following command:
 
 ```
 curl -s http://localhost:9004 | python3 -m json.tool
 ```
 
-Alternatively, you may want to print the performance metrics continuously to the console. To do so, run with option `--log-stats`, as follows:
-
 ### Example 16
 
+Alternatively, you may want to print the performance metrics periodically to the console. To do so, run with option `--log`, as follows:
+
 ```
-dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --log-stats
+dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --log
 ```
+
+By default, this option prints a short set of metrics. However, you can switch to a more comprehensive JSON-formatted logging mode using option `--log-all`. Furthermore, you can control the logging periodicity with option `--log-period`.
 
 ## Further Information
 

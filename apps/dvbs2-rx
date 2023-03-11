@@ -1106,14 +1106,41 @@ def monitoring_server(top_block, port):
     httpd.serve_forever()
 
 
-def _json_dumps_spdlog(in_dict):
+def _log_simple(in_dict):
+    line = "Lock={}".format(in_dict['lock'])
+
+    if in_dict['lock']:
+        snr = in_dict['snr']
+        fer = in_dict['fec']['fer']
+        per = in_dict['mpeg-ts']['per']
+
+        line += "; "
+
+        if snr is not None:
+            line += "SNR={:.2f}; ".format(snr)
+
+        line += "FECFRAMEs={:d}; ".format(in_dict['fec']['frames'])
+
+        if fer is not None:
+            line += "FER={:.1e}; ".format(fer)
+
+        line += "TS Packets={:d}; ".format(in_dict['mpeg-ts']['packets'])
+
+        if per is not None:
+            line += "PER={:.1e}".format(per)
+
+    return line
+
+
+def _log_all(in_dict):
     return json.dumps(in_dict).replace("{", "{{").replace("}", "}}")
 
 
-def monitoring_loop(top_block, period=1):
+def monitoring_loop(top_block, period=1, log_all=False):
     """Log the receiver stats dictionary periodically"""
+    _logger = _log_all if log_all else _log_simple
     while (True):
-        gr.log.info(_json_dumps_spdlog(top_block.get_stats()))
+        gr.log.info(_logger(top_block.get_stats()))
         time.sleep(period)
 
 
@@ -1298,10 +1325,16 @@ def argument_parser():
                            help="View the spectrum using gr-fosphor.")
 
     mon_group = parser.add_argument_group('Monitoring Options')
-    mon_group.add_argument("--log-stats",
+    mon_group.add_argument("--log",
+                           "--log-stats",
                            action='store_true',
                            default=False,
-                           help="Log various receiver metrics periodically")
+                           help="Log receiver metrics periodically")
+    mon_group.add_argument(
+        "--log-all",
+        action='store_true',
+        default=False,
+        help="Log all available receiver metrics in JSON format")
     mon_group.add_argument("--log-period",
                            type=int,
                            default=1,
@@ -1523,9 +1556,9 @@ def main():
     tb = DVBS2RxTopBlock(options)
     tb.start()
 
-    if (options.log_stats):
+    if (options.log or options.log_all):
         logging_thread = Thread(target=monitoring_loop,
-                                args=(tb, options.log_period),
+                                args=(tb, options.log_period, options.log_all),
                                 daemon=True)
         logging_thread.start()
 
