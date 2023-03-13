@@ -1133,7 +1133,16 @@ def _log_simple(in_dict):
 
 
 def _log_all(in_dict):
-    return json.dumps(in_dict).replace("{", "{{").replace("}", "}}")
+    version = StrictVersion(gr.version())
+    # GR versions 3.10.0 to 3.10.1.1 (inclusive) take braces ("{" and "}") as
+    # special characters denoting the string format, in which case they need to
+    # be escaped as "{{" or "}}" (see the fmtlib docs). More recent versions of
+    # GNU Radio fix this and do not require escaping.
+    if version <= StrictVersion('3.10.1.1') and \
+            version >= StrictVersion('3.10.0'):
+        return json.dumps(in_dict).replace("{", "{{").replace("}", "}}")
+    else:
+        return json.dumps(in_dict)
 
 
 def monitoring_loop(top_block, period=1, log_all=False):
