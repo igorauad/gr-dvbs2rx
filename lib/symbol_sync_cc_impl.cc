@@ -366,9 +366,31 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
         // iterations until the counter underflows again.
         double W1 = d_nominal_step + pi_out;
         double W2 = d_nominal_step + d_vi;
-        assert(W1 > 0);
-        assert(W2 > 0);
-        // NOTE: W1 and W2 can become negative when the loop bandwidth is too wide.
+        // NOTE: W1 and W2 can become negative when the loop bandwidth is too wide, or
+        // when the error magnitude is too large (e.g., due to AGC transient). In
+        // principle, that would lead to a negative d_jump, in which case the while loop
+        // would need to roll back. For now, prevent this scenario instead of treating it
+        // to avoid the additional computational cost. Do so by restarting the loop
+        // whenever either counter step (W1 or W2) becomes negative.
+        //
+        // Also, W1 and W2 can become larger than 1.0. Although theoretically possible,
+        // this scenario leads to problems with the current implementation where the mod-1
+        // counter is updated by "cnt_basepoint - W2 + 1" (with a similar expression for
+        // W1), instead of using a real modulo-1 operator (for speed reasons). In this
+        // case, when W1 or W2 are greater than 1, the +1 term used to wrap the counter
+        // around could not be sufficient to put the value within the [0,1) range. In
+        // other words, the counter value after the underflow could still be negative.
+        // Again, instead of treating the problem, assume a symbol sync loss in this case
+        // and restart the loop.
+        if (W1 < 0 || W2 < 0 || W1 > 1.0 || W2 > 1.0) {
+            d_logger->warn("Symbol sync lost. Restarting loop.");
+            d_vi = 0;                     // restart the integrator
+            d_cnt = 1.0 - d_nominal_step; // restart the modulo-1 counter
+            W1 = d_nominal_step;          // assume e=0 (so that pi_out=0)
+            W2 = d_nominal_step;          // assume d_vi=0 (integrator restarted)
+        }
+        assert(W1 >= 0 && W1 <= 1.0);
+        assert(W2 >= 0 && W2 <= 1.0);
 
         // Iterations to underflow the modulo-1 counter
         //
