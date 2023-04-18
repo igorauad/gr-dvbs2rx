@@ -85,6 +85,7 @@ private:
     unsigned d_history;    /**< History of samples in the input buffer */
     float d_K1;            /**< PI filter's proportional constant */
     float d_K2;            /**< PI filter's integrator constant */
+    float d_Kp;            /**< Gardner TED gain */
     double d_vi;           /**< Last integrator value */
     double d_nominal_step; /**< Nominal mod-1 counter step (equal to "1/d_sps") */
     double d_cnt;          /**< Modulo-1 counter */
@@ -108,6 +109,9 @@ private:
     quadratic_interpolator d_qua_interp;
     cubic_interpolator d_cub_interp;
     polyphase_interpolator d_poly_interp;
+
+    void set_gted_gain(float rolloff);
+    void set_pi_constants(float loop_bw, float damping_factor);
 
 
 public:

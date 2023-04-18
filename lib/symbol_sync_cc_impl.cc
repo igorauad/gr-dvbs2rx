@@ -155,39 +155,29 @@ symbol_sync_cc::sptr symbol_sync_cc::make(float sps,
         sps, loop_bw, damping_factor, rolloff, rrc_delay, n_subfilt, interp_method);
 }
 
+// NOTE: All equations references that follow refer to the book "Digital Communications: A
+//  Discrete-Time Approach", by Michael Rice.
 
-/*
- * The private constructor
- */
-symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
-                                         float loop_bw,
-                                         float damping_factor,
-                                         float rolloff,
-                                         int rrc_delay,
-                                         int n_subfilt,
-                                         int interp_method)
-    : gr::block("symbol_sync_cc",
-                gr::io_signature::make(1, 1, sizeof(gr_complex)),
-                gr::io_signature::make(1, 1, sizeof(gr_complex))),
-      d_sps(sps),
-      d_midpoint(sps / 2),
-      d_vi(0.0),
-      d_nominal_step(1.0 / sps),
-      d_cnt(1.0 - d_nominal_step), // modulo-1 counter (always ">= 0" and "< 1")
-      d_mu(0),
-      d_jump(d_sps),
-      d_init(false),
-      d_last_xi(0),
-      d_interp_method(interp_method),
-      d_poly_interp(sps, rolloff, rrc_delay, n_subfilt)
+void symbol_sync_cc_impl::set_gted_gain(float rolloff)
 {
-    if ((ceilf(sps) != sps) || (floorf(sps) != sps) || (static_cast<int>(sps) % 2 != 0) ||
-        (sps < 2.0)) {
-        throw std::runtime_error("sps has to be an even integer >= 2");
-    }
+    // Gardner Timing Error Detector (GTED) gain
+    //
+    // Use Eq. (8.47) while assuming K=1 (unitary channel gain due to an AGC), Eavg=1
+    // (unitary average symbol energy), and tau_e/Ts = 1/L, where "L" is a hypothetical
+    // oversampling factor used for the S-curve evaluation (not the same as d_sps). Note
+    // the Eavg=1 assumption holds for DVB-S2 BPSK, QPSK, and 8PSK constellations,
+    // according to the standard. It also typically holds for 16APSK and 32APSK. although
+    // the standard admits another Eavg options for these constellations.
+    float L = 1e3;
+    float C = sin(M_PI * rolloff / 2) / (4 * M_PI * (1 - (rolloff * rolloff / 4)));
+    float delta_x = 2.0 / L;                   // small interval around the origin
+    float delta_y = 8 * C * sin(2 * M_PI / L); // corresponding S-curve (y-axis) change
+    d_Kp = delta_y / delta_x;                  // the gain is the slope around the origin
+}
 
-    // Define the loop constants. All equations references that follow refer to the book
-    // "Digital Communications: A Discrete-Time Approach", by Michael Rice.
+void symbol_sync_cc_impl::set_pi_constants(float loop_bw, float damping_factor)
+{
+    assert(d_Kp != -1); // GTED gain must be initialized
 
     // Loop bandwidth
     //
@@ -208,23 +198,47 @@ symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
     // Counter gain (analogous to a DDS gain)
     float K0 = -1; // negative because the counter is a decrementing counter
 
-    // Gardner Timing Error Detector (GTED) gain
-    //
-    // Use Eq. (8.47) while assuming K=1 (unitary channel gain due to an AGC), Eavg=1
-    // (unitary average symbol energy), and tau_e/Ts = 1/L, where "L" is a hypothetical
-    // oversampling factor used for the S-curve evaluation (not the same as d_sps). Note
-    // the Eavg=1 assumption holds for DVB-S2 BPSK, QPSK, and 8PSK constellations,
-    // according to the standard. It also typically holds for 16APSK and 32APSK. although
-    // the standard admits another Eavg options for these constellations.
-    float L = 1e3;
-    float C = sin(M_PI * rolloff / 2) / (4 * M_PI * (1 - (rolloff * rolloff / 4)));
-    float delta_x = 2.0 / L;                   // small interval around the origin
-    float delta_y = 8 * C * sin(2 * M_PI / L); // corresponding S-curve (y-axis) change
-    float Kp = delta_y / delta_x;              // slope around the origin
-
     // Finally, compute the PI contants:
-    d_K1 = Kp_K0_K1 / (Kp * K0);
-    d_K2 = Kp_K0_K2 / (Kp * K0);
+    d_K1 = Kp_K0_K1 / (d_Kp * K0);
+    d_K2 = Kp_K0_K2 / (d_Kp * K0);
+}
+
+/*
+ * The private constructor
+ */
+symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
+                                         float loop_bw,
+                                         float damping_factor,
+                                         float rolloff,
+                                         int rrc_delay,
+                                         int n_subfilt,
+                                         int interp_method)
+    : gr::block("symbol_sync_cc",
+                gr::io_signature::make(1, 1, sizeof(gr_complex)),
+                gr::io_signature::make(1, 1, sizeof(gr_complex))),
+      d_sps(sps),
+      d_midpoint(sps / 2),
+      d_K1(-1), // assume -1 means uninitialized for K1, K2, and Kp
+      d_K2(-1),
+      d_Kp(-1),
+      d_vi(0.0),
+      d_nominal_step(1.0 / sps),
+      d_cnt(1.0 - d_nominal_step), // modulo-1 counter (always ">= 0" and "< 1")
+      d_mu(0),
+      d_jump(d_sps),
+      d_init(false),
+      d_last_xi(0),
+      d_interp_method(interp_method),
+      d_poly_interp(sps, rolloff, rrc_delay, n_subfilt)
+{
+    if ((ceilf(sps) != sps) || (floorf(sps) != sps) || (static_cast<int>(sps) % 2 != 0) ||
+        (sps < 2.0)) {
+        throw std::runtime_error("sps has to be an even integer >= 2");
+    }
+
+    // Define the loop constants.
+    set_gted_gain(rolloff);
+    set_pi_constants(loop_bw, damping_factor);
 
     // The k-th interpolant is computed based on the n-th sample and some preceding
     // samples, including the k-th basepoint index "n-1". Make sure these samples are
