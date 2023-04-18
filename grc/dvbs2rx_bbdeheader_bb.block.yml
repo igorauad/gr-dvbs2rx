@@ -33,9 +33,9 @@ templates:
         dvbs2rx.bbdeheader_bb(
             *dvbs2rx.params.translate(${standard},
                 ${framesize},
-                ${rate},
-                ${debug_level}
-            )
+                ${rate}
+            ),
+            ${debug_level}
         )
 
 file_format: 1
