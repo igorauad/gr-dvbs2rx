@@ -17,6 +17,7 @@
 namespace gr {
 namespace dvbs2rx {
 
+template <typename T>
 struct base_interpolator {
     base_interpolator(unsigned history) : d_history(history){};
 
@@ -28,7 +29,7 @@ struct base_interpolator {
      * @param mu Fractional timing offset estimate.
      * @return gr_complex Output interpolant.
      */
-    virtual gr_complex operator()(const gr_complex* in, int m_k, float mu) const = 0;
+    virtual gr_complex operator()(const gr_complex* in, int m_k, T mu) const = 0;
 
     /**
      * @brief Get the interpolator history requirement.
@@ -45,24 +46,28 @@ constexpr unsigned hist_linear_interp = 1;    // accesses m_k = n - 1
 constexpr unsigned hist_quadratic_interp = 3; // accesses m_k - 2 = n - 3
 constexpr unsigned hist_cubic_interp = 3;     // accesses m_k - 2 = n - 3
 
-struct linear_interpolator : public base_interpolator {
+struct linear_interpolator : public base_interpolator<float> {
     linear_interpolator() : base_interpolator(hist_linear_interp){};
     gr_complex operator()(const gr_complex* in, int m_k, float mu) const;
 };
 
-struct quadratic_interpolator : public base_interpolator {
+struct quadratic_interpolator : public base_interpolator<float> {
     quadratic_interpolator() : base_interpolator(hist_quadratic_interp){};
     gr_complex operator()(const gr_complex* in, int m_k, float mu) const;
 };
 
-struct cubic_interpolator : public base_interpolator {
+struct cubic_interpolator : public base_interpolator<float> {
     cubic_interpolator() : base_interpolator(hist_cubic_interp){};
     gr_complex operator()(const gr_complex* in, int m_k, float mu) const;
 };
 
-struct polyphase_interpolator : public base_interpolator {
+struct polyphase_interpolator : public base_interpolator<double> {
     polyphase_interpolator(float sps, float rolloff, int rrc_delay, size_t n_subfilt);
-    gr_complex operator()(const gr_complex* in, int m_k, float mu) const;
+    gr_complex operator()(const gr_complex* in, int m_k, double mu) const;
+    // NOTE: on the polyphase interpolator, represent mu by a double (instead of float) to
+    // avoid mu=1.0 that can result from numerical errors. While the other interpolators
+    // can handle mu=1.0 (although the effects are TBC), the polyphase would certainly
+    // segfault with mu=1.0, as that would lead to an out-of-range subfilter index.
     size_t get_subfilt_delay() const { return d_subfilt_delay; }
 
 private:
@@ -75,18 +80,18 @@ private:
 class DVBS2RX_API symbol_sync_cc_impl : public symbol_sync_cc
 {
 private:
-    int d_sps;            /**< Samples per symbol (oversampling ratio) */
-    int d_midpoint;       /**< Midpoint index between interpolants */
-    unsigned d_history;   /**< History of samples in the input buffer */
-    float d_K1;           /**< PI filter's proportional constant */
-    float d_K2;           /**< PI filter's integrator constant */
-    float d_vi;           /**< Last integrator value */
-    float d_nominal_step; /**< Nominal mod-1 counter step (equal to "1/d_sps") */
-    float d_cnt;          /**< Modulo-1 counter */
-    float d_mu;           /**< Fractional symbol timing offset estimate */
-    int d_jump;           /**< Samples to jump until the next strobe */
-    bool d_init;          /**< Whether the loop is initialized (after the first work) */
-    gr_complex d_last_xi; /**< Last output interpolant */
+    int d_sps;             /**< Samples per symbol (oversampling ratio) */
+    int d_midpoint;        /**< Midpoint index between interpolants */
+    unsigned d_history;    /**< History of samples in the input buffer */
+    float d_K1;            /**< PI filter's proportional constant */
+    float d_K2;            /**< PI filter's integrator constant */
+    double d_vi;           /**< Last integrator value */
+    double d_nominal_step; /**< Nominal mod-1 counter step (equal to "1/d_sps") */
+    double d_cnt;          /**< Modulo-1 counter */
+    double d_mu;           /**< Fractional symbol timing offset estimate */
+    int d_jump;            /**< Samples to jump until the next strobe */
+    bool d_init;           /**< Whether the loop is initialized (after the first work) */
+    gr_complex d_last_xi;  /**< Last output interpolant */
     std::vector<int> d_strobe_idx;     /**< Indexes of the output interpolants */
     std::vector<tag_t> d_pending_tags; /**< Pending tags from the previous work */
 

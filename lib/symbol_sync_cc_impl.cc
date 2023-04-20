@@ -85,7 +85,7 @@ polyphase_interpolator::polyphase_interpolator(float sps,
                                                float rolloff,
                                                int rrc_delay,
                                                size_t n_subfilt)
-    : base_interpolator(calc_rrc_subfilt_len(sps, rrc_delay, n_subfilt) - 1),
+    : base_interpolator<double>(calc_rrc_subfilt_len(sps, rrc_delay, n_subfilt) - 1),
       d_n_subfilt(n_subfilt),
       d_subfilt_len(calc_rrc_subfilt_len(sps, rrc_delay, n_subfilt)),
       d_subfilt_delay((d_subfilt_len - 1) / 2)
@@ -131,7 +131,7 @@ polyphase_interpolator::polyphase_interpolator(float sps,
 }
 
 gr_complex
-polyphase_interpolator::operator()(const gr_complex* in, int m_k, float mu) const
+polyphase_interpolator::operator()(const gr_complex* in, int m_k, double mu) const
 {
     int idx_subfilt = (int)std::floor(d_n_subfilt * mu);
     const volk::vector<float>& subfilt = d_rrc_subfilters[idx_subfilt];
@@ -340,9 +340,9 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
         d_last_xi = out[k++];
 
         // Loop filter
-        float vp = d_K1 * e;      // Proportional
-        d_vi += (d_K2 * e);       // Integral
-        float pi_out = vp + d_vi; // PI Output
+        double vp = d_K1 * e;      // Proportional
+        d_vi += (d_K2 * e);        // Integral
+        double pi_out = vp + d_vi; // PI Output
 
         // NOTE: the PI output is "vp + vi" on a strobe index (when a new interpolant is
         // computed and the TED error is evaluated), and simply "vi" on the other indexes
@@ -350,8 +350,8 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
         // strobe index and then changes back to "(1/L + vi)" on the remaining indexes.
         // Both counter steps must be taken into account when calculating how many
         // iterations until the counter underflows again.
-        float W1 = d_nominal_step + pi_out;
-        float W2 = d_nominal_step + d_vi;
+        double W1 = d_nominal_step + pi_out;
+        double W2 = d_nominal_step + d_vi;
         assert(W1 > 0);
         assert(W2 > 0);
         // NOTE: W1 and W2 can become negative when the loop bandwidth is too wide.
@@ -365,7 +365,7 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
 
         if (d_jump > 1) {
             // Counter value on the next basepoint index (before the next underflow)
-            float cnt_basepoint = d_cnt - W1 - ((d_jump - 2) * W2);
+            double cnt_basepoint = d_cnt - W1 - ((d_jump - 2) * W2);
             assert(cnt_basepoint >= 0);
 
             // Update the fractional symbol timing offset estimate using Eq. (8.89).
@@ -379,6 +379,12 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
             d_mu = d_cnt / W1;
             d_cnt = d_cnt - W1 + 1;
         }
+        // d_mu is the ratio between the mod-1 counter value at the basepoint index and
+        // the counter step (W1 or W2) that leads to underflow in the next cycle. Hence,
+        // the denominator is always greater than the numerator, otherwise the counter
+        // would not underflow. However, due to numerical errors, d_mu may end up being
+        // equal to 1.0. To avoid that as much as possible, we use double for the mod-1
+        // counter arithmetic (W1, W2, d_cnt, cnt_basepoint, and d_mu) instead of float.
         assert(d_mu >= 0 && d_mu < 1.0);
     }
 
