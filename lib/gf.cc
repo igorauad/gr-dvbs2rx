@@ -35,7 +35,8 @@ galois_field<T>::galois_field(const gf2_poly<T>& prim_poly)
 
     // The computation that follows ignores the unitary coefficient of the highest-order
     // term in the primitive polynomial.
-    const T prim_poly_exc_high_bit = prim_poly.get_poly() ^ (1 << prim_poly.degree());
+    const T prim_poly_exc_high_bit =
+        prim_poly.get_poly() ^ (static_cast<T>(1) << prim_poly.degree());
 
     // Table of GF(2^m) elements
     //
@@ -156,7 +157,7 @@ gf2_poly<T>::gf2_poly(T coefs) : m_poly(coefs)
     // Polynomial degree
     m_degree = -1; // convention for the zero polynomial
     for (int i = m_max_degree; i >= 0; i--) {
-        if (m_poly & (1 << i)) {
+        if (m_poly & (static_cast<T>(1) << i)) {
             m_degree = i;
             break;
         }
@@ -184,7 +185,7 @@ gf2_poly<T> gf2_poly<T>::operator*(const gf2_poly<T>& x) const
     const T& x_coefs = x.get_poly();
     T res = 0;
     for (int i = 0; i <= x.degree(); i++) {
-        if (x_coefs & (1 << i)) {
+        if (x_coefs & (static_cast<T>(1) << i)) {
             res ^= m_poly << i;
         }
     }
@@ -213,7 +214,7 @@ gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, const gf2_poly<T>& gf2_
 {
     const T& coefs = gf2_poly.get_poly();
     for (int i = 0; i <= gf2_poly.degree(); i++) {
-        if (coefs & (1U << i)) {
+        if (coefs & (static_cast<T>(1) << i)) {
             m_poly.push_back((*gf)[1]);
         } else {
             m_poly.push_back((*gf)[0]);
@@ -303,7 +304,7 @@ gf2_poly<T> gf2m_poly<T>::to_gf2_poly() const
                 "Trying to reduce non-binary GF(2^m) polynomial to GF(2)");
         }
         if (m_poly[i])
-            gf2_coefs ^= 1 << i;
+            gf2_coefs ^= static_cast<T>(1) << i;
     }
     return gf2_poly<T>(gf2_coefs);
 }
@@ -313,14 +314,17 @@ gf2_poly<T> gf2m_poly<T>::to_gf2_poly() const
 
 template class galois_field<uint16_t>;
 template class galois_field<uint32_t>;
+template class galois_field<uint64_t>;
 template class galois_field<int>;
 
 template class gf2_poly<uint16_t>;
 template class gf2_poly<uint32_t>;
+template class gf2_poly<uint64_t>;
 template class gf2_poly<int>;
 
 template class gf2m_poly<uint16_t>;
 template class gf2m_poly<uint32_t>;
+template class gf2m_poly<uint64_t>;
 template class gf2m_poly<int>;
 
 } // namespace dvbs2rx

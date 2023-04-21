@@ -35,10 +35,10 @@ template <typename T>
 class DVBS2RX_API galois_field
 {
 private:
-    uint8_t m_m;                // dimension of the GF(2^m) field
-    T m_two_to_m_minus_one;     // shortcut for (2^m - 1)
-    std::vector<T> m_table;     // field elements
-    std::vector<T> m_inv_table; // LUT to map element alpha^i to its GF table index i+1
+    const uint8_t m_m;            // dimension of the GF(2^m) field
+    const T m_two_to_m_minus_one; // shortcut for (2^m - 1)
+    std::vector<T> m_table;       // field elements
+    std::vector<T> m_inv_table;   // LUT to map element alpha^i to its GF table index i+1
 
 
 public:

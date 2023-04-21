@@ -17,24 +17,27 @@ namespace dvbs2rx {
 
 BOOST_AUTO_TEST_CASE(test_gf2m_construction)
 {
-    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
-    galois_field gf(prim_poly);
-    BOOST_CHECK_EQUAL(gf[0], 0);
-    BOOST_CHECK_EQUAL(gf[1], 0b0001);
-    BOOST_CHECK_EQUAL(gf[2], 0b0010);
-    BOOST_CHECK_EQUAL(gf[3], 0b0100);
-    BOOST_CHECK_EQUAL(gf[4], 0b1000);
-    BOOST_CHECK_EQUAL(gf[5], 0b0011);
-    BOOST_CHECK_EQUAL(gf[6], 0b0110);
-    BOOST_CHECK_EQUAL(gf[7], 0b1100);
-    BOOST_CHECK_EQUAL(gf[8], 0b1011);
-    BOOST_CHECK_EQUAL(gf[9], 0b0101);
-    BOOST_CHECK_EQUAL(gf[10], 0b1010);
-    BOOST_CHECK_EQUAL(gf[11], 0b0111);
-    BOOST_CHECK_EQUAL(gf[12], 0b1110);
-    BOOST_CHECK_EQUAL(gf[13], 0b1111);
-    BOOST_CHECK_EQUAL(gf[14], 0b1101);
-    BOOST_CHECK_EQUAL(gf[15], 0b1001);
+    gf2_poly_u16 prim_poly_u16(0b10011); // x^4 + x + 1
+    galois_field gf_u16(prim_poly_u16);
+    std::vector<uint16_t> expected = { 0,      0b0001, 0b0010, 0b0100, 0b1000, 0b0011,
+                                       0b0110, 0b1100, 0b1011, 0b0101, 0b1010, 0b0111,
+                                       0b1110, 0b1111, 0b1101, 0b1001 };
+    for (size_t i = 0; i < expected.size(); i++) {
+        BOOST_CHECK_EQUAL(gf_u16[i], expected[i]);
+    }
+
+    // Test the same field using other template types
+    gf2_poly_u32 prim_poly_u32(0b10011); // x^4 + x + 1
+    galois_field gf_u32(prim_poly_u32);
+    for (size_t i = 0; i < expected.size(); i++) {
+        BOOST_CHECK_EQUAL(gf_u32[i], expected[i]);
+    }
+
+    gf2_poly_u64 prim_poly_u64(0b10011); // x^4 + x + 1
+    galois_field gf_u64(prim_poly_u64);
+    for (size_t i = 0; i < expected.size(); i++) {
+        BOOST_CHECK_EQUAL(gf_u64[i], expected[i]);
+    }
 }
 
 BOOST_AUTO_TEST_CASE(test_gf2m_get_alpha_i_and_exponent)
