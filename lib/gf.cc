@@ -193,6 +193,26 @@ gf2_poly<T> gf2_poly<T>::operator*(const gf2_poly<T>& x) const
 }
 
 template <typename T>
+gf2_poly<T> gf2_poly<T>::operator%(const gf2_poly<T>& x) const
+{
+    if (x.degree() == -1) // zero divisor
+        throw std::runtime_error("Remainder of division by a zero polynomial");
+    if (m_poly == 0) // zero dividend
+        return gf2_poly<T>(0);
+    if (m_degree < x.degree()) // remainder is the polynomial itself
+        return gf2_poly<T>(m_poly);
+
+    T x_degree = x.degree();
+    T remainder = m_poly;
+    const T x_coefs = x.get_poly();
+    for (T i = m_degree; i >= x_degree; i--) {
+        if (remainder & (static_cast<T>(1) << i))
+            remainder ^= x_coefs << (i - x_degree);
+    }
+    return remainder;
+}
+
+template <typename T>
 bool gf2_poly<T>::operator==(const gf2_poly<T>& x) const
 {
     return m_poly == x.get_poly();

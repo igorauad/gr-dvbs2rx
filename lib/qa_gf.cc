@@ -332,6 +332,34 @@ BOOST_AUTO_TEST_CASE(test_gf2_poly_multiplication)
     BOOST_CHECK(e * e == gf2_poly_u32(0x10001)); // x^16 + 1
 }
 
+BOOST_AUTO_TEST_CASE(test_gf2_poly_remainder)
+{
+    // f(x) = x^6 + x^5 + x^4 + x + 1
+    // g(x) = x^3 + x + 1
+    //
+    // f(x) = (x^3 + x^2)*g(x) + (x^2 + x + 1)
+    auto f = gf2_poly(0b1110011);
+    auto g = gf2_poly(0b1011);
+    BOOST_CHECK(f % g == gf2_poly(0b111));
+
+    // In the reverse order, g(x) % f(x) = g(x) given that g(x) has lower degree than f(x)
+    BOOST_CHECK(g % f == g);
+
+    // Theorem: a primitive polynomial of degree m necessarily divides "x^(2^m - 1) + 1".
+    // Example for m=3: (x^7 + 1) divided by (x^3 + x + 1) must yield zero remainder.
+    auto a = gf2_poly(0b10000001);
+    auto b = gf2_poly(0b1011);
+    BOOST_CHECK(a % b == gf2_poly(0));
+
+    // A zero polynomial divided by a non-zero polynomial should result in zero
+    auto zero_poly = gf2_poly(0);
+    auto d = gf2_poly(0b1101);
+    BOOST_CHECK(zero_poly % d == zero_poly);
+
+    // A non-zero polynomial divided by a zero polynomial should throw error
+    BOOST_CHECK_THROW(d % zero_poly, std::runtime_error);
+}
+
 BOOST_AUTO_TEST_CASE(test_gf2_poly_to_gf2m_poly)
 {
     gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1

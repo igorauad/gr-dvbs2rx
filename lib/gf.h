@@ -174,6 +174,14 @@ public:
     gf2_poly<T> operator*(const gf2_poly<T>& x) const;
 
     /**
+     * @brief Remainder of division by another GF(2) polynomial.
+     *
+     * @param x Divisor polynomial.
+     * @return gf2_poly Remainder result.
+     */
+    gf2_poly<T> operator%(const gf2_poly<T>& x) const;
+
+    /**
      * @brief Equal comparator.
      *
      * @param x The other GF(2^m) polynomial.
