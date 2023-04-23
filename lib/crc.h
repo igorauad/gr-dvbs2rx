@@ -35,7 +35,8 @@ std::array<T, 256> build_crc_lut(const T& gen_poly)
     // See http://www.sunshine2k.de/articles/coding/crc/understanding_crc.html
     std::array<T, 256> table;
     for (int dividend = 0; dividend < 256; dividend++) {
-        T shift_reg = dividend << BITS_AFTER_MSB(T); // dividend byte on the MSB
+        T shift_reg = static_cast<T>(dividend)
+                      << BITS_AFTER_MSB(T); // dividend byte on the MSB
         for (unsigned char bit = 0; bit < 8; bit++) {
             if (shift_reg & MSB_MASK(T)) {
                 shift_reg = (shift_reg << 1) ^ gen_poly;

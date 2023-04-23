@@ -17,6 +17,7 @@ list(APPEND dvbs2rx_sources
     bbdeheader_bb_impl.cc
     bbdescrambler_bb_impl.cc
     bch_decoder_bb_impl.cc
+    bch.cc
     gf.cc
     ldpc_decoder_cb_impl.cc
     pi2_bpsk.cc
@@ -84,7 +85,7 @@ include(GrTest)
 #include_directories()
 # List all files that contain Boost.UTF unit tests here
 list(APPEND test_dvbs2rx_sources
-  qa_symbol_sync_cc.cc
+  qa_bch.cc
   qa_cdeque.cc
   qa_crc.cc
   qa_delay_line.cc
@@ -94,6 +95,7 @@ list(APPEND test_dvbs2rx_sources
   qa_pl_freq_sync.cc
   qa_pl_signaling.cc
   qa_reed_muller.cc
+  qa_symbol_sync_cc.cc
 )
 # Anything we need to link to for the unit tests go here
 list(APPEND GR_TEST_TARGET_DEPS gnuradio-dvbs2rx)

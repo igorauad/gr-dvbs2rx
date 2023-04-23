@@ -121,6 +121,13 @@ public:
      * @return gf2_poly Minimal polynomial of beta as a polynomial over GF(2).
      */
     gf2_poly<T> get_min_poly(T beta) const;
+
+    /**
+     * @brief Get the dimension m of the GF(2^m) field.
+     *
+     * @return uint8_t Dimension m.
+     */
+    uint8_t get_m() const { return m_m; };
 };
 
 /**
@@ -314,6 +321,7 @@ public:
 // Type definitions
 typedef gf2_poly<uint16_t> gf2_poly_u16;
 typedef gf2_poly<uint32_t> gf2_poly_u32;
+typedef gf2_poly<uint64_t> gf2_poly_u64;
 
 } // namespace dvbs2rx
 } // namespace gr
