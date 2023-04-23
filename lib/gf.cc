@@ -312,6 +312,23 @@ bool gf2m_poly<T>::operator==(const gf2m_poly& x) const
 }
 
 template <typename T>
+T gf2m_poly<T>::operator()(T x) const
+{
+    if (x == 0)
+        return m_poly[0]; // all other coefficients are zeroed
+
+    // A non-zero x can be represented as a power alpha^i of the primitive element alpha
+    const T i = m_gf->get_exponent(x);
+    T res = 0;
+    for (int j = 0; j <= m_degree; j++) {
+        T coef_j = m_poly[j]; // j-th coefficient (multiplies x^j)
+        if (coef_j)           // is non-zero
+            res ^= m_gf->multiply(coef_j, m_gf->get_alpha_i(i * j));
+    }
+    return res;
+}
+
+template <typename T>
 gf2_poly<T> gf2m_poly<T>::to_gf2_poly() const
 {
     if (m_degree > static_cast<int>(sizeof(T) * 8 - 1))

@@ -275,6 +275,17 @@ public:
     bool operator==(const gf2m_poly<T>& x) const;
 
     /**
+     * @brief Evaluate the polynomial for a given GF(2^m) element.
+     *
+     * Assuming the underlying polynomial is p(x), this function evaluates p(x) for a
+     * given x from GF(2^m).
+     *
+     * @param x GF(2^m) value for which the polynomial should be evaluated.
+     * @return T Evaluation result within GF(2^m).
+     */
+    T operator()(T x) const;
+
+    /**
      * @brief Get the polynomial coefficients.
      *
      * @return const std::vector<T>& Reference to vector of polynomial coefficients.

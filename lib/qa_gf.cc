@@ -443,6 +443,30 @@ BOOST_AUTO_TEST_CASE(test_gf2m_poly_multiplication)
     BOOST_CHECK(a * 1 == a);
 }
 
+BOOST_AUTO_TEST_CASE(test_gf2m_poly_eval)
+{
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+
+    uint16_t unit = gf.get_alpha_i(0);
+    uint16_t alpha = gf.get_alpha_i(1);
+    uint16_t alpha_2 = gf.get_alpha_i(2);
+    uint16_t alpha_3 = gf.get_alpha_i(3);
+    uint16_t alpha_4 = gf.get_alpha_i(4);
+    uint16_t alpha_5 = gf.get_alpha_i(5);
+
+    // a(x) = x^3 + alpha^4
+    auto a = gf2m_poly(&gf, { alpha_4, 0, 0, 1 });
+    BOOST_CHECK(a(0) == alpha_4);
+    BOOST_CHECK(a(unit) == (unit ^ alpha_4));
+    BOOST_CHECK(a(alpha) == (alpha_3 ^ alpha_4));
+
+    // b(x) = alpha^2 x^2 + alpha^5
+    auto b = gf2m_poly(&gf, { alpha_5, 0, alpha_2 });
+    BOOST_CHECK(b(0) == alpha_5);
+    BOOST_CHECK(b(unit) == (alpha_2 ^ alpha_5));
+    BOOST_CHECK(b(alpha) == (alpha_4 ^ alpha_5));
+}
 
 } // namespace dvbs2rx
 } // namespace gr
