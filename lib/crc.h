@@ -19,7 +19,7 @@ namespace dvbs2rx {
 
 #define BITS_AFTER_MSB(T) ((sizeof(T) - 1) * 8) // bits after the most significant byte
 #define MSB_MASK(T) \
-    (static_cast<T>(1) << (sizeof(T) * 8 - 1)) // mask to check the most significant bit
+    (static_cast<T>(1) << (sizeof(T) * 8 - 1))  // mask to check the most significant bit
 
 /**
  * @brief Build the CRC computation look-up table (LUT)
@@ -28,9 +28,11 @@ namespace dvbs2rx {
  * @param gen_poly Generator polynomial in normal representation and excluding the MSB.
  * For instance, x^4 + x + 1 would be given as 0b11.
  * @return std::array<T, 256> Byte-by-byte CRC look-up table.
+ * @note This implementation only works for generator polynomials with degrees multiple of
+ * 8, e.g., for CRC8, CRC16, CRC32, etc.
  */
 template <typename T>
-std::array<T, 256> build_crc_lut(const T& gen_poly)
+std::array<T, 256> build_crc_lut(const T& gen_poly_no_msb)
 {
     // See http://www.sunshine2k.de/articles/coding/crc/understanding_crc.html
     std::array<T, 256> table;
@@ -39,7 +41,7 @@ std::array<T, 256> build_crc_lut(const T& gen_poly)
                       << BITS_AFTER_MSB(T); // dividend byte on the MSB
         for (unsigned char bit = 0; bit < 8; bit++) {
             if (shift_reg & MSB_MASK(T)) {
-                shift_reg = (shift_reg << 1) ^ gen_poly;
+                shift_reg = (shift_reg << 1) ^ gen_poly_no_msb;
             } else {
                 shift_reg <<= 1;
             }

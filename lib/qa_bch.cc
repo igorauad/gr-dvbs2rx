@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE(test_bch_encoder)
     // BCH code over GF(2^4)
     gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec codec(&gf, 2); // Double-error-correcting code
+    bch_codec codec(&gf, 2);         // Double-error-correcting code
 
     std::vector<uint16_t> expected_codewords = {
         0b000000000000000, 0b000000111010001, 0b000001001110011, 0b000001110100010,
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(test_bch_encoder)
     };
 
     uint16_t max_msg = (1 << codec.get_k()) - 1;
-    for (uint64_t msg = 0; msg <= max_msg; msg++) {
+    for (uint16_t msg = 0; msg <= max_msg; msg++) {
         uint16_t codeword = codec.encode(msg);
         BOOST_CHECK(codeword == expected_codewords[msg]);
     }
@@ -150,7 +150,7 @@ BOOST_AUTO_TEST_CASE(test_bch_encoder)
 BOOST_AUTO_TEST_CASE(test_bch_syndrome)
 {
     // BCH code over GF(2^4)
-    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    gf2_poly_u16 prim_poly(0b10011);    // x^4 + x + 1
     galois_field gf(prim_poly);
     bch_codec codec(&gf, 2);            // Double-error-correcting code
     uint16_t rx_codeword = 0b100000001; // r(x) = x^8 + 1
@@ -159,6 +159,28 @@ BOOST_AUTO_TEST_CASE(test_bch_syndrome)
         gf.get_alpha_i(2), gf.get_alpha_i(4), gf.get_alpha_i(7), gf.get_alpha_i(8)
     };
     BOOST_CHECK(syndrome == expected_syndrome);
+
+    // Same calculation but with the Rx codeword given by a vector of bytes
+    std::vector<uint8_t> rx_codeword2({ 0x01, 0x01 });
+    auto syndrome2 = codec.syndrome(rx_codeword2);
+    BOOST_CHECK(syndrome2 == expected_syndrome);
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_syndrome_error_free)
+{
+    // BCH code over GF(2^4)
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+    bch_codec codec(&gf, 2);         // Double-error-correcting code
+
+    // Test with error-free codewords (syndrome should be zero)
+    uint16_t max_msg = (1 << codec.get_k()) - 1;
+    for (uint16_t msg = 0; msg <= max_msg; msg++) {
+        uint16_t rx_codeword = codec.encode(msg);
+        auto syndrome = codec.syndrome(rx_codeword);
+        for (const auto& element : syndrome)
+            BOOST_CHECK_EQUAL(element, gf[0]);
+    }
 }
 
 } // namespace dvbs2rx

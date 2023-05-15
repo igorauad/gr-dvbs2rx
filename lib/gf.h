@@ -11,7 +11,6 @@
 #define INCLUDED_DVBS2RX_GF_H
 
 #include <gnuradio/dvbs2rx/api.h>
-#include <array>
 #include <cstdint>
 #include <set>
 #include <vector>

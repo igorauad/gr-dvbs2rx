@@ -90,6 +90,7 @@ list(APPEND test_dvbs2rx_sources
   qa_crc.cc
   qa_delay_line.cc
   qa_gf.cc
+  qa_gf2_util.cc
   qa_pi2_bpsk.cc
   qa_pl_frame_sync.cc
   qa_pl_freq_sync.cc
