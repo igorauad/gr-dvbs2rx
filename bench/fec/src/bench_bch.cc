@@ -366,9 +366,9 @@ struct buffers {
 struct utils {
     std::unique_ptr<tools::Sigma<>> noise; // a sigma noise type
     std::vector<std::unique_ptr<tools::Reporter>>
-        reporters; // list of reporters dispayed in the terminal
+        reporters;                         // list of reporters dispayed in the terminal
     std::unique_ptr<tools::Terminal_std>
-        terminal; // manage the output text in the terminal
+        terminal;                          // manage the output text in the terminal
 };
 
 void init_modules(const params& p, modules& m);
