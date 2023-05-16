@@ -166,20 +166,131 @@ BOOST_AUTO_TEST_CASE(test_bch_syndrome)
     BOOST_CHECK(syndrome2 == expected_syndrome);
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_syndrome_error_free)
+template <typename T>
+void check_err_free_syndrome(const bch_codec<T>& codec, const galois_field<T>& gf)
 {
-    // BCH code over GF(2^4)
-    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
-    galois_field gf(prim_poly);
-    bch_codec codec(&gf, 2);         // Double-error-correcting code
-
-    // Test with error-free codewords (syndrome should be zero)
-    uint16_t max_msg = (1 << codec.get_k()) - 1;
-    for (uint16_t msg = 0; msg <= max_msg; msg++) {
-        uint16_t rx_codeword = codec.encode(msg);
+    // The syndrome should be zero for error-free codewords
+    T max_msg = (1 << codec.get_k()) - 1;
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T rx_codeword = codec.encode(msg);
         auto syndrome = codec.syndrome(rx_codeword);
         for (const auto& element : syndrome)
             BOOST_CHECK_EQUAL(element, gf[0]);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_syndrome_error_free)
+{
+    // BCH code over GF(2^4)
+    {
+        gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+        galois_field gf(prim_poly);
+        bch_codec codec(&gf, 2);         // Double-error-correcting code
+        check_err_free_syndrome(codec, gf);
+    }
+
+    // BCH code over GF(2^6)
+    {
+        gf2_poly_u64 prim_poly(0b1000011); // x^6 + x + 1
+        galois_field gf(prim_poly);
+        bch_codec codec(&gf, 15);          // t = 15
+        check_err_free_syndrome(codec, gf);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_err_loc_poly_and_numbers)
+{
+    // BCH code over GF(2 ^ 4)
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+    bch_codec codec(&gf, 3);         // Triple-error-correcting code
+
+    // Received codeword and syndrome
+    uint16_t rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
+    auto syndrome = codec.syndrome(rx_codeword);
+    std::vector<uint16_t> expected_syndrome = { gf.get_alpha_i(0),  gf.get_alpha_i(0),
+                                                gf.get_alpha_i(10), gf.get_alpha_i(0),
+                                                gf.get_alpha_i(10), gf.get_alpha_i(5) };
+    BOOST_CHECK(syndrome == expected_syndrome);
+
+    auto err_loc_poly = codec.err_loc_polynomial(syndrome);
+    uint16_t unit = gf.get_alpha_i(0);
+    uint16_t alpha_5 = gf.get_alpha_i(5);
+    gf2m_poly<uint16_t> expected_err_loc_poly(&gf, { unit, unit, 0, alpha_5 });
+    BOOST_CHECK(err_loc_poly == expected_err_loc_poly);
+
+    auto err_loc_numbers = codec.err_loc_numbers(err_loc_poly);
+    std::vector<uint16_t> expected_err_loc_numbers = { gf.get_alpha_i(12),
+                                                       gf.get_alpha_i(5),
+                                                       gf.get_alpha_i(3) };
+    BOOST_CHECK(err_loc_numbers == expected_err_loc_numbers);
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_err_loc_poly_error_free)
+{
+    // BCH code over GF(2 ^ 4)
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+    bch_codec codec(&gf, 3);         // Triple-error-correcting code
+
+    // Test with error-free codewords. The syndrome should be zero, and the
+    // error-location polynomial should be sigma(x)=1, a polynomial of zero degree
+    // (i.e., with no roots).
+    uint16_t max_msg = (1 << codec.get_k()) - 1;
+    uint16_t unit = gf.get_alpha_i(0);
+    for (uint16_t msg = 0; msg <= max_msg; msg++) {
+        uint16_t rx_codeword = codec.encode(msg);
+        auto syndrome = codec.syndrome(rx_codeword);
+        auto err_loc_poly = codec.err_loc_polynomial(syndrome);
+        BOOST_CHECK(err_loc_poly.get_poly() == std::vector<uint16_t>({ unit }));
+        BOOST_CHECK_EQUAL(err_loc_poly.degree(), 0);
+        // The list of error-location numbers should be empty.
+        auto err_loc_numbers = codec.err_loc_numbers(err_loc_poly);
+        BOOST_CHECK_EQUAL(err_loc_numbers.size(), 0);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_err_correction)
+{
+    // BCH code over GF(2 ^ 4)
+    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+    bch_codec codec(&gf, 3);         // Triple-error-correcting code
+
+    // Received codeword and syndrome
+    uint16_t rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
+    BOOST_CHECK_EQUAL(codec.decode(rx_codeword), 0);
+}
+
+template <typename T>
+void check_err_free_decode(const bch_codec<T>& codec, const galois_field<T>& gf)
+{
+    // The syndrome should be zero for error-free codewords
+    T max_msg = (1 << codec.get_k()) - 1;
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T rx_codeword = codec.encode(msg);
+        T decoded_msg = codec.decode(rx_codeword);
+        BOOST_CHECK_EQUAL(decoded_msg, msg);
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(test_bch_encode_decode_error_free)
+{
+    // BCH code over GF(2^4)
+    {
+        gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+        galois_field gf(prim_poly);
+        bch_codec codec(&gf, 2);         // Double-error-correcting code
+        check_err_free_decode(codec, gf);
+    }
+
+    // BCH code over GF(2^6)
+    {
+        gf2_poly_u64 prim_poly(0b1000011); // x^6 + x + 1
+        galois_field gf(prim_poly);
+        bch_codec codec(&gf, 15);          // t = 15
+        check_err_free_decode(codec, gf);
     }
 }
 

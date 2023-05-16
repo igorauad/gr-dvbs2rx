@@ -170,6 +170,131 @@ std::vector<T> bch_codec<T>::syndrome(const std::vector<uint8_t>& codeword) cons
     return syndrome_vec;
 }
 
+template <typename T>
+gf2m_poly<T> bch_codec<T>::err_loc_polynomial(const std::vector<T>& syndrome) const
+{
+    T unit = m_gf->get_alpha_i(0);
+
+    // Form a table iteratively with up to t + 2 rows.
+    uint16_t nrows = m_t + 2;
+
+    // Prefill the values of mu for each row:
+    std::vector<float> mu_vec(nrows);
+    mu_vec[0] = -0.5;
+    for (int i = 0; i < m_t + 1; i++)
+        mu_vec[i + 1] = i;
+
+    // Iteratively computed error-location polynomial.
+    //
+    // The first two rows are prefilled with "sigma(x) = 1". The third row can be
+    // prefilled with the first-degree polynomial "S[0]*x + 1", where S[0] is the first
+    // syndrome element.
+    std::vector<gf2m_poly<T>> sigma_vec = { gf2m_poly<T>(m_gf, std::vector<T>({ unit })),
+                                            gf2m_poly<T>(m_gf, std::vector<T>({ unit })),
+                                            gf2m_poly<T>(m_gf, { unit, syndrome[0] }) };
+
+    // Discrepancy, a GF(2^m) value. The first two rows have discrepancies equal to 1 and
+    // S[0] (first syndrome component), respectively.
+    std::vector<T> d(nrows);
+    d[0] = unit;
+    d[1] = syndrome[0];
+
+    int row = 2;
+    while (row <= m_t) {
+        float mu = mu_vec[row];
+        int two_mu = 2 * mu;
+
+        // Discrepancy from equation (6.42) of Lin & Costello's book
+        //
+        // NOTE: compute d_mu instead of d_(mu+1) as in (6.42). Then, adjust the indexes
+        // based on mu in (6.42). For instance, S_(2mu + 3) becomes "S_(2*(mu-1) + 3) =
+        // S_(2*mu + 1)". Also, note the formulation considers syndrome components S_1 to
+        // S_2t, which is S[0] to S[2*t - 1] here. Thus, in the end, S_(2mu + 3) from
+        // (6.42) becomes S[2*mu] below, while S_(2mu + 2) becomes S[2*mu - 1], and so on.
+        d[row] = syndrome[two_mu];                  // e.g., for mu=1, pick S[2]
+        const auto& sigma = sigma_vec[row].get_poly();
+        for (size_t j = 1; j < sigma.size(); j++) { // exclude the zero-degree term
+            if (sigma[j] != 0)                      // j-th coefficient
+                d[row] ^= m_gf->multiply(sigma[j], syndrome[two_mu - j]);
+        }
+
+        // Next candidate polynomial
+        if (d[row] == 0)
+            sigma_vec.push_back(sigma_vec[row]);
+        else {
+            // Find another row rho prior to the μ-th row such that the rho-th discrepancy
+            // d[rho] is not zero and the difference between twice the row number (2*rho)
+            // and the degree of sigma at this row has the largest value
+            int row_rho = 0;     // row number where mu = rho
+            int max_diff = -2;   // maximum diff "2*rho - sigma[row_rho].degree"
+            for (int j = row - 1; j >= 0; j--) {
+                if (d[j] != 0) { // discrepancy is not zero
+                    int diff = (2 * mu_vec[j]) - sigma_vec[j].degree();
+                    if (diff > max_diff) {
+                        max_diff = diff;
+                        row_rho = j;
+                    }
+                }
+            }
+            float rho = mu_vec[row_rho]; // value of mu at the rho-th row
+
+            // Equation (6.41)
+            T d_mu_inv_d_rho = m_gf->divide(d[row], d[row_rho]);
+            std::vector<T> x_two_mu_minus_rho_coefs(int(2 * (mu - rho)));
+            x_two_mu_minus_rho_coefs.push_back(1);
+            const auto x_two_mu_minus_rho =
+                gf2m_poly<T>(m_gf, std::move(x_two_mu_minus_rho_coefs));
+            sigma_vec.push_back(sigma_vec[row] + (x_two_mu_minus_rho * d_mu_inv_d_rho *
+                                                  sigma_vec[row_rho]));
+        }
+        row += 1;
+    }
+    return sigma_vec[row];
+}
+
+template <typename T>
+std::vector<T> bch_codec<T>::err_loc_numbers(const gf2m_poly<T>& sigma) const
+{
+    // Given the codeword has length n, the error location numbers can range from alpha^0
+    // to alpha^n-1. Since alpha^n = alpha^(2^m - 1) = 1, the corresponding inverses range
+    // from alpha^n to alpha. See if any of these are the roots of sigma and record the
+    // results. TODO: optimize this computation using a strategy like the one in Fig. 6.1.
+    std::vector<T> numbers;
+    for (int i = 1; i < m_n; i++) {
+        const T elem = m_gf->get_alpha_i(i);
+        if (sigma(elem) == 0)
+            numbers.push_back(m_gf->inverse(elem));
+    }
+    return numbers;
+}
+
+template <typename T>
+T bch_codec<T>::decode(T codeword) const
+{
+    const auto s = syndrome(codeword);
+    bool has_errors = false;
+    for (const T& element : s) {
+        if (element != 0) {
+            has_errors = true;
+            break;
+        }
+    }
+
+    if (has_errors) {
+        const auto poly = err_loc_polynomial(s);
+        const auto numbers = err_loc_numbers(poly);
+        for (const T& number : numbers) {
+            // An error-location number alpha^j means there is an error in the polynomial
+            // coefficient (bit) multiplying x^j, namely the j-th bit. Thus, we can
+            // correct the error by flipping the j-th bit.
+            T exponent = m_gf->get_exponent(number);
+            codeword ^= static_cast<T>(1) << exponent;
+        }
+    }
+
+    return (codeword >> m_parity) & m_msg_mask;
+}
+
 /********** Explicit Instantiations **********/
 template class bch_codec<uint16_t>;
 template class bch_codec<uint32_t>;

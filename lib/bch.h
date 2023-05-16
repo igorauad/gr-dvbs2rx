@@ -65,6 +65,38 @@ public:
     std::vector<T> syndrome(const std::vector<uint8_t>& codeword) const;
 
     /**
+     * @brief Compute the error-location polynomial.
+     *
+     * The error-location polynomial is a polynomial over GF(2^m) whose roots indicate the
+     * location of bit errors. The implementation for finding this polynomial is based on
+     * the simplified Berlekamp's iterative algorithm, which works for binary BCH codes.
+     *
+     * @param syndrome Syndrome vector with 2t elements.
+     * @return gf2m_poly<T> Error-location polynomial, a polynomial over GF(2^m).
+     */
+    gf2m_poly<T> err_loc_polynomial(const std::vector<T>& syndrome) const;
+
+    /**
+     * @brief Compute the error-location numbers.
+     *
+     * The error-location numbers are the numbers from GF(2^m) corresponding to the
+     * reciprocal of the roots of the error-location polynomial. An error-location number
+     * alpha^j indicates there is an error in the j-th bit of the received codeword.
+     *
+     * @param sigma Error location polynomial.
+     * @return std::vector<T> Error location numbers, a vector of elements from GF(2^m).
+     */
+    std::vector<T> err_loc_numbers(const gf2m_poly<T>& sigma) const;
+
+    /**
+     * @brief Decode an input codeword.
+     *
+     * @param codeword n-bit input codeword.
+     * @return T Decoded message.
+     */
+    T decode(T codeword) const;
+
+    /**
      * @brief Get the generator polynomial object.
      *
      * @return const gf2_poly<T>& Generator polynomial.
