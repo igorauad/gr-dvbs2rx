@@ -16,6 +16,6 @@ jobs:
       - name: Check Python formatting
         run: yapf --diff --recursive --verbose apps/ python/
       - name: Check C++ formatting
-        uses: DoozyX/clang-format-lint-action@v0.12
+        uses: DoozyX/clang-format-lint-action@v0.16.1
         with:
-          clangFormatVersion: 10
+          clangFormatVersion: 16

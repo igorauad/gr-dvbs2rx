@@ -140,14 +140,14 @@ private:
     uint8_t d_unlock_cnt;       /**< Count of consecutive frame detection failures */
     std::chrono::system_clock::time_point d_lock_time; /**< Frame lock timestamp */
 
-    delay_line<gr_complex> d_plsc_delay_buf; /**< Buffer used as delay line */
-    delay_line<gr_complex> d_sof_buf;        /**< SOF correlator buffer */
-    delay_line<gr_complex> d_plsc_e_buf;     /**< Even PLSC correlator buffer  */
-    delay_line<gr_complex> d_plsc_o_buf;     /**< Odd PLSC correlator buffer */
-    cdeque<gr_complex> d_plheader_buf;       /**< Buffer to store the PLHEADER symbols */
-    volk::vector<gr_complex> d_payload_buf;  /**< Buffer to store the PLFRAME payload */
-    volk::vector<gr_complex> d_sof_taps;     /**< SOF cross-correlation taps */
-    volk::vector<gr_complex> d_plsc_taps;    /**< PLSC cross-correlation taps */
+    delay_line<gr_complex> d_plsc_delay_buf;           /**< Buffer used as delay line */
+    delay_line<gr_complex> d_sof_buf;                  /**< SOF correlator buffer */
+    delay_line<gr_complex> d_plsc_e_buf;    /**< Even PLSC correlator buffer  */
+    delay_line<gr_complex> d_plsc_o_buf;    /**< Odd PLSC correlator buffer */
+    cdeque<gr_complex> d_plheader_buf;      /**< Buffer to store the PLHEADER symbols */
+    volk::vector<gr_complex> d_payload_buf; /**< Buffer to store the PLFRAME payload */
+    volk::vector<gr_complex> d_sof_taps;    /**< SOF cross-correlation taps */
+    volk::vector<gr_complex> d_plsc_taps;   /**< PLSC cross-correlation taps */
 
     /* Timing metric threshold for inferring a start of frame.
      *
