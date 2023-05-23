@@ -73,6 +73,8 @@ gr-dvbs2rx GNU Radio out-of-tree module documentation.
 %doc %{_docdir}/%{name}
 
 %changelog
+* Tue May 23 2023 Igor Freire <igor@ifcomm.com.br> - 1.2.0-1
+- Update to version 1.2.0.
 * Wed Mar 1 2023 Igor Freire <igor@ifcomm.com.br> - 1.1.0-1
 - Update to version 1.1.0.
 * Sat Aug 20 2022 Igor Freire <igor@ifcomm.com.br> - 1.0.0-1
