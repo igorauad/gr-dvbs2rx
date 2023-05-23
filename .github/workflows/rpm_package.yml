@@ -1,7 +1,9 @@
 name: Build RPM Package
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   build:
@@ -14,7 +16,12 @@ jobs:
           dnf install -y git
       - uses: actions/checkout@v3
         with:
+          submodules: "recursive"
           fetch-depth: 0
+      - name: Workaround for unsafe repo git error
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Check CMakeLists version matches tag
+        run: .packaging/scripts/check-version-tag.sh $GITHUB_REF_NAME
       - name: Install rpmbuild dependencies
         run: |
           dnf install -y \
@@ -22,12 +29,8 @@ jobs:
             dnf-utils \
             rpm-build \
             rpm-devel \
-            rpmdevtools
-      - name: Workaround for unsafe repo git error
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - name: Checkout submodules
-        run: |
-          git submodule update --init --recursive
+            rpmdevtools \
+            rpmlint
       - name: Install gr-dvbs2rx build dependencies
         run: |
           dnf install -y \

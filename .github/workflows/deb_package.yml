@@ -1,7 +1,9 @@
 name: Build Deb Package
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   build:
@@ -15,13 +17,18 @@ jobs:
           fetch-depth: 0
       - name: Workaround for unsafe repo git error
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - name: Install build dependencies
+      - name: Check CMakeLists version matches tag
+        run: .packaging/scripts/check-version-tag.sh $GITHUB_REF_NAME
+      - name: Install debian build dependencies
         run: |
           apt update && apt install -y \
-              debhelper \
-              devscripts \
-              dh-python \
-              libsndfile1-dev
+            debhelper \
+            devscripts \
+            dh-python
+      - name: Install gr-dvbs2rx build dependencies
+        run: |
+          apt update && apt install -y \
+            libsndfile1-dev
       - name: Build deb package
         run: .packaging/scripts/pkg-debian.sh
       - name: Upload results
