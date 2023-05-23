@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <cstdint>
 
 template <typename TYPE>
 struct NormalUpdate {

@@ -12,6 +12,7 @@
 
 #include <gnuradio/dvbs2rx/api.h>
 #include <gnuradio/gr_complex.h>
+#include <cstdint>
 
 namespace gr {
 namespace dvbs2rx {
