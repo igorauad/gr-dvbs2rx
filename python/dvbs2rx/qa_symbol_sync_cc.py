@@ -93,7 +93,7 @@ class qa_plsync_cc(gr_unittest.TestCase):
         x_syms = list(map(complex, [1.0, -1.0, 3.0, -2.0, 2.0, -2.5, 1.5]))
 
         # Upsampling
-        x_up = np.zeros(len(x_syms) * sps, dtype=np.complex)
+        x_up = np.zeros(len(x_syms) * sps, dtype=complex)
         for i in range(len(x_syms)):
             x_up[2 * i] = x_syms[i]
 
