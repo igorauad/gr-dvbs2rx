@@ -5,9 +5,17 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
-      - uses: DoozyX/clang-format-lint-action@v0.12
+      - name: Set up Python
+        uses: actions/setup-python@v2
+      - name: Install dependencies
+        run: python3 -m pip install flake8 yapf
+      - name: Lint with flake8
+        run: flake8 . --exclude docs/doxygen/
+      - name: Check Python formatting
+        run: yapf --diff --recursive --verbose apps/ python/
+      - name: Check C++ formatting
+        uses: DoozyX/clang-format-lint-action@v0.12
         with:
           clangFormatVersion: 10

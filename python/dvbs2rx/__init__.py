@@ -5,7 +5,6 @@
 #
 
 # The presence of this file turns this directory into a Python package
-
 '''
 This is the GNU Radio DVBS2RX module. Place your Python package
 description here (python/__init__.py).
@@ -15,11 +14,11 @@ import os
 
 # import pybind11 generated symbols into the dvbs2rx namespace
 try:
-    from .dvbs2rx_python import *
+    from .dvbs2rx_python import *  # noqa: F403
 except ImportError:
     dirname, filename = os.path.split(os.path.abspath(__file__))
-    __path__.append(os.path.join(dirname, "bindings"))
-    from .dvbs2rx_python import *
+    __path__.append(os.path.join(dirname, "bindings"))  # noqa: F405
+    from .dvbs2rx_python import *  # noqa: F403
 
 # import any pure python here
-from .params import *
+from .params import *  # noqa: F401, F403
