@@ -49,7 +49,7 @@ freq_sync::freq_sync(unsigned int period, int debug_level)
     /* Initialize the vector containing the complex conjugate of all 128
      * possible PLHEADER BPSK symbol sequences */
     plsc_encoder plsc_mapper;
-    for (int i = 0; i < n_plsc_codewords; i++) { // codewords
+    for (unsigned int i = 0; i < n_plsc_codewords; i++) { // codewords
         gr_complex* ptr = plheader_conj.data() + (i * PLHEADER_LEN);
         // SOF symbols:
         map_bpsk(sof_big_endian, ptr, SOF_LEN);

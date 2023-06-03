@@ -104,13 +104,14 @@ plsync_cc_impl::plsync_cc_impl(int gold_code,
     //   second row in Table D.2 of the standard.
     std::vector<uint8_t> expected_plsc;
     for (uint8_t pls = 0; pls < n_plsc_codewords; pls++) {
-        uint64_t mask = 1ULL << pls;
-        bool enabled = (pls < 64) ? (pls_filter_lo & mask) : (pls_filter_hi & mask);
+        bool enabled = (pls < 64) ? (pls_filter_lo & (1ULL << pls))
+                                  : (pls_filter_hi & (1ULL << (pls - 64)));
         d_pls_enabled[pls] = enabled;
         if (enabled) {
             expected_plsc.push_back(pls);
         }
     }
+
     // In CCM mode, up to two PLSs are allowed, as long as they refer to the same MODCOD
     // and frame size (differring only on the pilots flag).
     if (!acm_vcm && expected_plsc.size() == 2) {

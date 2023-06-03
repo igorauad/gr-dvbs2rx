@@ -36,7 +36,7 @@ namespace gr {
 namespace dvbs2rx {
 
 // number of codewords for the 7-bit PLSC dataword
-const int n_plsc_codewords = 128;
+const unsigned int n_plsc_codewords = 128;
 // Start of Frame field in bit-level big endian format (MSB transmitted first)
 constexpr uint64_t sof_big_endian = 0x18D2E82ll << 38;
 // PLSC scrambler sequence (see Section 5.5.2.4 of the standard)
