@@ -7,8 +7,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef INCLUDED_DVBS2RX_GF2_UTIL_H
-#define INCLUDED_DVBS2RX_GF2_UTIL_H
+#ifndef INCLUDED_DVBS2RX_GF_UTIL_H
+#define INCLUDED_DVBS2RX_GF_UTIL_H
 
 #include "gf.h"
 #include <array>
@@ -101,7 +101,20 @@ gf2_poly<T> gf2_poly_rem(const std::vector<uint8_t>& y,
     return gf2_poly<T>(y_last_bytes) % x;
 }
 
+/**
+ * @brief Test if bit is set
+ *
+ * @param x Bit register.
+ * @param i_bit Target bit index.
+ * @return true if bit is 1 and false otherwise.
+ */
+template <typename T>
+inline bool is_bit_set(const T& x, int i_bit)
+{
+    return x & (static_cast<T>(1) << i_bit);
+}
+
 } // namespace dvbs2rx
 } // namespace gr
 
-#endif // INCLUDED_DVBS2RX_GF2_UTIL_H
+#endif // INCLUDED_DVBS2RX_GF_UTIL_H

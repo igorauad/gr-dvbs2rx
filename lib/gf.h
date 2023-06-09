@@ -12,6 +12,7 @@
 
 #include <gnuradio/dvbs2rx/api.h>
 #include <cstdint>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -34,11 +35,11 @@ template <typename T>
 class DVBS2RX_API galois_field
 {
 private:
-    const uint8_t m_m;            // dimension of the GF(2^m) field
-    const T m_two_to_m_minus_one; // shortcut for (2^m - 1)
-    std::vector<T> m_table;       // field elements
-    std::vector<T> m_inv_table;   // LUT to map element alpha^i to its GF table index i+1
-
+    const uint8_t m_m;                   // dimension of the GF(2^m) field
+    const uint32_t m_two_to_m_minus_one; // shortcut for (2^m - 1)
+    std::vector<T> m_table;              // field elements
+    std::map<T, uint32_t>
+        m_inv_table; // LUT to map element alpha^i to its GF table index i+1
 
 public:
     /**
@@ -54,7 +55,7 @@ public:
      * @param index Target index.
      * @return T GF(2^m) element.
      */
-    T operator[](T index) const;
+    T operator[](uint32_t index) const;
 
     /**
      * @brief Get the i-th power of the primitive element (alpha^i).
@@ -65,7 +66,7 @@ public:
      * zero element cannot be expressed as a power of the primitive element. To access the
      * zero element, use the operator[] instead.
      */
-    T get_alpha_i(T i) const;
+    T get_alpha_i(uint32_t i) const;
 
     /**
      * @brief Get the exponent i of a given element beta = alpha^i.
@@ -73,7 +74,7 @@ public:
      * @param beta Element beta that is a power of the primitive element alpha.
      * @return T Exponent i.
      */
-    T get_exponent(T beta) const;
+    uint32_t get_exponent(const T& beta) const;
 
     /**
      * @brief Multiply two elements from GF(2^m).
@@ -82,7 +83,7 @@ public:
      * @param b Second multiplicand.
      * @return T Product a*b.
      */
-    T multiply(T a, T b) const;
+    T multiply(const T& a, const T& b) const;
 
     /**
      * @brief Get the inverse beta^-1 from a GF(2^m) element beta.
@@ -90,7 +91,7 @@ public:
      * @param beta Element to invert.
      * @return T Inverse beta^-1.
      */
-    T inverse(T beta) const;
+    T inverse(const T& beta) const;
 
     /**
      * @brief Divide two elements from GF(2^m).
@@ -99,7 +100,7 @@ public:
      * @param b Divisor.
      * @return T Quotient a/b.
      */
-    T divide(T a, T b) const;
+    T divide(const T& a, const T& b) const;
 
     /**
      * @brief Get the conjugates of element beta.
@@ -108,7 +109,7 @@ public:
      * @return std::set<T> The set of distinct conjugates alpha^(i^(2^l)) in GF(2^m)
      * associated with element beta=alpha^i.
      */
-    std::set<T> get_conjugates(T beta) const;
+    std::set<T> get_conjugates(const T& beta) const;
 
     /**
      * @brief Compute the minimal polynomial associated with element beta.
@@ -119,7 +120,7 @@ public:
      * @param beta GF(2^m) element.
      * @return gf2_poly Minimal polynomial of beta as a polynomial over GF(2).
      */
-    gf2_poly<T> get_min_poly(T beta) const;
+    gf2_poly<T> get_min_poly(const T& beta) const;
 
     /**
      * @brief Get the dimension m of the GF(2^m) field.
@@ -153,7 +154,7 @@ public:
      *
      * @param coefs Binary coefficients.
      */
-    gf2_poly(T coefs);
+    gf2_poly(const T& coefs);
 
     /**
      * @brief GF(2) polynomial addition.

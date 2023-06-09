@@ -8,7 +8,7 @@
  */
 
 #include "bch.h"
-#include "gf2_util.h"
+#include "gf_util.h"
 #include <algorithm>
 #include <map>
 #include <stdexcept>

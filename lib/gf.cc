@@ -8,6 +8,7 @@
  */
 
 #include "gf.h"
+#include "gf_util.h"
 #include <cassert>
 #include <stdexcept>
 
@@ -18,10 +19,7 @@ namespace dvbs2rx {
 
 template <typename T>
 galois_field<T>::galois_field(const gf2_poly<T>& prim_poly)
-    : m_m(prim_poly.degree()),
-      m_two_to_m_minus_one((1 << m_m) - 1),
-      m_table(1 << m_m),
-      m_inv_table(1 << m_m)
+    : m_m(prim_poly.degree()), m_two_to_m_minus_one((1 << m_m) - 1), m_table(1 << m_m)
 {
     // The field elements can be represented with m bits each. However, the minimal
     // polynomials can have degree up to m such that they need a storage of "m + 1" bits
@@ -47,58 +45,52 @@ galois_field<T>::galois_field(const gf2_poly<T>& prim_poly)
     // of the reference Python implementation.
     m_table[0] = 0;
     m_table[1] = 1;
-    for (T i = 1; i < m_two_to_m_minus_one; i++)
+    for (uint32_t i = 1; i < m_two_to_m_minus_one; i++)
         m_table[i + 1] = ((m_table[i] << 1) & m_two_to_m_minus_one) ^
                          ((m_table[i] >> (m_m - 1)) * prim_poly_exc_high_bit);
 
-    // Inverse LUT: maps element alpha^i to its m_table index.
+    // Inverse LUT: map each non-zero element alpha^i to its m_table index.
     //
     // Since m_table has element alpha^0 at index=1, alpha^1 at index=2, and so on, this
-    // function generates an array whose value at position "alpha^i" is the index "i+1",
-    // i.e., "x[alpha^i] = i + 1".
-    for (T i = 1; i <= m_two_to_m_minus_one; i++) {
-        for (T beta = 1; beta <= m_two_to_m_minus_one; beta++) {
-            if (m_table[i] == beta) {
-                m_inv_table[beta] = i;
-                break;
-            }
-        }
-    }
+    // function generates a map whose value for key "alpha^i" is the index "i+1".
+    for (uint32_t i = 1; i <= m_two_to_m_minus_one; i++)
+        m_inv_table.insert({ m_table[i], i });
 }
 
 template <typename T>
-T galois_field<T>::operator[](T index) const
+T galois_field<T>::operator[](uint32_t index) const
 {
     assert(index <= m_two_to_m_minus_one);
     return m_table[index];
 }
 
 template <typename T>
-T galois_field<T>::get_alpha_i(T i) const
+T galois_field<T>::get_alpha_i(uint32_t i) const
 {
     return m_table[(i % m_two_to_m_minus_one) + 1];
 }
 
 template <typename T>
-T galois_field<T>::get_exponent(T beta) const
+uint32_t galois_field<T>::get_exponent(const T& beta) const
 {
     if (beta == 0)
         throw std::runtime_error("Zero element does not have an exponent");
+    if (m_inv_table.count(beta) == 0)
+        throw std::runtime_error("Element is not in the field");
     // Recall alpha^i is stored at position i + 1.
-    return m_inv_table[beta] - 1;
+    return m_inv_table.at(beta) - 1;
 }
 
 template <typename T>
-T galois_field<T>::multiply(T a, T b) const
+T galois_field<T>::multiply(const T& a, const T& b) const
 {
     if (a == 0 || b == 0)
         return 0;
-    assert(a <= m_two_to_m_minus_one && b <= m_two_to_m_minus_one);
     return get_alpha_i(get_exponent(a) + get_exponent(b));
 }
 
 template <typename T>
-T galois_field<T>::inverse(T beta) const
+T galois_field<T>::inverse(const T& beta) const
 {
     // We want "beta^-1" such that "beta * beta^-1 = 1". For that, we use the property
     // that any GF(2^m) element raised to the power "2^m - 1" is equal to one, i.e.,
@@ -108,13 +100,13 @@ T galois_field<T>::inverse(T beta) const
 }
 
 template <typename T>
-T galois_field<T>::divide(T a, T b) const
+T galois_field<T>::divide(const T& a, const T& b) const
 {
     return multiply(a, inverse(b));
 }
 
 template <typename T>
-std::set<T> galois_field<T>::get_conjugates(T beta) const
+std::set<T> galois_field<T>::get_conjugates(const T& beta) const
 {
     std::set<T> conjugates;
 
@@ -134,7 +126,7 @@ std::set<T> galois_field<T>::get_conjugates(T beta) const
 }
 
 template <typename T>
-gf2_poly<T> galois_field<T>::get_min_poly(T beta) const
+gf2_poly<T> galois_field<T>::get_min_poly(const T& beta) const
 {
     if (beta == 0) { // 0 is always a root of "f(x) = x"
         return gf2_poly<T>(0b10);
@@ -152,12 +144,12 @@ gf2_poly<T> galois_field<T>::get_min_poly(T beta) const
 /********** Polynomial over GF(2) **********/
 
 template <typename T>
-gf2_poly<T>::gf2_poly(T coefs) : m_poly(coefs)
+gf2_poly<T>::gf2_poly(const T& coefs) : m_poly(coefs)
 {
     // Polynomial degree
     m_degree = -1; // convention for the zero polynomial
     for (int i = m_max_degree; i >= 0; i--) {
-        if (m_poly & (static_cast<T>(1) << i)) {
+        if (is_bit_set(m_poly, i)) {
             m_degree = i;
             break;
         }
@@ -173,8 +165,9 @@ gf2_poly<T> gf2_poly<T>::operator+(const gf2_poly<T>& x) const
 template <typename T>
 gf2_poly<T> gf2_poly<T>::operator*(bool x) const
 {
-    return m_poly * x;
+    return x ? m_poly : 0;
 }
+
 
 template <typename T>
 gf2_poly<T> gf2_poly<T>::operator*(const gf2_poly<T>& x) const
@@ -185,7 +178,7 @@ gf2_poly<T> gf2_poly<T>::operator*(const gf2_poly<T>& x) const
     const T& x_coefs = x.get_poly();
     T res = 0;
     for (int i = 0; i <= x.degree(); i++) {
-        if (x_coefs & (static_cast<T>(1) << i)) {
+        if (is_bit_set(x_coefs, i)) {
             res ^= m_poly << i;
         }
     }
@@ -202,11 +195,11 @@ gf2_poly<T> gf2_poly<T>::operator%(const gf2_poly<T>& x) const
     if (m_degree < x.degree()) // remainder is the polynomial itself
         return gf2_poly<T>(m_poly);
 
-    T x_degree = x.degree();
+    int x_degree = x.degree();
     T remainder = m_poly;
     const T x_coefs = x.get_poly();
-    for (T i = m_degree; i >= x_degree; i--) {
-        if (remainder & (static_cast<T>(1) << i))
+    for (int i = m_degree; i >= x_degree; i--) {
+        if (is_bit_set(remainder, i))
             remainder ^= x_coefs << (i - x_degree);
     }
     return remainder;
@@ -233,7 +226,7 @@ gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, const gf2_poly<T>& gf2_
 {
     const T& coefs = gf2_poly.get_poly();
     for (int i = 0; i <= gf2_poly.degree(); i++) {
-        if (coefs & (static_cast<T>(1) << i)) {
+        if (is_bit_set(coefs, i)) {
             m_poly.push_back((*gf)[1]);
         } else {
             m_poly.push_back((*gf)[0]);
