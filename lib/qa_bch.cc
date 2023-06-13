@@ -8,104 +8,124 @@
  */
 
 #include "bch.h"
+#include <boost/mpl/list.hpp>
+#include <boost/mpl/pair.hpp>
 #include <boost/test/data/test_case.hpp>
 #include <boost/test/unit_test.hpp>
 
 namespace gr {
 namespace dvbs2rx {
 
-BOOST_AUTO_TEST_CASE(test_bch_gen_poly)
+typedef boost::mpl::list<boost::mpl::pair<uint16_t, uint16_t>,
+                         boost::mpl::pair<uint16_t, uint32_t>,
+                         boost::mpl::pair<uint32_t, uint32_t>,
+                         boost::mpl::pair<uint32_t, uint64_t>,
+                         boost::mpl::pair<uint64_t, uint64_t>>
+    bch_base_types;
+
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_gen_poly, type_pair, bch_base_types)
 {
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
+
     // BCH code over GF(2^4)
-    gf2_poly_u16 prim_poly_m4(0b10011); // x^4 + x + 1
-    galois_field gf_m4(prim_poly_m4);
+    if (sizeof(T) * 8 >= 16) {
+        gf2_poly<T> prim_poly_m4(0b10011); // x^4 + x + 1
+        galois_field gf_m4(prim_poly_m4);
 
-    // Single-error-correcting code
-    uint8_t t = 1;
-    bch_codec codec_m4_t1(&gf_m4, t);
-    // g(x) should be identical to the primitive polynomial
-    BOOST_CHECK(codec_m4_t1.get_gen_poly() == prim_poly_m4);
+        // Single-error-correcting code
+        uint8_t t = 1;
+        bch_codec<T, P> codec_m4_t1(&gf_m4, t);
+        // g(x) should be identical to the primitive polynomial
+        BOOST_CHECK(codec_m4_t1.get_gen_poly() == gf2_poly<P>(prim_poly_m4.get_poly()));
 
-    // Double-error-correcting code
-    t = 2;
-    bch_codec codec_m4_t2(&gf_m4, t);
-    // Expected g(x): x^8 + x^7 + x^6 + x^4 + 1
-    BOOST_CHECK(codec_m4_t2.get_gen_poly() == gf2_poly_u16(0b111010001));
+        // Double-error-correcting code
+        t = 2;
+        bch_codec<T, P> codec_m4_t2(&gf_m4, t);
+        // Expected g(x): x^8 + x^7 + x^6 + x^4 + 1
+        BOOST_CHECK(codec_m4_t2.get_gen_poly() == gf2_poly<P>(0b111010001));
 
-    // Triple-error-correcting code
-    t = 3;
-    bch_codec codec_m4_t3(&gf_m4, t);
-    // Expected g(x): x^10 + x^8 + x^5 + x^4 + x^2 + x + 1
-    BOOST_CHECK(codec_m4_t3.get_gen_poly() == gf2_poly_u16(0b10100110111));
+        // Triple-error-correcting code
+        t = 3;
+        bch_codec<T, P> codec_m4_t3(&gf_m4, t);
+        // Expected g(x): x^10 + x^8 + x^5 + x^4 + x^2 + x + 1
+        BOOST_CHECK(codec_m4_t3.get_gen_poly() == gf2_poly<P>(0b10100110111));
+    }
 
     // BCH code over GF(2^6)
-    gf2_poly_u64 prim_poly_m6(0b1000011); // x^6 + x + 1
-    galois_field gf_m6(prim_poly_m6);
-    // t = 1
-    bch_codec codec_m6_t1(&gf_m6, 1);
-    auto g1 = prim_poly_m6; // x^6 + x + 1
-    BOOST_CHECK(codec_m6_t1.get_gen_poly() == g1);
-    BOOST_CHECK_EQUAL(codec_m6_t1.get_k(), 57);
-    // t = 2
-    bch_codec codec_m6_t2(&gf_m6, 2);
-    auto g2 = g1 * gf2_poly_u64(0b1010111); // g1 * (x^6 + x^4 + x^2 + x + 1)
-    BOOST_CHECK(codec_m6_t2.get_gen_poly() == g2);
-    BOOST_CHECK_EQUAL(codec_m6_t2.get_k(), 51);
-    // t = 3
-    bch_codec codec_m6_t3(&gf_m6, 3);
-    auto g3 = g2 * gf2_poly_u64(0b1100111); // g2 * (x^6 + x^5 + x^2 + x + 1)
-    BOOST_CHECK(codec_m6_t3.get_gen_poly() == g3);
-    BOOST_CHECK_EQUAL(codec_m6_t3.get_k(), 45);
-    // t = 4
-    bch_codec codec_m6_t4(&gf_m6, 4);
-    auto g4 = g3 * gf2_poly_u64(0b1001001); // g3 * (x^6 + x^3 + 1)
-    BOOST_CHECK(codec_m6_t4.get_gen_poly() == g4);
-    BOOST_CHECK_EQUAL(codec_m6_t4.get_k(), 39);
-    // t = 5
-    bch_codec codec_m6_t5(&gf_m6, 5);
-    auto g5 = g4 * gf2_poly_u64(0b1101); // g4 * (x^3 + x^2 + 1)
-    BOOST_CHECK(codec_m6_t5.get_gen_poly() == g5);
-    BOOST_CHECK_EQUAL(codec_m6_t5.get_k(), 36);
-    // t = 6
-    bch_codec codec_m6_t6(&gf_m6, 6);
-    auto g6 = g5 * gf2_poly_u64(0b1101101); // g5 * (x^6 + x^5 + x^3 + x^2 + 1)
-    BOOST_CHECK(codec_m6_t6.get_gen_poly() == g6);
-    BOOST_CHECK_EQUAL(codec_m6_t6.get_k(), 30);
-    // t = 7
-    bch_codec codec_m6_t7(&gf_m6, 7);
-    auto g7 = g6 * gf2_poly_u64(0b1011011); // g6 * (x^6 + x^4 + x^3 + x + 1)
-    BOOST_CHECK(codec_m6_t7.get_gen_poly() == g7);
-    BOOST_CHECK_EQUAL(codec_m6_t7.get_k(), 24);
-    // t = 10
-    bch_codec codec_m6_t10(&gf_m6, 10);
-    auto g10 = g7 * gf2_poly_u64(0b1110101); // g7 * (x^6 + x^5 + x^4 + x^2 + 1)
-    BOOST_CHECK(codec_m6_t10.get_gen_poly() == g10);
-    BOOST_CHECK_EQUAL(codec_m6_t10.get_k(), 18);
-    // t = 11
-    bch_codec codec_m6_t11(&gf_m6, 11);
-    auto g11 = g10 * gf2_poly_u64(0b111); // g10 * (x^2 + x + 1)
-    BOOST_CHECK(codec_m6_t11.get_gen_poly() == g11);
-    BOOST_CHECK_EQUAL(codec_m6_t11.get_k(), 16);
-    // t = 13
-    bch_codec codec_m6_t13(&gf_m6, 13);
-    auto g13 = g11 * gf2_poly_u64(0b1110011); // g11 * (x^6 + x^5 + x^4 + x + 1)
-    BOOST_CHECK(codec_m6_t13.get_gen_poly() == g13);
-    BOOST_CHECK_EQUAL(codec_m6_t13.get_k(), 10);
-    // t = 15
-    bch_codec codec_m6_t15(&gf_m6, 15);
-    auto g15 = g13 * gf2_poly_u64(0b1011); // g13 * (x^3 + x + 1)
-    BOOST_CHECK(codec_m6_t15.get_gen_poly() == g15);
-    BOOST_CHECK_EQUAL(codec_m6_t15.get_k(), 7);
+    if (sizeof(T) * 8 >= 64) {
+        gf2_poly<T> prim_poly_m6(0b1000011); // x^6 + x + 1
+        galois_field gf_m6(prim_poly_m6);
+        // t = 1
+        bch_codec<T, P> codec_m6_t1(&gf_m6, 1);
+        gf2_poly<P> g1 = prim_poly_m6.get_poly(); // x^6 + x + 1
+        BOOST_CHECK(codec_m6_t1.get_gen_poly() == g1);
+        BOOST_CHECK_EQUAL(codec_m6_t1.get_k(), 57);
+        // t = 2
+        bch_codec<T, P> codec_m6_t2(&gf_m6, 2);
+        auto g2 = g1 * gf2_poly<P>(0b1010111); // g1 * (x^6 + x^4 + x^2 + x + 1)
+        BOOST_CHECK(codec_m6_t2.get_gen_poly() == g2);
+        BOOST_CHECK_EQUAL(codec_m6_t2.get_k(), 51);
+        // t = 3
+        bch_codec<T, P> codec_m6_t3(&gf_m6, 3);
+        auto g3 = g2 * gf2_poly<P>(0b1100111); // g2 * (x^6 + x^5 + x^2 + x + 1)
+        BOOST_CHECK(codec_m6_t3.get_gen_poly() == g3);
+        BOOST_CHECK_EQUAL(codec_m6_t3.get_k(), 45);
+        // t = 4
+        bch_codec<T, P> codec_m6_t4(&gf_m6, 4);
+        auto g4 = g3 * gf2_poly<P>(0b1001001); // g3 * (x^6 + x^3 + 1)
+        BOOST_CHECK(codec_m6_t4.get_gen_poly() == g4);
+        BOOST_CHECK_EQUAL(codec_m6_t4.get_k(), 39);
+        // t = 5
+        bch_codec<T, P> codec_m6_t5(&gf_m6, 5);
+        auto g5 = g4 * gf2_poly<P>(0b1101); // g4 * (x^3 + x^2 + 1)
+        BOOST_CHECK(codec_m6_t5.get_gen_poly() == g5);
+        BOOST_CHECK_EQUAL(codec_m6_t5.get_k(), 36);
+        // t = 6
+        bch_codec<T, P> codec_m6_t6(&gf_m6, 6);
+        auto g6 = g5 * gf2_poly<P>(0b1101101); // g5 * (x^6 + x^5 + x^3 + x^2 + 1)
+        BOOST_CHECK(codec_m6_t6.get_gen_poly() == g6);
+        BOOST_CHECK_EQUAL(codec_m6_t6.get_k(), 30);
+        // t = 7
+        bch_codec<T, P> codec_m6_t7(&gf_m6, 7);
+        auto g7 = g6 * gf2_poly<P>(0b1011011); // g6 * (x^6 + x^4 + x^3 + x + 1)
+        BOOST_CHECK(codec_m6_t7.get_gen_poly() == g7);
+        BOOST_CHECK_EQUAL(codec_m6_t7.get_k(), 24);
+        // t = 10
+        bch_codec<T, P> codec_m6_t10(&gf_m6, 10);
+        auto g10 = g7 * gf2_poly<P>(0b1110101); // g7 * (x^6 + x^5 + x^4 + x^2 + 1)
+        BOOST_CHECK(codec_m6_t10.get_gen_poly() == g10);
+        BOOST_CHECK_EQUAL(codec_m6_t10.get_k(), 18);
+        // t = 11
+        bch_codec<T, P> codec_m6_t11(&gf_m6, 11);
+        auto g11 = g10 * gf2_poly<P>(0b111); // g10 * (x^2 + x + 1)
+        BOOST_CHECK(codec_m6_t11.get_gen_poly() == g11);
+        BOOST_CHECK_EQUAL(codec_m6_t11.get_k(), 16);
+        // t = 13
+        bch_codec<T, P> codec_m6_t13(&gf_m6, 13);
+        auto g13 = g11 * gf2_poly<P>(0b1110011); // g11 * (x^6 + x^5 + x^4 + x + 1)
+        BOOST_CHECK(codec_m6_t13.get_gen_poly() == g13);
+        BOOST_CHECK_EQUAL(codec_m6_t13.get_k(), 10);
+        // t = 15
+        bch_codec<T, P> codec_m6_t15(&gf_m6, 15);
+        auto g15 = g13 * gf2_poly<P>(0b1011); // g13 * (x^3 + x + 1)
+        BOOST_CHECK(codec_m6_t15.get_gen_poly() == g15);
+        BOOST_CHECK_EQUAL(codec_m6_t15.get_k(), 7);
+    }
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_encoder)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encoder, type_pair, bch_base_types)
 {
-    // BCH code over GF(2^4)
-    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
-    galois_field gf(prim_poly);
-    bch_codec codec(&gf, 2);         // Double-error-correcting code
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
 
-    std::vector<uint16_t> expected_codewords = {
+    // BCH code over GF(2^4)
+    gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+    bch_codec<T, P> codec(&gf, 2);  // Double-error-correcting code
+
+    std::vector<T> expected_codewords = {
         0b000000000000000, 0b000000111010001, 0b000001001110011, 0b000001110100010,
         0b000010011100110, 0b000010100110111, 0b000011010010101, 0b000011101000100,
         0b000100000011101, 0b000100111001100, 0b000101001101110, 0b000101110111111,
@@ -140,22 +160,25 @@ BOOST_AUTO_TEST_CASE(test_bch_encoder)
         0b111110001011101, 0b111110110001100, 0b111111000101110, 0b111111111111111,
     };
 
-    uint16_t max_msg = (1 << codec.get_k()) - 1;
-    for (uint16_t msg = 0; msg <= max_msg; msg++) {
-        uint16_t codeword = codec.encode(msg);
+    T max_msg = (1 << codec.get_k()) - 1;
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T codeword = codec.encode(msg);
         BOOST_CHECK(codeword == expected_codewords[msg]);
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_syndrome)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_syndrome, type_pair, bch_base_types)
 {
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
+
     // BCH code over GF(2^4)
-    gf2_poly_u16 prim_poly(0b10011);    // x^4 + x + 1
+    gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec codec(&gf, 2);            // Double-error-correcting code
-    uint16_t rx_codeword = 0b100000001; // r(x) = x^8 + 1
+    bch_codec<T, P> codec(&gf, 2);  // Double-error-correcting code
+    T rx_codeword = 0b100000001;    // r(x) = x^8 + 1
     auto syndrome = codec.syndrome(rx_codeword);
-    std::vector<uint16_t> expected_syndrome = {
+    std::vector<T> expected_syndrome = {
         gf.get_alpha_i(2), gf.get_alpha_i(4), gf.get_alpha_i(7), gf.get_alpha_i(8)
     };
     BOOST_CHECK(syndrome == expected_syndrome);
@@ -166,8 +189,8 @@ BOOST_AUTO_TEST_CASE(test_bch_syndrome)
     BOOST_CHECK(syndrome2 == expected_syndrome);
 }
 
-template <typename T>
-void check_err_free_syndrome(const bch_codec<T>& codec, const galois_field<T>& gf)
+template <typename T, typename P>
+void check_err_free_syndrome(const bch_codec<T, P>& codec, const galois_field<T>& gf)
 {
     // The syndrome should be zero for error-free codewords
     T max_msg = (1 << codec.get_k()) - 1;
@@ -179,70 +202,81 @@ void check_err_free_syndrome(const bch_codec<T>& codec, const galois_field<T>& g
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_syndrome_error_free)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_syndrome_error_free, type_pair, bch_base_types)
 {
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
+
     // BCH code over GF(2^4)
-    {
-        gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    if (sizeof(T) * 8 >= 16) {
+        gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
         galois_field gf(prim_poly);
-        bch_codec codec(&gf, 2);         // Double-error-correcting code
+        bch_codec<T, P> codec(&gf, 2);  // Double-error-correcting code
         check_err_free_syndrome(codec, gf);
     }
 
     // BCH code over GF(2^6)
-    {
-        gf2_poly_u64 prim_poly(0b1000011); // x^6 + x + 1
+    if (sizeof(T) * 8 >= 64) {
+        gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
         galois_field gf(prim_poly);
-        bch_codec codec(&gf, 15);          // t = 15
+        bch_codec<T, P> codec(&gf, 15);   // t = 15
         check_err_free_syndrome(codec, gf);
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_err_loc_poly_and_numbers)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_loc_poly_and_numbers,
+                              type_pair,
+                              bch_base_types)
 {
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
+
     // BCH code over GF(2 ^ 4)
-    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec codec(&gf, 3);         // Triple-error-correcting code
+    bch_codec<T, P> codec(&gf, 3);  // Triple-error-correcting code
 
     // Received codeword and syndrome
-    uint16_t rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
+    T rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
     auto syndrome = codec.syndrome(rx_codeword);
-    std::vector<uint16_t> expected_syndrome = { gf.get_alpha_i(0),  gf.get_alpha_i(0),
-                                                gf.get_alpha_i(10), gf.get_alpha_i(0),
-                                                gf.get_alpha_i(10), gf.get_alpha_i(5) };
+    std::vector<T> expected_syndrome = { gf.get_alpha_i(0),  gf.get_alpha_i(0),
+                                         gf.get_alpha_i(10), gf.get_alpha_i(0),
+                                         gf.get_alpha_i(10), gf.get_alpha_i(5) };
     BOOST_CHECK(syndrome == expected_syndrome);
 
     auto err_loc_poly = codec.err_loc_polynomial(syndrome);
-    uint16_t unit = gf.get_alpha_i(0);
-    uint16_t alpha_5 = gf.get_alpha_i(5);
-    gf2m_poly<uint16_t> expected_err_loc_poly(&gf, { unit, unit, 0, alpha_5 });
+    T unit = gf.get_alpha_i(0);
+    T alpha_5 = gf.get_alpha_i(5);
+    gf2m_poly<T> expected_err_loc_poly(&gf, { unit, unit, 0, alpha_5 });
     BOOST_CHECK(err_loc_poly == expected_err_loc_poly);
 
     auto err_loc_numbers = codec.err_loc_numbers(err_loc_poly);
-    std::vector<uint16_t> expected_err_loc_numbers = { gf.get_alpha_i(12),
-                                                       gf.get_alpha_i(5),
-                                                       gf.get_alpha_i(3) };
+    std::vector<T> expected_err_loc_numbers = { gf.get_alpha_i(12),
+                                                gf.get_alpha_i(5),
+                                                gf.get_alpha_i(3) };
     BOOST_CHECK(err_loc_numbers == expected_err_loc_numbers);
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_err_loc_poly_error_free)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_loc_poly_error_free, type_pair, bch_base_types)
 {
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
+
     // BCH code over GF(2 ^ 4)
-    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec codec(&gf, 3);         // Triple-error-correcting code
+    bch_codec<T, P> codec(&gf, 3);  // Triple-error-correcting code
 
     // Test with error-free codewords. The syndrome should be zero, and the
     // error-location polynomial should be sigma(x)=1, a polynomial of zero degree
     // (i.e., with no roots).
-    uint16_t max_msg = (1 << codec.get_k()) - 1;
-    uint16_t unit = gf.get_alpha_i(0);
-    for (uint16_t msg = 0; msg <= max_msg; msg++) {
-        uint16_t rx_codeword = codec.encode(msg);
+    T max_msg = (1 << codec.get_k()) - 1;
+    T unit = gf.get_alpha_i(0);
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T rx_codeword = codec.encode(msg);
         auto syndrome = codec.syndrome(rx_codeword);
         auto err_loc_poly = codec.err_loc_polynomial(syndrome);
-        BOOST_CHECK(err_loc_poly.get_poly() == std::vector<uint16_t>({ unit }));
+        BOOST_CHECK(err_loc_poly.get_poly() == std::vector<T>({ unit }));
         BOOST_CHECK_EQUAL(err_loc_poly.degree(), 0);
         // The list of error-location numbers should be empty.
         auto err_loc_numbers = codec.err_loc_numbers(err_loc_poly);
@@ -250,20 +284,23 @@ BOOST_AUTO_TEST_CASE(test_bch_err_loc_poly_error_free)
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_err_correction)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_correction, type_pair, bch_base_types)
 {
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
+
     // BCH code over GF(2 ^ 4)
-    gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec codec(&gf, 3);         // Triple-error-correcting code
+    bch_codec<T, P> codec(&gf, 3);  // Triple-error-correcting code
 
     // Received codeword and syndrome
-    uint16_t rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
+    T rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
     BOOST_CHECK_EQUAL(codec.decode(rx_codeword), 0);
 }
 
-template <typename T>
-void check_err_free_decode(const bch_codec<T>& codec, const galois_field<T>& gf)
+template <typename T, typename P>
+void check_err_free_decode(const bch_codec<T, P>& codec, const galois_field<T>& gf)
 {
     // The syndrome should be zero for error-free codewords
     T max_msg = (1 << codec.get_k()) - 1;
@@ -275,21 +312,26 @@ void check_err_free_decode(const bch_codec<T>& codec, const galois_field<T>& gf)
 }
 
 
-BOOST_AUTO_TEST_CASE(test_bch_encode_decode_error_free)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode_error_free,
+                              type_pair,
+                              bch_base_types)
 {
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
+
     // BCH code over GF(2^4)
-    {
-        gf2_poly_u16 prim_poly(0b10011); // x^4 + x + 1
+    if (sizeof(T) * 8 >= 16) {
+        gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
         galois_field gf(prim_poly);
-        bch_codec codec(&gf, 2);         // Double-error-correcting code
+        bch_codec<T, P> codec(&gf, 2);  // Double-error-correcting code
         check_err_free_decode(codec, gf);
     }
 
     // BCH code over GF(2^6)
-    {
-        gf2_poly_u64 prim_poly(0b1000011); // x^6 + x + 1
+    if (sizeof(T) * 8 >= 64) {
+        gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
         galois_field gf(prim_poly);
-        bch_codec codec(&gf, 15);          // t = 15
+        bch_codec<T, P> codec(&gf, 15);   // t = 15
         check_err_free_decode(codec, gf);
     }
 }

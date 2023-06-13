@@ -17,16 +17,22 @@
 namespace gr {
 namespace dvbs2rx {
 
-template <typename T>
+/**
+ * @brief BCH coder/decoder.
+ *
+ * @tparam T Base type for the Galois Field elements.
+ * @tparam P Base type for the GF(2) generator polynomial.
+ */
+template <typename T, typename P>
 class DVBS2RX_API bch_codec
 {
 private:
     const galois_field<T>* m_gf;         // Galois field
     uint8_t m_t;                         // error correction capability
-    gf2_poly<T> m_g;                     // generator polynomial
-    uint16_t m_n;                        // codeword length
-    uint16_t m_k;                        // message length
-    uint16_t m_parity;                   // number of parity bits
+    gf2_poly<P> m_g;                     // generator polynomial
+    uint32_t m_n;                        // codeword length
+    uint32_t m_k;                        // message length
+    uint32_t m_parity;                   // number of parity bits
     T m_msg_mask;                        // mask used to enforce k bits per message
     std::vector<gf2_poly<T>> m_min_poly; // minimal polynomials in g(x)
     std::vector<int> m_conjugate_map; // LUT mapping each GF(2^m) element to a conjugate
@@ -99,9 +105,9 @@ public:
     /**
      * @brief Get the generator polynomial object.
      *
-     * @return const gf2_poly<T>& Generator polynomial.
+     * @return const gf2_poly<P>& Generator polynomial.
      */
-    const gf2_poly<T>& get_gen_poly() const { return m_g; };
+    const gf2_poly<P>& get_gen_poly() const { return m_g; };
 
     /**
      * @brief Get the codeword length n.

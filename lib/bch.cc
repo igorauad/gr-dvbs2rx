@@ -16,15 +16,25 @@
 namespace gr {
 namespace dvbs2rx {
 
-template <typename T>
-gf2_poly<T> compute_gen_poly(const galois_field<T>* const gf, uint8_t t)
+/**
+ * @brief Compute the generator polynomial g(x) for a BCH code.
+ *
+ * @tparam T Base type for the Galois Field elements and the minimal GF(2) polynomials.
+ * @tparam P Base type for the GF(2) generator polynomial resulting from the product of
+ * minimal polynomials.
+ * @param gf Galois field.
+ * @param t Target error correction capability.
+ * @return gf2_poly<P> Generator polynomial.
+ */
+template <typename T, typename P>
+gf2_poly<P> compute_gen_poly(const galois_field<T>* const gf, uint8_t t)
 {
     // The generator polynomial g is the product of the set of unique minimal polynomials
     // associated with the t elements alpha^j for odd j varying from j=1 to j=(2*t -1).
     // Each minimum polynomial appears only once in the product so that the result is
     // equivalent to the LCM of the minimum polynomials.
     std::set<T> processed_conjugates;
-    gf2_poly<T> g(1); // start with g(x) = 1
+    gf2_poly<P> g(1); // start with g(x) = 1
     for (int i = 0; i < t; i++) {
         T exponent = (2 * i) + 1;
         T beta = gf->get_alpha_i(exponent);
@@ -35,17 +45,21 @@ gf2_poly<T> compute_gen_poly(const galois_field<T>* const gf, uint8_t t)
         auto conjugates = gf->get_conjugates(beta);
         processed_conjugates.insert(conjugates.begin(), conjugates.end());
         auto min_poly = gf->get_min_poly(beta);
-        g = g * min_poly;
+        if (min_poly.degree() + g.degree() + 1 > static_cast<int>(sizeof(P) * 8))
+            throw std::runtime_error(
+                "Type P cannot fit the product of minimal polynomials of type T");
+        gf2_poly<P> min_poly_p(min_poly.get_poly());
+        g = g * min_poly_p;
     }
     return g;
 }
 
-template <typename T>
-bch_codec<T>::bch_codec(const galois_field<T>* const gf, uint8_t t)
+template <typename T, typename P>
+bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t)
     : m_gf(gf),
       m_t(t),
-      m_g(std::move(compute_gen_poly(gf, t))),
-      m_n((static_cast<T>(1) << gf->get_m()) - 1),
+      m_g(std::move(compute_gen_poly<T, P>(gf, t))),
+      m_n((static_cast<uint32_t>(1) << gf->get_m()) - 1),
       m_k(m_n - m_g.degree()),
       m_parity(m_n - m_k),
       m_msg_mask((static_cast<T>(1) << m_k) - 1), // k-bit mask
@@ -56,8 +70,8 @@ bch_codec<T>::bch_codec(const galois_field<T>* const gf, uint8_t t)
       m_conjugate_map(2 * t + 1),
       m_min_poly_rem_lut(2 * t + 1)
 {
-    if (m_n > sizeof(T) * 8)
-        throw std::runtime_error("Type T cannot fit the codeword length");
+    if (gf->get_m() > (sizeof(uint32_t) * 8) - 1) // ensure m_n does not overflow
+        throw std::runtime_error("GF(2^m) dimension m not supported (too large)");
 
     // Build the LUTs to assist in computing the remainder of "r(x) % phi_i(x)", for
     // arbitrary r(x), and for the 2t minimal polynomials phi_1(x) to phi_2t(x).
@@ -92,8 +106,8 @@ bch_codec<T>::bch_codec(const galois_field<T>* const gf, uint8_t t)
     }
 }
 
-template <typename T>
-T bch_codec<T>::encode(const T& msg) const
+template <typename T, typename P>
+T bch_codec<T, P>::encode(const T& msg) const
 {
     // The codeword is given by:
     //
@@ -102,13 +116,13 @@ T bch_codec<T>::encode(const T& msg) const
     // where d(x) is the message, x^(n-k)*d(x) shifts the message by n-k bits (i.e., to
     // create space for the parity bits), and rho(x) (the polynomial representing the
     // parity bits) is equal to the remainder of x^(n-k)*d(x) divided by g(x).
-    const auto shifted_msg_poly = gf2_poly<T>((msg & m_msg_mask) << m_parity);
+    const auto shifted_msg_poly = gf2_poly<P>((msg & m_msg_mask) << m_parity);
     const auto parity_poly = shifted_msg_poly % m_g;
     return (shifted_msg_poly + parity_poly).get_poly();
 }
 
-template <typename T>
-std::vector<T> bch_codec<T>::syndrome(const T& codeword) const
+template <typename T, typename P>
+std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
 {
     std::vector<T> syndrome_vec;
     const auto codeword_poly = gf2_poly(codeword);
@@ -149,8 +163,8 @@ std::vector<T> bch_codec<T>::syndrome(const T& codeword) const
     return syndrome_vec;
 }
 
-template <typename T>
-std::vector<T> bch_codec<T>::syndrome(const std::vector<uint8_t>& codeword) const
+template <typename T, typename P>
+std::vector<T> bch_codec<T, P>::syndrome(const std::vector<uint8_t>& codeword) const
 {
     std::vector<T> syndrome_vec;
     std::map<int, gf2_poly<T>> bi_map;
@@ -170,8 +184,8 @@ std::vector<T> bch_codec<T>::syndrome(const std::vector<uint8_t>& codeword) cons
     return syndrome_vec;
 }
 
-template <typename T>
-gf2m_poly<T> bch_codec<T>::err_loc_polynomial(const std::vector<T>& syndrome) const
+template <typename T, typename P>
+gf2m_poly<T> bch_codec<T, P>::err_loc_polynomial(const std::vector<T>& syndrome) const
 {
     T unit = m_gf->get_alpha_i(0);
 
@@ -252,15 +266,15 @@ gf2m_poly<T> bch_codec<T>::err_loc_polynomial(const std::vector<T>& syndrome) co
     return sigma_vec[row];
 }
 
-template <typename T>
-std::vector<T> bch_codec<T>::err_loc_numbers(const gf2m_poly<T>& sigma) const
+template <typename T, typename P>
+std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
 {
     // Given the codeword has length n, the error location numbers can range from alpha^0
     // to alpha^n-1. Since alpha^n = alpha^(2^m - 1) = 1, the corresponding inverses range
     // from alpha^n to alpha. See if any of these are the roots of sigma and record the
     // results. TODO: optimize this computation using a strategy like the one in Fig. 6.1.
     std::vector<T> numbers;
-    for (int i = 1; i < m_n; i++) {
+    for (uint32_t i = 1; i < m_n; i++) {
         const T elem = m_gf->get_alpha_i(i);
         if (sigma(elem) == 0)
             numbers.push_back(m_gf->inverse(elem));
@@ -268,8 +282,8 @@ std::vector<T> bch_codec<T>::err_loc_numbers(const gf2m_poly<T>& sigma) const
     return numbers;
 }
 
-template <typename T>
-T bch_codec<T>::decode(T codeword) const
+template <typename T, typename P>
+T bch_codec<T, P>::decode(T codeword) const
 {
     const auto s = syndrome(codeword);
     bool has_errors = false;
@@ -296,10 +310,12 @@ T bch_codec<T>::decode(T codeword) const
 }
 
 /********** Explicit Instantiations **********/
-template class bch_codec<uint16_t>;
-template class bch_codec<uint32_t>;
-template class bch_codec<uint64_t>;
-template class bch_codec<int>;
+template class bch_codec<uint16_t, uint16_t>;
+template class bch_codec<uint16_t, uint32_t>;
+template class bch_codec<uint32_t, uint32_t>;
+template class bch_codec<uint32_t, uint64_t>;
+template class bch_codec<uint64_t, uint64_t>;
+template class bch_codec<int, int>;
 
 } // namespace dvbs2rx
 } // namespace gr
