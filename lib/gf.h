@@ -11,6 +11,7 @@
 #define INCLUDED_DVBS2RX_GF_H
 
 #include <gnuradio/dvbs2rx/api.h>
+#include <bitset>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -322,6 +323,8 @@ public:
 typedef gf2_poly<uint16_t> gf2_poly_u16;
 typedef gf2_poly<uint32_t> gf2_poly_u32;
 typedef gf2_poly<uint64_t> gf2_poly_u64;
+typedef std::bitset<192> bitset192_t;
+typedef gf2_poly<bitset192_t> gf2_poly_b192;
 
 } // namespace dvbs2rx
 } // namespace gr

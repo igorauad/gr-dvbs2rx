@@ -17,7 +17,7 @@ namespace gr {
 namespace dvbs2rx {
 
 typedef boost::mpl::list<uint16_t, uint32_t, uint64_t> gf_elem_types;
-typedef boost::mpl::list<uint16_t, uint32_t, uint64_t> gf2_poly_base_types;
+typedef boost::mpl::list<uint16_t, uint32_t, uint64_t, bitset192_t> gf2_poly_base_types;
 
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_construction, T, gf_elem_types)
@@ -358,7 +358,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2_poly_remainder, T, gf2_poly_base_types)
     BOOST_CHECK_THROW(d % zero_poly, std::runtime_error);
 }
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2_poly_to_gf2m_poly, T, gf2_poly_base_types)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2_poly_to_gf2m_poly, T, gf_elem_types)
 {
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
@@ -370,7 +370,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2_poly_to_gf2m_poly, T, gf2_poly_base_types
     BOOST_CHECK_EQUAL(poly_gf2.get_poly(), poly_gf2m.to_gf2_poly().get_poly());
 }
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_to_gf2_poly, T, gf2_poly_base_types)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_to_gf2_poly, T, gf_elem_types)
 {
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
@@ -397,7 +397,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_to_gf2_poly, T, gf2_poly_base_types
     BOOST_CHECK_THROW(poly_ext_field3.to_gf2_poly(), std::runtime_error);
 }
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_addition, T, gf2_poly_base_types)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_addition, T, gf_elem_types)
 {
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
@@ -419,7 +419,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_addition, T, gf2_poly_base_types)
     BOOST_CHECK(res2 == expected2);
 }
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_multiplication, T, gf2_poly_base_types)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_multiplication, T, gf_elem_types)
 {
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
@@ -444,7 +444,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_multiplication, T, gf2_poly_base_ty
     BOOST_CHECK(a * 1 == a);
 }
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_eval, T, gf2_poly_base_types)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_eval, T, gf_elem_types)
 {
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);

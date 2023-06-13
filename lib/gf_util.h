@@ -114,6 +114,15 @@ inline bool is_bit_set(const T& x, int i_bit)
     return x & (static_cast<T>(1) << i_bit);
 }
 
+/**
+ * @overload
+ */
+template <>
+inline bool is_bit_set(const bitset192_t& x, int i_bit)
+{
+    return x.test(i_bit);
+}
+
 } // namespace dvbs2rx
 } // namespace gr
 
