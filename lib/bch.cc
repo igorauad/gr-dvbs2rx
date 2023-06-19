@@ -8,8 +8,8 @@
  */
 
 #include "bch.h"
-#include "gf_util.h"
 #include <algorithm>
+#include <cstring>
 #include <map>
 #include <stdexcept>
 
@@ -62,13 +62,17 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t)
       m_n((static_cast<uint32_t>(1) << gf->get_m()) - 1),
       m_k(m_n - m_g.degree()),
       m_parity(m_n - m_k),
+      m_n_bytes(m_n / 8),
+      m_k_bytes(m_k / 8),
+      m_parity_bytes(m_parity / 8),
       m_msg_mask((static_cast<T>(1) << m_k) - 1), // k-bit mask
       // The tables below need 2t elements (the number of minimal polynomials in g(x)),
       // but the index i goes from 1 to 2*t in the computations that follow, skipping i=0.
       // For convenience, it is helpful to allocate 2t+1 elements and leave the first
       // empty so that the for loop and array indexes coincide.
       m_conjugate_map(2 * t + 1),
-      m_min_poly_rem_lut(2 * t + 1)
+      m_min_poly_rem_lut(2 * t + 1),
+      m_gen_poly_lut_generated(false)
 {
     if (gf->get_m() > (sizeof(uint32_t) * 8) - 1) // ensure m_n does not overflow
         throw std::runtime_error("GF(2^m) dimension m not supported (too large)");
@@ -107,8 +111,23 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t)
 }
 
 template <typename T, typename P>
+void bch_codec<T, P>::build_gen_poly_rem_lut()
+{
+    if (m_gen_poly_lut_generated)
+        return;
+    m_gen_poly_rem_lut = build_gf2_poly_rem_lut(m_g);
+    m_gen_poly_lut_generated = true;
+}
+
+template <typename T, typename P>
 T bch_codec<T, P>::encode(const T& msg) const
 {
+    if (m_k > sizeof(T) * 8)
+        throw std::runtime_error("Type T cannot fit the message length k.");
+
+    if (m_n > sizeof(T) * 8)
+        throw std::runtime_error("Type T cannot fit the codeword length n.");
+
     // The codeword is given by:
     //
     // c(x) = x^(n-k)*d(x) + rho(x),
@@ -119,6 +138,25 @@ T bch_codec<T, P>::encode(const T& msg) const
     const auto shifted_msg_poly = gf2_poly<P>((msg & m_msg_mask) << m_parity);
     const auto parity_poly = shifted_msg_poly % m_g;
     return (shifted_msg_poly + parity_poly).get_poly();
+}
+
+template <typename T, typename P>
+void bch_codec<T, P>::encode(const u8_ptr_t& msg, u8_ptr_t codeword) const
+{
+    // For simplicity, make sure k and n are byte-aligned when representing messages and
+    // codewords by byte arrays.
+    if (m_k % 8 != 0 || m_n % 8 != 0)
+        throw std::runtime_error(
+            "u8 array messages are only supported for k and n multiple of 8.");
+
+    if (!m_gen_poly_lut_generated)
+        throw std::runtime_error("Generator polynomial remainder LUT not generated.");
+
+    memcpy(codeword, msg, m_k_bytes);                // systematic bytes
+    memset(codeword + m_k_bytes, 0, m_parity_bytes); // zero-initialize the parity bytes
+    const auto parity_poly = gf2_poly_rem(codeword, m_n_bytes, m_g, m_gen_poly_rem_lut);
+    const auto parity_poly_u8_vec = to_u8_vector(parity_poly.get_poly());
+    memcpy(codeword + m_k_bytes, parity_poly_u8_vec.data(), m_parity_bytes);
 }
 
 template <typename T, typename P>
@@ -164,7 +202,7 @@ std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
 }
 
 template <typename T, typename P>
-std::vector<T> bch_codec<T, P>::syndrome(const std::vector<uint8_t>& codeword) const
+std::vector<T> bch_codec<T, P>::syndrome(const u8_vector_t& codeword) const
 {
     std::vector<T> syndrome_vec;
     std::map<int, gf2_poly<T>> bi_map;

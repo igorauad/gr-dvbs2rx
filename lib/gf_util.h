@@ -157,6 +157,23 @@ inline bool is_bit_set(const bitset192_t& x, int i_bit)
     return x.test(i_bit);
 }
 
+/**
+ * @brief Convert type to u8 vector in network byte order (big-endian)
+ *
+ * @tparam T Bit storage type.
+ * @param val Value to be converted.
+ * @return u8_vector_t Resulting u8 vector.
+ */
+template <typename T>
+u8_vector_t to_u8_vector(T val)
+{
+    u8_vector_t vec;
+    for (int i = sizeof(T) - 1; i >= 0; i--) {
+        vec.push_back((val >> (8 * i)) & 0xFF);
+    }
+    return vec;
+}
+
 } // namespace dvbs2rx
 } // namespace gr
 
