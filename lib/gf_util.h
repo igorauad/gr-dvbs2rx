@@ -22,6 +22,98 @@ namespace dvbs2rx {
 typedef std::vector<unsigned char> u8_vector_t;
 
 /**
+ * @brief Get bitmask for the least significant bits of a type T
+ *
+ * @param n_bits Number of bits over which the mask is high.
+ * @return T Bitmask.
+ */
+template <typename T>
+inline T bitmask(int n_bits)
+{
+    return (static_cast<T>(1) << n_bits) - 1;
+}
+
+/**
+ * @overload
+ * @note Template specialization for T = bitset256_t.
+ */
+template <>
+inline bitset256_t bitmask(int n_bits)
+{
+    bitset256_t mask;
+    for (int i = 0; i < n_bits; i++)
+        mask.set(i);
+    return mask;
+}
+
+/**
+ * @brief Get the byte at a given index of a type T value.
+ *
+ * @tparam T Value type.
+ * @param value Value.
+ * @param byte_index Target byte index.
+ * @return uint8_t Extracted byte value.
+ */
+template <typename T>
+inline uint8_t get_byte(const T& value, uint32_t byte_index)
+{
+    return (value >> (byte_index * 8)) & 0xFF;
+}
+
+/**
+ * @overload
+ * @note Template specialization for T = bitset256_t.
+ */
+template <>
+inline uint8_t get_byte(const bitset256_t& value, uint32_t byte_index)
+{
+    uint8_t byte = 0;
+    for (uint32_t i = byte_index * 8; i < (byte_index + 1) * 8; i++)
+        byte |= value[i] << (i - byte_index * 8);
+    return byte;
+}
+
+/**
+ * @brief Test if bit is set
+ *
+ * @param x Bit register.
+ * @param i_bit Target bit index.
+ * @return true if bit is 1 and false otherwise.
+ */
+template <typename T>
+inline bool is_bit_set(const T& x, int i_bit)
+{
+    return x & (static_cast<T>(1) << i_bit);
+}
+
+/**
+ * @overload
+ * @note Template specialization for T = bitset256_t.
+ */
+template <>
+inline bool is_bit_set(const bitset256_t& x, int i_bit)
+{
+    return x.test(i_bit);
+}
+
+/**
+ * @brief Convert type to u8 vector in network byte order (big-endian)
+ *
+ * @tparam T Bit storage type.
+ * @param val Value to be converted.
+ * @return u8_vector_t Resulting u8 vector.
+ */
+template <typename T>
+inline u8_vector_t to_u8_vector(T val)
+{
+    u8_vector_t vec;
+    for (int i = sizeof(T) - 1; i >= 0; i--) {
+        vec.push_back(get_byte(val, i));
+    }
+    return vec;
+}
+
+/**
  * @brief Build LUT to assist with GF(2) polynomial remainder computation
  *
  * The resulting LUT can be used to compute "y % x" more efficiently for any "y" and a
@@ -84,8 +176,9 @@ gf2_poly<T> gf2_poly_rem(const unsigned char* y,
                          const std::array<T, 256>& x_lut)
 {
     const int n_leak_bytes = sizeof(T) - 1; // see build_gf2_poly_rem_lut
-    const T bits_after_msby = (n_leak_bytes - 1) * 8;
-    const T leak_mask = (static_cast<T>(1) << (n_leak_bytes * 8)) - 1;
+    const uint32_t bytes_after_msby = n_leak_bytes - 1;
+    const uint32_t bits_after_msby = bytes_after_msby * 8;
+    const T leak_mask = bitmask<T>(n_leak_bytes * 8);
 
     // Over the first "y_size - n_leak_bytes" bytes, iteratively look up the leak that the
     // input byte introduces into the next n_leak_bytes bytes.
@@ -96,7 +189,7 @@ gf2_poly<T> gf2_poly_rem(const unsigned char* y,
         // determines the next leak. The other bytes (other than the MSBy) from the
         // preceding leak continue to leak (are carried forward) over the next bytes.
         T padded_in_byte = static_cast<T>(y[i]) << bits_after_msby;
-        uint8_t msby = (leak ^ padded_in_byte) >> bits_after_msby;
+        uint8_t msby = get_byte((leak ^ padded_in_byte), bytes_after_msby);
         T leak_carried_forward = (leak_mask & (leak << 8));
         leak = leak_carried_forward ^ x_lut[msby];
     }
@@ -133,45 +226,6 @@ gf2_poly<T>
 gf2_poly_rem(const u8_vector_t& y, const gf2_poly<T>& x, const std::array<T, 256>& x_lut)
 {
     return gf2_poly_rem(y.data(), y.size(), x, x_lut);
-}
-
-/**
- * @brief Test if bit is set
- *
- * @param x Bit register.
- * @param i_bit Target bit index.
- * @return true if bit is 1 and false otherwise.
- */
-template <typename T>
-inline bool is_bit_set(const T& x, int i_bit)
-{
-    return x & (static_cast<T>(1) << i_bit);
-}
-
-/**
- * @overload
- */
-template <>
-inline bool is_bit_set(const bitset192_t& x, int i_bit)
-{
-    return x.test(i_bit);
-}
-
-/**
- * @brief Convert type to u8 vector in network byte order (big-endian)
- *
- * @tparam T Bit storage type.
- * @param val Value to be converted.
- * @return u8_vector_t Resulting u8 vector.
- */
-template <typename T>
-u8_vector_t to_u8_vector(T val)
-{
-    u8_vector_t vec;
-    for (int i = sizeof(T) - 1; i >= 0; i--) {
-        vec.push_back((val >> (8 * i)) & 0xFF);
-    }
-    return vec;
 }
 
 } // namespace dvbs2rx

@@ -17,7 +17,7 @@ namespace gr {
 namespace dvbs2rx {
 
 typedef boost::mpl::list<uint16_t, uint32_t, uint64_t> gf_elem_types;
-typedef boost::mpl::list<uint16_t, uint32_t, uint64_t, bitset192_t> gf2_poly_base_types;
+typedef boost::mpl::list<uint16_t, uint32_t, uint64_t, bitset256_t> gf2_poly_base_types;
 
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_construction, T, gf_elem_types)

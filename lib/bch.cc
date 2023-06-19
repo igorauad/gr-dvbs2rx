@@ -64,8 +64,8 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t)
       m_parity(m_n - m_k),
       m_n_bytes(m_n / 8),
       m_k_bytes(m_k / 8),
-      m_parity_bytes(m_parity / 8),
-      m_msg_mask((static_cast<T>(1) << m_k) - 1), // k-bit mask
+      m_parity_bytes(m_n_bytes - m_k_bytes),
+      m_msg_mask(bitmask<T>(m_k)), // k-bit mask
       // The tables below need 2t elements (the number of minimal polynomials in g(x)),
       // but the index i goes from 1 to 2*t in the computations that follow, skipping i=0.
       // For convenience, it is helpful to allocate 2t+1 elements and leave the first
@@ -119,6 +119,35 @@ void bch_codec<T, P>::build_gen_poly_rem_lut()
     m_gen_poly_lut_generated = true;
 }
 
+// Encode into type T
+template <typename T, typename P>
+T _encode(const T& msg, const gf2_poly<P>& g, uint32_t msg_mask, uint32_t n_parity_bits)
+{
+    // The codeword is given by:
+    //
+    // c(x) = x^(n-k)*d(x) + rho(x),
+    //
+    // where d(x) is the message, x^(n-k)*d(x) shifts the message by n-k bits (i.e., to
+    // create space for the parity bits), and rho(x) (the polynomial representing the
+    // parity bits) is equal to the remainder of x^(n-k)*d(x) divided by g(x).
+    const auto shifted_msg_poly = gf2_poly<P>((msg & msg_mask) << n_parity_bits);
+    const auto parity_poly = shifted_msg_poly % g;
+    return (shifted_msg_poly + parity_poly).get_poly();
+}
+
+// Template specialization for P = bitset256_t
+template <typename T>
+T _encode(const T& msg,
+          const gf2_poly<bitset256_t>& g,
+          uint32_t msg_mask,
+          uint32_t n_parity_bits)
+{
+    const auto shifted_msg_poly =
+        gf2_poly<bitset256_t>((msg & msg_mask) << n_parity_bits);
+    const auto parity_poly = shifted_msg_poly % g;
+    return static_cast<T>((shifted_msg_poly + parity_poly).get_poly().to_ulong());
+}
+
 template <typename T, typename P>
 T bch_codec<T, P>::encode(const T& msg) const
 {
@@ -128,16 +157,7 @@ T bch_codec<T, P>::encode(const T& msg) const
     if (m_n > sizeof(T) * 8)
         throw std::runtime_error("Type T cannot fit the codeword length n.");
 
-    // The codeword is given by:
-    //
-    // c(x) = x^(n-k)*d(x) + rho(x),
-    //
-    // where d(x) is the message, x^(n-k)*d(x) shifts the message by n-k bits (i.e., to
-    // create space for the parity bits), and rho(x) (the polynomial representing the
-    // parity bits) is equal to the remainder of x^(n-k)*d(x) divided by g(x).
-    const auto shifted_msg_poly = gf2_poly<P>((msg & m_msg_mask) << m_parity);
-    const auto parity_poly = shifted_msg_poly % m_g;
-    return (shifted_msg_poly + parity_poly).get_poly();
+    return _encode(msg, m_g, m_msg_mask, m_parity);
 }
 
 template <typename T, typename P>
@@ -353,7 +373,7 @@ template class bch_codec<uint16_t, uint32_t>;
 template class bch_codec<uint32_t, uint32_t>;
 template class bch_codec<uint32_t, uint64_t>;
 template class bch_codec<uint64_t, uint64_t>;
-template class bch_codec<int, int>;
+template class bch_codec<uint32_t, bitset256_t>;
 
 } // namespace dvbs2rx
 } // namespace gr

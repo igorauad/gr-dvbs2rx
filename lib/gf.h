@@ -328,8 +328,8 @@ public:
 typedef gf2_poly<uint16_t> gf2_poly_u16;
 typedef gf2_poly<uint32_t> gf2_poly_u32;
 typedef gf2_poly<uint64_t> gf2_poly_u64;
-typedef std::bitset<192> bitset192_t;
-typedef gf2_poly<bitset192_t> gf2_poly_b192;
+typedef std::bitset<256> bitset256_t;
+typedef gf2_poly<bitset256_t> gf2_poly_b256;
 
 } // namespace dvbs2rx
 } // namespace gr

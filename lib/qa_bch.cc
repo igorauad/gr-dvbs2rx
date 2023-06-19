@@ -20,7 +20,8 @@ typedef boost::mpl::list<boost::mpl::pair<uint16_t, uint16_t>,
                          boost::mpl::pair<uint16_t, uint32_t>,
                          boost::mpl::pair<uint32_t, uint32_t>,
                          boost::mpl::pair<uint32_t, uint64_t>,
-                         boost::mpl::pair<uint64_t, uint64_t>>
+                         boost::mpl::pair<uint64_t, uint64_t>,
+                         boost::mpl::pair<uint32_t, bitset256_t>>
     bch_base_types;
 
 
@@ -59,7 +60,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_gen_poly, type_pair, bch_base_types)
         galois_field gf_m6(prim_poly_m6);
         // t = 1
         bch_codec<T, P> codec_m6_t1(&gf_m6, 1);
-        gf2_poly<P> g1 = prim_poly_m6.get_poly(); // x^6 + x + 1
+        gf2_poly<P> g1 = gf2_poly<P>(0b1000011); // x^6 + x + 1
         BOOST_CHECK(codec_m6_t1.get_gen_poly() == g1);
         BOOST_CHECK_EQUAL(codec_m6_t1.get_k(), 57);
         // t = 2
@@ -334,6 +335,14 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode_error_free,
         bch_codec<T, P> codec(&gf, 15);   // t = 15
         check_err_free_decode(codec, gf);
     }
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_dvbs2)
+{
+    // From Table 6a (Normal FECFRAME) based on GF(2^16)
+    gf2_poly_u32 prim_poly1(0b10000000000101101);      // x^16 + x^5 + x^3 + x^2 + 1
+    galois_field gf1(prim_poly1);
+    bch_codec<uint32_t, bitset256_t> codec1(&gf1, 12); // t = 12
 }
 
 } // namespace dvbs2rx

@@ -350,7 +350,7 @@ template class gf2_poly<uint16_t>;
 template class gf2_poly<uint32_t>;
 template class gf2_poly<uint64_t>;
 template class gf2_poly<int>;
-template class gf2_poly<bitset192_t>;
+template class gf2_poly<bitset256_t>;
 
 template class gf2m_poly<uint16_t>;
 template class gf2m_poly<uint32_t>;
