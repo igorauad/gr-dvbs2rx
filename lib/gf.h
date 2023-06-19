@@ -29,6 +29,7 @@ class DVBS2RX_API gf2m_poly;
 /**
  * @brief Galois Field GF(2^m).
  *
+ * @tparam T Base type for the field elements.
  * @note See the reference implementation at
  * https://github.com/igorauad/bch/blob/master/gf.py.
  */
@@ -135,6 +136,8 @@ public:
  * @brief Polynomial over GF(2).
  *
  * A polynomial whose coefficients are elements from GF(2), i.e., binary.
+ *
+ * @tparam T Type whose bits represent the binary polynomial coefficients.
  */
 template <typename T>
 class DVBS2RX_API gf2_poly
@@ -217,6 +220,8 @@ public:
  * @brief Polynomial over GF(2^m).
  *
  * A polynomial whose coefficients are elements from a GF(2^m) extension field.
+ *
+ * @tparam T Type used to represent each polynomial coefficient as a GF(2^m) element.
  */
 template <typename T>
 class DVBS2RX_API gf2m_poly
