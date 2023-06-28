@@ -237,8 +237,12 @@ std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
 }
 
 template <typename T, typename P>
-std::vector<T> bch_codec<T, P>::syndrome(const u8_vector_t& codeword) const
+std::vector<T> bch_codec<T, P>::syndrome(const u8_ptr_t codeword) const
 {
+    if (m_k % 8 != 0 || m_n % 8 != 0)
+        throw std::runtime_error(
+            "u8 array processing is only supported for k and n multiple of 8.");
+
     std::vector<T> syndrome_vec;
     std::map<int, gf2_poly<T>> bi_map;
     for (int i = 1; i <= (2 * m_t); i++) {
@@ -246,8 +250,9 @@ std::vector<T> bch_codec<T, P>::syndrome(const u8_vector_t& codeword) const
         // difference here is that the remainder computation to obtain b_i(x) is based on
         // LUTs instead of manual bit shifts and XORs for each input bit.
         if (m_conjugate_map[i] == 0) // new b_i(x)
-            bi_map.emplace(i,
-                           gf2_poly_rem(codeword, m_min_poly[i], m_min_poly_rem_lut[i]));
+            bi_map.emplace(
+                i,
+                gf2_poly_rem(codeword, m_n_bytes, m_min_poly[i], m_min_poly_rem_lut[i]));
         const int bi_idx = (m_conjugate_map[i] == 0) ? i : m_conjugate_map[i];
         const auto& bi = bi_map.at(bi_idx);
         const auto bi_gf2m = gf2m_poly(m_gf, bi);

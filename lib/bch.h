@@ -103,8 +103,9 @@ public:
 
     /**
      * @overload
+     * @param codeword Pointer to u8 array with the received codeword.
      */
-    std::vector<T> syndrome(const u8_vector_t& codeword) const;
+    std::vector<T> syndrome(const u8_ptr_t codeword) const;
 
     /**
      * @brief Compute the error-location polynomial.

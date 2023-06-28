@@ -24,6 +24,22 @@ typedef boost::mpl::list<boost::mpl::pair<uint16_t, uint16_t>,
                          boost::mpl::pair<uint32_t, bitset256_t>>
     bch_base_types;
 
+template <typename T>
+T flip_bits(const T& in_codeword, uint32_t bch_n, uint32_t num_errors)
+{
+    std::set<uint32_t> flipped_bits;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, bch_n - 1);
+    T out_codeword = in_codeword;
+    for (uint32_t i = 0; i < num_errors; i++) {
+        uint32_t bit_idx = dis(gen);
+        while (flipped_bits.find(bit_idx) != flipped_bits.end())
+            bit_idx = dis(gen);
+        out_codeword ^= static_cast<T>(1) << bit_idx;
+    }
+    return out_codeword;
+}
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_gen_poly, type_pair, bch_base_types)
 {
@@ -210,11 +226,38 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_syndrome, type_pair, bch_base_types)
         gf.get_alpha_i(2), gf.get_alpha_i(4), gf.get_alpha_i(7), gf.get_alpha_i(8)
     };
     BOOST_CHECK(syndrome == expected_syndrome);
+}
 
-    // Same calculation but with the Rx codeword given by a vector of bytes
-    std::vector<uint8_t> rx_codeword2({ 0x01, 0x01 });
-    auto syndrome2 = codec.syndrome(rx_codeword2);
-    BOOST_CHECK(syndrome2 == expected_syndrome);
+BOOST_AUTO_TEST_CASE(test_bch_syndrome_u8_codeword)
+{
+    typedef uint64_t T;
+    typedef uint64_t P;
+
+    // Create a BCH codec with byte-aligned n and k
+    gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
+    galois_field gf(prim_poly);
+    uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
+    bch_codec<T, P> codec(&gf, t, /*n=*/56);
+    BOOST_CHECK_EQUAL(codec.get_n(), 56);
+    BOOST_CHECK_EQUAL(codec.get_k(), 32);
+    BOOST_CHECK(codec.get_n() % 8 == 0);
+    BOOST_CHECK(codec.get_k() % 8 == 0);
+    uint32_t n_bytes = codec.get_n() / 8;
+
+    // Compare the syndrome computed from a T-typed codeword with up to t errors to the
+    // syndrome computed based on an equivalent u8 array codeword.
+    T max_msg = (1 << codec.get_k()) - 1;
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T codeword = codec.encode(msg);
+        for (uint8_t num_errors = 0; num_errors <= t; num_errors++) {
+            T rx_codeword = flip_bits(codeword, codec.get_n(), num_errors);
+            auto syndrome = codec.syndrome(rx_codeword);
+            u8_vector_t rx_codeword_u8 = to_u8_vector(rx_codeword, n_bytes);
+            auto syndrome_u8 = codec.syndrome(rx_codeword_u8.data());
+            BOOST_CHECK_EQUAL_COLLECTIONS(
+                syndrome.begin(), syndrome.end(), syndrome_u8.begin(), syndrome_u8.end());
+        }
+    }
 }
 
 template <typename T, typename P>
@@ -325,23 +368,6 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_correction, type_pair, bch_base_types
     // Received codeword and syndrome
     T rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
     BOOST_CHECK_EQUAL(codec.decode(rx_codeword), 0);
-}
-
-template <typename T>
-T flip_bits(const T& in_codeword, uint32_t bch_n, uint32_t num_errors)
-{
-    std::set<uint32_t> flipped_bits;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, bch_n - 1);
-    T out_codeword = in_codeword;
-    for (uint32_t i = 0; i < num_errors; i++) {
-        uint32_t bit_idx = dis(gen);
-        while (flipped_bits.find(bit_idx) != flipped_bits.end())
-            bit_idx = dis(gen);
-        out_codeword ^= static_cast<T>(1) << bit_idx;
-    }
-    return out_codeword;
 }
 
 template <typename T, typename P>
