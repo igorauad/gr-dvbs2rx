@@ -55,11 +55,12 @@ gf2_poly<P> compute_gen_poly(const galois_field<T>* const gf, uint8_t t)
 }
 
 template <typename T, typename P>
-bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t)
+bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t, uint32_t n)
     : m_gf(gf),
       m_t(t),
       m_g(std::move(compute_gen_poly<T, P>(gf, t))),
-      m_n((static_cast<uint32_t>(1) << gf->get_m()) - 1),
+      m_n(n == 0 ? ((static_cast<uint32_t>(1) << gf->get_m()) - 1) : n),
+      m_s(((static_cast<uint32_t>(1) << gf->get_m()) - 1) - m_n),
       m_k(m_n - m_g.degree()),
       m_parity(m_n - m_k),
       m_n_bytes(m_n / 8),
@@ -74,6 +75,13 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t)
       m_min_poly_rem_lut(2 * t + 1),
       m_gen_poly_lut_generated(false)
 {
+    if (n > ((static_cast<uint32_t>(1) << gf->get_m()) - 1))
+        throw std::runtime_error("Codeword length n exceeds the maximum of (2^m - 1)");
+
+    if (static_cast<int>(m_n) <= m_g.degree())
+        throw std::runtime_error(
+            "Codeword length n must be greater than the generator polynomial's degree");
+
     if (gf->get_m() > (sizeof(uint32_t) * 8) - 1) // ensure m_n does not overflow
         throw std::runtime_error("GF(2^m) dimension m not supported (too large)");
 
@@ -328,11 +336,13 @@ template <typename T, typename P>
 std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
 {
     // Given the codeword has length n, the error location numbers can range from alpha^0
-    // to alpha^n-1. Since alpha^n = alpha^(2^m - 1) = 1, the corresponding inverses range
-    // from alpha^n to alpha. See if any of these are the roots of sigma and record the
-    // results. TODO: optimize this computation using a strategy like the one in Fig. 6.1.
+    // to alpha^n-1. Since alpha^(n+s) = alpha^(2^m - 1) = 1, the corresponding inverses
+    // range from alpha^(n+s) to alpha^(s+1). See if any of these are the roots of sigma
+    // and record the results.
+    //
+    // TODO: optimize this computation using a strategy like the one in Fig. 6.1.
     std::vector<T> numbers;
-    for (uint32_t i = 1; i < m_n; i++) {
+    for (uint32_t i = m_s + 1; i < (m_n + m_s); i++) {
         const T elem = m_gf->get_alpha_i(i);
         if (sigma(elem) == 0)
             numbers.push_back(m_gf->inverse(elem));

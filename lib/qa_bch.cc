@@ -371,6 +371,34 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode, type_pair, bch_base_types)
     }
 }
 
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode_shortened_bch,
+                              type_pair,
+                              bch_base_types)
+{
+    typedef typename type_pair::first T;
+    typedef typename type_pair::second P;
+
+    gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+    uint8_t t = 2;                  // Double-error-correcting code
+    uint32_t n_nominal = (1 << gf.get_m()) - 1;
+    uint32_t max_s = n_nominal - (gf.get_m() * t);
+    // The generator polynomial has degree less than or equal to m*t. Hence, the maximum
+    // shortening amount s could be slightly higher than the given max_s, but the given
+    // range is ok for testing purposes.
+
+    for (uint32_t s = 0; s < max_s; s++) {
+        uint32_t n = n_nominal - s;
+        bch_codec<T, P> codec(&gf, t, n);
+        // Error free
+        check_decode(codec, gf);
+        // Error correction
+        for (uint8_t num_errors = 1; num_errors <= t; num_errors++) {
+            check_decode(codec, gf, num_errors);
+        }
+    }
+}
+
 BOOST_AUTO_TEST_CASE(test_bch_dvbs2)
 {
     // From Table 6a (Normal FECFRAME) based on GF(2^16)

@@ -34,6 +34,7 @@ private:
     uint8_t m_t;                         // error correction capability
     gf2_poly<P> m_g;                     // generator polynomial
     uint32_t m_n;                        // codeword length
+    uint32_t m_s;                        // code shortening
     uint32_t m_k;                        // message length
     uint32_t m_parity;                   // number of parity bits
     uint32_t m_n_bytes;                  // codeword length in bytes
@@ -69,8 +70,15 @@ public:
      *
      * @param gf Reference Galois field.
      * @param t Target error correction capability.
+     * @param n Target codeword length in bits.
+     * @note The default codeword length is n=(2^m - 1), where m is the dimension of the
+     * GF(2^m) Galois Field, so the codeword length is inferred from the gf parameter.
+     * Alternatively, a codeword length lower than (2^m - 1) and greater than the
+     * generator polynomial's degree can be specified through parameter n. In this case,
+     * the constructor attempts to construct a shortened (n - s, k - s) BCH code, with
+     * parameter s equal to (2^m - 1) - n.
      */
-    bch_codec(const galois_field<T>* const gf, uint8_t t);
+    bch_codec(const galois_field<T>* const gf, uint8_t t, uint32_t n = 0);
 
     /**
      * @brief Encode an input message.
