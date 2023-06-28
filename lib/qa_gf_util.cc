@@ -17,6 +17,27 @@ namespace dvbs2rx {
 
 typedef boost::mpl::list<uint16_t, uint32_t, uint64_t> gf2_poly_base_types;
 
+BOOST_AUTO_TEST_CASE_TEMPLATE(to_from_u8_vector, T, gf2_poly_base_types)
+{
+    // Generate a random value of type T from a uniform distribution.
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<T> dis(0, std::numeric_limits<T>::max());
+
+    // Convert to u8 vector and back.
+    const T val = dis(gen);
+    const auto u8_vec = to_u8_vector(val);
+    const auto val2 = from_u8_vector<T>(u8_vec);
+    BOOST_CHECK(val == val2);
+
+    // Limit the number of bytes for the conversion.
+    const size_t n_bytes = sizeof(T) - 1;
+    const T mask = bitmask<T>(n_bytes * 8);
+    const auto u8_vec2 = to_u8_vector(val, n_bytes);
+    const auto val3 = from_u8_vector<T>(u8_vec2);
+    BOOST_CHECK((val & mask) == val3);
+}
+
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_remainder, T, gf2_poly_base_types)
 {
     // Example 1:

@@ -168,6 +168,33 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encoder, type_pair, bch_base_types)
     }
 }
 
+BOOST_AUTO_TEST_CASE(test_bch_encoder_u8_vector_out)
+{
+    typedef uint64_t T;
+    typedef uint64_t P;
+
+    // Create a BCH codec with byte-aligned n and k
+    gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
+    galois_field gf(prim_poly);
+    uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
+    bch_codec<T, P> codec(&gf, t, /*n=*/56);
+    BOOST_CHECK_EQUAL(codec.get_n(), 56);
+    BOOST_CHECK_EQUAL(codec.get_k(), 32);
+    BOOST_CHECK(codec.get_n() % 8 == 0);
+    BOOST_CHECK(codec.get_k() % 8 == 0);
+    uint32_t n_bytes = codec.get_n() / 8;
+
+    // Compare encoding into type T and u8 array
+    T max_msg = (1 << codec.get_k()) - 1;
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T codeword = codec.encode(msg);
+        u8_vector_t msg_u8 = to_u8_vector(msg);
+        u8_vector_t codeword_u8(n_bytes);
+        codec.encode(msg_u8.data(), codeword_u8.data());
+        BOOST_CHECK_EQUAL(codeword, from_u8_vector<T>(codeword_u8));
+    }
+}
+
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_syndrome, type_pair, bch_base_types)
 {
     typedef typename type_pair::first T;

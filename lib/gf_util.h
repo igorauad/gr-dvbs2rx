@@ -101,16 +101,39 @@ inline bool is_bit_set(const bitset256_t& x, int i_bit)
  *
  * @tparam T Bit storage type.
  * @param val Value to be converted.
+ * @param n_bytes Number of least significant bytes to be converted. E.g., n_bytes=3
+ * converts the three least significant bytes of val into a vector in network order.
  * @return u8_vector_t Resulting u8 vector.
  */
 template <typename T>
-inline u8_vector_t to_u8_vector(T val)
+inline u8_vector_t to_u8_vector(T val, size_t n_bytes = sizeof(T))
 {
+    if (n_bytes > sizeof(T))
+        throw std::invalid_argument("n_bytes too large for type T");
     u8_vector_t vec;
-    for (int i = sizeof(T) - 1; i >= 0; i--) {
+    for (int i = n_bytes - 1; i >= 0; i--) {
         vec.push_back(get_byte(val, i));
     }
     return vec;
+}
+
+/**
+ * @brief Convert u8 vector in network byte order (big-endian) to type
+ *
+ * @tparam T Bit storage type.
+ * @param vec u8 vector to be converted.
+ * @return T Resulting value.
+ */
+template <typename T>
+inline T from_u8_vector(const u8_vector_t& vec)
+{
+    if (vec.size() > sizeof(T))
+        throw std::invalid_argument("u8 vector too large for type T");
+    T val = 0;
+    for (size_t i = 0; i < vec.size(); i++) {
+        val |= static_cast<T>(vec[i]) << ((vec.size() - 1 - i) * 8);
+    }
+    return val;
 }
 
 /**

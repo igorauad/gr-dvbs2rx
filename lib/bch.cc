@@ -93,6 +93,21 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t, uint32_t 
         m_min_poly_rem_lut[i] = build_gf2_poly_rem_lut(m_min_poly[i]);
     }
 
+    // When k and n are multiples of 8, the message and parity bits are byte-aligned, so
+    // encoding into bytes array becomes supported. For that, generate the LUT to help
+    // computing the remainder of "r(x) % g(x)", where r(x) is an arbitrary GF(2)
+    // polynomial and g(x) is the generator polynomial.
+    //
+    // NOTE: This LUT imposes an additional limitation on the maximum degree of g(x) based
+    // on the size of type P. Since g(x) can have degree up to m*t, the P-typed remainder
+    // LUT can only be computed for a g(x) with degree up to (sizeof(P) - 1)*8, as
+    // detailed in the implementation of the LUT builder. Hence, to alleviate the issue,
+    // compute the LUT only when bytes-based encoding is supported.
+    if (m_k % 8 == 0 || m_n % 8 == 0) {
+        m_gen_poly_rem_lut = build_gf2_poly_rem_lut(m_g);
+        m_gen_poly_lut_generated = true;
+    }
+
     // To speed up the syndrome computation, it is useful to keep a map of the elements
     // associated with the same minimal polynomial (conjugates). For the i-th index, a
     // value m_conjugate_map[i] equal to j (with j > 0) indicates that alpha^i has a
@@ -118,14 +133,6 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t, uint32_t 
     }
 }
 
-template <typename T, typename P>
-void bch_codec<T, P>::build_gen_poly_rem_lut()
-{
-    if (m_gen_poly_lut_generated)
-        return;
-    m_gen_poly_rem_lut = build_gf2_poly_rem_lut(m_g);
-    m_gen_poly_lut_generated = true;
-}
 
 // Encode into type T
 template <typename T, typename P>
@@ -169,7 +176,7 @@ T bch_codec<T, P>::encode(const T& msg) const
 }
 
 template <typename T, typename P>
-void bch_codec<T, P>::encode(const u8_ptr_t& msg, u8_ptr_t codeword) const
+void bch_codec<T, P>::encode(const u8_ptr_t msg, u8_ptr_t codeword) const
 {
     // For simplicity, make sure k and n are byte-aligned when representing messages and
     // codewords by byte arrays.
@@ -183,7 +190,7 @@ void bch_codec<T, P>::encode(const u8_ptr_t& msg, u8_ptr_t codeword) const
     memcpy(codeword, msg, m_k_bytes);                // systematic bytes
     memset(codeword + m_k_bytes, 0, m_parity_bytes); // zero-initialize the parity bytes
     const auto parity_poly = gf2_poly_rem(codeword, m_n_bytes, m_g, m_gen_poly_rem_lut);
-    const auto parity_poly_u8_vec = to_u8_vector(parity_poly.get_poly());
+    const auto parity_poly_u8_vec = to_u8_vector(parity_poly.get_poly(), m_parity_bytes);
     memcpy(codeword + m_k_bytes, parity_poly_u8_vec.data(), m_parity_bytes);
 }
 

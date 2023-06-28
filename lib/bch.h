@@ -50,20 +50,6 @@ private:
     bool m_gen_poly_lut_generated; // Whether the generator polynomial remainder LUT has
                                    // been generated already
 
-    /**
-     * @brief Build LUT to help computing the remainder of "r(x) % g(x)"
-     *
-     * where g(x) is the generator GF2 polynomial whose coefficients are represented by
-     * type P and r(x) is an arbitrary array of bytes (interpreted as a GF2 polynomial).
-     *
-     * @note This LUT is only used and computed when the message and codewords are
-     * encoded/decoded into/from u8 arrays. The disadvantage of computing when not needed
-     * is that the LUT imposes an additional limitation on the maximum degree of g(x)
-     * based on the size of type P. Since g(x) can have degree up to m*t, the P-typed
-     * remainder LUT can only be computed for a g(x) with degree up to (sizeof(P) - 1)*8.
-     */
-    void build_gen_poly_rem_lut();
-
 public:
     /**
      * @brief Construct a new BCH coder/decoder object
@@ -105,7 +91,7 @@ public:
      * data and space.
      * @note This bytes-based encoding is only supported when n and k are multiples of 8.
      */
-    void encode(const u8_ptr_t& msg, u8_ptr_t codeword) const;
+    void encode(const u8_ptr_t msg, u8_ptr_t codeword) const;
 
     /**
      * @brief Compute syndrome of a receiver codeword.
