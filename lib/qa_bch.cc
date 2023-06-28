@@ -300,22 +300,40 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_correction, type_pair, bch_base_types
     BOOST_CHECK_EQUAL(codec.decode(rx_codeword), 0);
 }
 
+template <typename T>
+T flip_bits(const T& in_codeword, uint32_t bch_n, uint32_t num_errors)
+{
+    std::set<uint32_t> flipped_bits;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, bch_n - 1);
+    T out_codeword = in_codeword;
+    for (uint32_t i = 0; i < num_errors; i++) {
+        uint32_t bit_idx = dis(gen);
+        while (flipped_bits.find(bit_idx) != flipped_bits.end())
+            bit_idx = dis(gen);
+        out_codeword ^= static_cast<T>(1) << bit_idx;
+    }
+    return out_codeword;
+}
+
 template <typename T, typename P>
-void check_err_free_decode(const bch_codec<T, P>& codec, const galois_field<T>& gf)
+void check_decode(const bch_codec<T, P>& codec,
+                  const galois_field<T>& gf,
+                  uint8_t num_errors = 0)
 {
     // The syndrome should be zero for error-free codewords
     T max_msg = (1 << codec.get_k()) - 1;
     for (T msg = 0; msg <= max_msg; msg++) {
-        T rx_codeword = codec.encode(msg);
+        T tx_codeword = codec.encode(msg);
+        T rx_codeword = flip_bits(tx_codeword, codec.get_n(), num_errors);
         T decoded_msg = codec.decode(rx_codeword);
         BOOST_CHECK_EQUAL(decoded_msg, msg);
     }
 }
 
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode_error_free,
-                              type_pair,
-                              bch_base_types)
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode, type_pair, bch_base_types)
 {
     typedef typename type_pair::first T;
     typedef typename type_pair::second P;
@@ -324,16 +342,32 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode_error_free,
     if (sizeof(T) * 8 >= 16) {
         gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
         galois_field gf(prim_poly);
-        bch_codec<T, P> codec(&gf, 2);  // Double-error-correcting code
-        check_err_free_decode(codec, gf);
+        uint8_t t = 2;                  // Double-error-correcting code
+        bch_codec<T, P> codec(&gf, t);
+
+        // Error free
+        check_decode(codec, gf);
+
+        // Error correction
+        for (uint8_t num_errors = 1; num_errors <= t; num_errors++) {
+            check_decode(codec, gf, num_errors);
+        }
     }
 
     // BCH code over GF(2^6)
     if (sizeof(T) * 8 >= 64) {
         gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
         galois_field gf(prim_poly);
-        bch_codec<T, P> codec(&gf, 15);   // t = 15
-        check_err_free_decode(codec, gf);
+        uint8_t t = 15;
+        bch_codec<T, P> codec(&gf, t);
+
+        // Error free
+        check_decode(codec, gf);
+
+        // Error correction
+        for (uint8_t num_errors = 1; num_errors <= t; num_errors++) {
+            check_decode(codec, gf, num_errors);
+        }
     }
 }
 
