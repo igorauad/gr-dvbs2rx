@@ -362,31 +362,117 @@ std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
     return numbers;
 }
 
+/**
+ * @brief Check if the codeword has errors according to the syndrome vector.
+ *
+ * @tparam T GF(2^m) element type.
+ * @param syndrome Syndrome vector.
+ * @return true if there are errors in the codeword, false otherwise.
+ */
+template <typename T>
+bool syndrome_has_errors(const std::vector<T>& syndrome)
+{
+    for (const T& element : syndrome) {
+        if (element != 0)
+            return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Correct errors in the given codeword.
+ *
+ * @tparam T Codeword type and GF(2^m) element type.
+ * @param codeword n-bit codeword to be corrected.
+ * @param n Codeword length in bits.
+ * @param gf Reference Galois field.
+ * @param numbers Error location numbers.
+ */
+template <typename T>
+void correct_errors(T& codeword,
+                    uint32_t n,
+                    const galois_field<T>* gf,
+                    const std::vector<T>& numbers)
+{
+    for (const T& number : numbers) {
+        // An error-location number alpha^j means there is an error in the polynomial
+        // coefficient (bit) multiplying x^j, namely the j-th bit. Thus, we can correct
+        // the error by flipping the j-th bit.
+        uint32_t bit_idx = gf->get_exponent(number);
+        if (bit_idx >= n) // should be up to n -1 only
+            throw std::runtime_error("Error location number out of range");
+        codeword ^= static_cast<T>(1) << bit_idx;
+    }
+}
+
+/**
+ * @brief Correct errors in the given codeword.
+ *
+ * @tparam T GF(2^m) element type.
+ * @param decoded_msg Pointer to the k/8 bytes message extracted from the systematic part
+ * of the codeword u8 array in network byte order.
+ * @param n Codeword length in bits.
+ * @param k Message length in bits.
+ * @param gf Reference Galois field.
+ * @param numbers Error location numbers.
+ * @note Unlike the alternative implementation based on T-typed codewords, this
+ * implementation (based on u8 arrays) corrects the k-bit message part only while ignoring
+ * errors in the parity bits. The main motivation for this approach is the ability to
+ * modify the decoded message in place with no need for changing the codeword array.
+ */
+template <typename T>
+void correct_errors(u8_ptr_t decoded_msg,
+                    uint32_t n,
+                    uint32_t k,
+                    const galois_field<T>* gf,
+                    const std::vector<T>& numbers)
+{
+    for (const T& number : numbers) {
+        // Same as above but taking the network byte order into account. When interpreting
+        // the codeword as a polynomial over GF(2), the first bit in the first byte of the
+        // array pointed by decoded_msg is the highest-order coefficient (multiplying
+        // x^(n-1)) and the last valid bit in the array is the coefficient of x^(n-k). The
+        // lower n-k coefficients from x^(n-k-1) down to x^0 are the parity bits, which
+        // should not be in the array pointed by the decoded_msg argument.
+        uint32_t bit_idx = gf->get_exponent(number);
+        if (bit_idx >= n)      // should be up to n -1 only
+            throw std::runtime_error("Error location number out of range");
+        if (bit_idx < (n - k)) // error in the parity bits (no need to correct)
+            continue;
+        uint32_t bit_idx_net_order = n - 1 - bit_idx;
+        uint32_t byte_idx = bit_idx_net_order / 8;
+        uint32_t bit_idx_in_byte = 7 - (bit_idx_net_order % 8);
+        decoded_msg[byte_idx] ^= static_cast<unsigned char>(1) << bit_idx_in_byte;
+    }
+}
+
 template <typename T, typename P>
 T bch_codec<T, P>::decode(T codeword) const
 {
     const auto s = syndrome(codeword);
-    bool has_errors = false;
-    for (const T& element : s) {
-        if (element != 0) {
-            has_errors = true;
-            break;
-        }
-    }
-
-    if (has_errors) {
+    if (syndrome_has_errors(s)) {
         const auto poly = err_loc_polynomial(s);
         const auto numbers = err_loc_numbers(poly);
-        for (const T& number : numbers) {
-            // An error-location number alpha^j means there is an error in the polynomial
-            // coefficient (bit) multiplying x^j, namely the j-th bit. Thus, we can
-            // correct the error by flipping the j-th bit.
-            T exponent = m_gf->get_exponent(number);
-            codeword ^= static_cast<T>(1) << exponent;
-        }
+        correct_errors(codeword, m_n, m_gf, numbers);
     }
-
     return (codeword >> m_parity) & m_msg_mask;
+}
+
+
+template <typename T, typename P>
+void bch_codec<T, P>::decode(const u8_ptr_t codeword, u8_ptr_t decoded_msg) const
+{
+    if (m_k % 8 != 0 || m_n % 8 != 0)
+        throw std::runtime_error(
+            "u8 array messages are only supported for k and n multiple of 8.");
+
+    memcpy(decoded_msg, codeword, m_k_bytes); // systematic bytes
+    const auto s = syndrome(codeword);
+    if (syndrome_has_errors(s)) {
+        const auto poly = err_loc_polynomial(s);
+        const auto numbers = err_loc_numbers(poly);
+        correct_errors(decoded_msg, m_n, m_k, m_gf, numbers);
+    }
 }
 
 /********** Explicit Instantiations **********/

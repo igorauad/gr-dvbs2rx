@@ -452,6 +452,37 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode_shortened_bch,
     }
 }
 
+BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array)
+{
+    typedef uint64_t T;
+    typedef uint64_t P;
+
+    // Create a BCH codec with byte-aligned n and k
+    gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
+    galois_field gf(prim_poly);
+    uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
+    bch_codec<T, P> codec(&gf, t, /*n=*/56);
+    BOOST_CHECK_EQUAL(codec.get_n(), 56);
+    BOOST_CHECK_EQUAL(codec.get_k(), 32);
+    BOOST_CHECK(codec.get_n() % 8 == 0);
+    BOOST_CHECK(codec.get_k() % 8 == 0);
+    uint32_t n_bytes = codec.get_n() / 8;
+    uint32_t k_bytes = codec.get_k() / 8;
+
+    // Add up to t errors to each possible message and decode
+    T max_msg = (1 << codec.get_k()) - 1;
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T codeword = codec.encode(msg);
+        for (uint8_t num_errors = 0; num_errors <= t; num_errors++) {
+            T rx_codeword = flip_bits(codeword, codec.get_n(), num_errors);
+            u8_vector_t rx_codeword_u8 = to_u8_vector(rx_codeword, n_bytes);
+            u8_vector_t decoded_msg(k_bytes);
+            codec.decode(rx_codeword_u8.data(), decoded_msg.data());
+            BOOST_CHECK_EQUAL(msg, from_u8_vector<T>(decoded_msg));
+        }
+    }
+}
+
 BOOST_AUTO_TEST_CASE(test_bch_dvbs2)
 {
     // From Table 6a (Normal FECFRAME) based on GF(2^16)

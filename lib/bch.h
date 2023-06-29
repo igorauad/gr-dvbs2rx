@@ -140,6 +140,16 @@ public:
     T decode(T codeword) const;
 
     /**
+     * @overload
+     * @param codeword Pointer to the received codeword with n/8 bytes.
+     * @param decoded_msg Pointer to the decoded message buffer with space for k/8 bytes.
+     * @note The caller should make sure the pointers point to memory regions with enough
+     * data and space.
+     * @note This bytes-based decoding is only supported when n and k are multiples of 8.
+     */
+    void decode(const u8_ptr_t codeword, u8_ptr_t decoded_msg) const;
+
+    /**
      * @brief Get the generator polynomial object.
      *
      * @return const gf2_poly<P>& Generator polynomial.
