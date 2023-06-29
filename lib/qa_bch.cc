@@ -24,21 +24,48 @@ typedef boost::mpl::list<boost::mpl::pair<uint16_t, uint16_t>,
                          boost::mpl::pair<uint32_t, bitset256_t>>
     bch_base_types;
 
+void fill_random_bytes(u8_vector_t& vec)
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 255);
+    for (size_t i = 0; i < vec.size(); i++) {
+        vec[i] = dis(gen);
+    }
+}
+
 template <typename T>
-T flip_bits(const T& in_codeword, uint32_t bch_n, uint32_t num_errors)
+T flip_bits(const T& in_data, uint32_t valid_bits, uint32_t num_bits)
 {
     std::set<uint32_t> flipped_bits;
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, bch_n - 1);
-    T out_codeword = in_codeword;
-    for (uint32_t i = 0; i < num_errors; i++) {
+    std::uniform_int_distribution<> dis(0, valid_bits - 1);
+    T out_data = in_data;
+    for (uint32_t i = 0; i < num_bits; i++) {
         uint32_t bit_idx = dis(gen);
         while (flipped_bits.find(bit_idx) != flipped_bits.end())
             bit_idx = dis(gen);
-        out_codeword ^= static_cast<T>(1) << bit_idx;
+        out_data ^= static_cast<T>(1) << bit_idx;
     }
-    return out_codeword;
+    return out_data;
+}
+
+void flip_bits(u8_vector_t& vec, uint32_t num_bits)
+{
+    std::set<uint32_t> flipped_bits;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, vec.size() * 8 - 1);
+    for (uint32_t i = 0; i < num_bits; i++) {
+        uint32_t bit_idx = dis(gen);
+        while (flipped_bits.find(bit_idx) != flipped_bits.end())
+            bit_idx = dis(gen);
+        uint32_t byte_idx = bit_idx / 8;
+        uint32_t bit_pos = bit_idx % 8;
+        vec[byte_idx] ^= (1 << bit_pos);
+        flipped_bits.insert(bit_idx);
+    }
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_gen_poly, type_pair, bch_base_types)
@@ -199,14 +226,21 @@ BOOST_AUTO_TEST_CASE(test_bch_encoder_u8_vector_out)
     BOOST_CHECK(codec.get_n() % 8 == 0);
     BOOST_CHECK(codec.get_k() % 8 == 0);
     uint32_t n_bytes = codec.get_n() / 8;
+    uint32_t k_bytes = codec.get_k() / 8;
 
     // Compare encoding into type T and u8 array
     T max_msg = (1 << codec.get_k()) - 1;
     for (T msg = 0; msg <= max_msg; msg++) {
         T codeword = codec.encode(msg);
-        u8_vector_t msg_u8 = to_u8_vector(msg);
+        u8_vector_t msg_u8 = to_u8_vector(msg, k_bytes);
         u8_vector_t codeword_u8(n_bytes);
         codec.encode(msg_u8.data(), codeword_u8.data());
+        // Ensure the systematic part is preserved on encoding
+        BOOST_CHECK_EQUAL_COLLECTIONS(msg_u8.begin(),
+                                      msg_u8.end(),
+                                      codeword_u8.begin(),
+                                      codeword_u8.begin() + k_bytes);
+        // Check the codewords match
         BOOST_CHECK_EQUAL(codeword, from_u8_vector<T>(codeword_u8));
     }
 }
@@ -483,12 +517,70 @@ BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array)
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_dvbs2)
+void test_dvbs2(bool normal_fecframe, uint32_t n, uint8_t t)
 {
-    // From Table 6a (Normal FECFRAME) based on GF(2^16)
-    gf2_poly_u32 prim_poly1(0b10000000000101101);      // x^16 + x^5 + x^3 + x^2 + 1
-    galois_field gf1(prim_poly1);
-    bch_codec<uint32_t, bitset256_t> codec1(&gf1, 12); // t = 12
+    // Primitive polynomials
+    // - Normal FECFRAME (Table 6a): x^16 + x^5 + x^3 + x^2 + 1, based on GF(2^16).
+    // - Short FECFRAME (Table 6b): x^14 + x^5 + x^3 + x + 1, based on GF(2^14).
+    uint32_t prim_poly_coefs = normal_fecframe ? 0b10000000000101101 : 0b100000000101011;
+    gf2_poly_u32 prim_poly(prim_poly_coefs);
+    galois_field gf(prim_poly);
+    bch_codec<uint32_t, bitset256_t> codec(&gf, t, n);
+    // NOTE: the generator polynomial can have degree up to 192, so use P=bitset256_t to
+    // store it. Also, use T=uint32_t to store the GF(2^m) elements (with up to 16 bits)
+    // and to represent the minimal polynomials (with up to 17 bits).
+    BOOST_CHECK_EQUAL(codec.get_n(), n);
+
+    // All DVB-S2 codeword and message lengths are byte-aligned
+    BOOST_CHECK(codec.get_n() % 8 == 0);
+    BOOST_CHECK(codec.get_k() % 8 == 0);
+
+    // Generate a random codeword
+    uint32_t k_bytes = codec.get_k() / 8;
+    uint32_t n_bytes = codec.get_n() / 8;
+    u8_vector_t msg(k_bytes);
+    u8_vector_t codeword(n_bytes);
+    fill_random_bytes(msg);
+    codec.encode(msg.data(), codeword.data());
+
+    // Add up to t random errors
+    flip_bits(codeword, t);
+
+    // Decode it with error correction
+    u8_vector_t decoded_msg(k_bytes);
+    codec.decode(codeword.data(), decoded_msg.data());
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        msg.begin(), msg.end(), decoded_msg.begin(), decoded_msg.end());
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_dvbs2_encode_decode)
+{
+    const auto params_table = std::vector<std::tuple<bool, uint32_t, uint8_t>>{
+        { true, 16200, 12 },  // Normal 1/4
+        { true, 21600, 12 },  // Normal 1/3
+        { true, 25920, 12 },  // Normal 2/5
+        { true, 32400, 12 },  // Normal 1/2
+        { true, 38880, 12 },  // Normal 3/5
+        { true, 43200, 10 },  // Normal 2/3
+        { true, 48600, 12 },  // Normal 3/4
+        { true, 51840, 12 },  // Normal 4/5
+        { true, 54000, 10 },  // Normal 5/6
+        { true, 57600, 8 },   // Normal 8/9
+        { true, 58320, 8 },   // Normal 9/10
+        { false, 3240, 12 },  // Short 1/4
+        { false, 5400, 12 },  // Short 1/3
+        { false, 6480, 12 },  // Short 2/5
+        { false, 7200, 12 },  // Short 1/2
+        { false, 9720, 12 },  // Short 3/5
+        { false, 10800, 12 }, // Short 2/3
+        { false, 11880, 12 }, // Short 3/4
+        { false, 12600, 12 }, // Short 4/5
+        { false, 13320, 12 }, // Short 5/6
+        { false, 14400, 12 }  // Short 8/9
+    };
+    for (const auto& params : params_table) {
+        test_dvbs2(std::get<0>(params), std::get<1>(params), std::get<2>(params));
+    }
 }
 
 } // namespace dvbs2rx
