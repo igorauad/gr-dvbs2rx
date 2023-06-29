@@ -16,6 +16,13 @@
 namespace gr {
 namespace dvbs2rx {
 
+void assert_byte_aligned_n_k(uint32_t n, uint32_t k)
+{
+    if (n % 8 != 0 || k % 8 != 0)
+        throw std::runtime_error(
+            "u8 array messages are only supported for n and k multiple of 8.");
+}
+
 /**
  * @brief Compute the generator polynomial g(x) for a BCH code.
  *
@@ -180,9 +187,7 @@ void bch_codec<T, P>::encode(const u8_ptr_t msg, u8_ptr_t codeword) const
 {
     // For simplicity, make sure k and n are byte-aligned when representing messages and
     // codewords by byte arrays.
-    if (m_k % 8 != 0 || m_n % 8 != 0)
-        throw std::runtime_error(
-            "u8 array messages are only supported for k and n multiple of 8.");
+    assert_byte_aligned_n_k(m_n, m_k);
 
     if (!m_gen_poly_lut_generated)
         throw std::runtime_error("Generator polynomial remainder LUT not generated.");
@@ -239,10 +244,7 @@ std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
 template <typename T, typename P>
 std::vector<T> bch_codec<T, P>::syndrome(const u8_ptr_t codeword) const
 {
-    if (m_k % 8 != 0 || m_n % 8 != 0)
-        throw std::runtime_error(
-            "u8 array processing is only supported for k and n multiple of 8.");
-
+    assert_byte_aligned_n_k(m_n, m_k);
     std::vector<T> syndrome_vec;
     std::map<int, gf2_poly<T>> bi_map;
     for (int i = 1; i <= (2 * m_t); i++) {
@@ -462,10 +464,7 @@ T bch_codec<T, P>::decode(T codeword) const
 template <typename T, typename P>
 void bch_codec<T, P>::decode(const u8_ptr_t codeword, u8_ptr_t decoded_msg) const
 {
-    if (m_k % 8 != 0 || m_n % 8 != 0)
-        throw std::runtime_error(
-            "u8 array messages are only supported for k and n multiple of 8.");
-
+    assert_byte_aligned_n_k(m_n, m_k);
     memcpy(decoded_msg, codeword, m_k_bytes); // systematic bytes
     const auto s = syndrome(codeword);
     if (syndrome_has_errors(s)) {
