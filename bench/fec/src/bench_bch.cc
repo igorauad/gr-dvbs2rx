@@ -1,177 +1,29 @@
-#include "bose_chaudhuri_hocquenghem_decoder.hh"
-#include "galois_field.hh"
+#include "gr_bch.h"
 #include <aff3ct.hpp>
 #include <boost/program_options.hpp>
-#include <bitset>
 #include <iostream>
-#include <memory>
-#include <string>
 #include <vector>
 
 using namespace aff3ct;
 namespace po = boost::program_options;
 
-typedef CODE::GaloisField<16, 0b10000000000101101, uint16_t> GF_NORMAL;
-typedef CODE::GaloisField<15, 0b1000000000101101, uint16_t> GF_MEDIUM;
-typedef CODE::GaloisField<14, 0b100000000101011, uint16_t> GF_SHORT;
-typedef CODE::BoseChaudhuriHocquenghemDecoder<24, 1, 65343, GF_NORMAL> BCH_NORMAL_12;
-typedef CODE::BoseChaudhuriHocquenghemDecoder<20, 1, 65375, GF_NORMAL> BCH_NORMAL_10;
-typedef CODE::BoseChaudhuriHocquenghemDecoder<16, 1, 65407, GF_NORMAL> BCH_NORMAL_8;
-typedef CODE::BoseChaudhuriHocquenghemDecoder<24, 1, 32587, GF_MEDIUM> BCH_MEDIUM_12;
-typedef CODE::BoseChaudhuriHocquenghemDecoder<24, 1, 16215, GF_SHORT> BCH_SHORT_12;
-
-#define MAX_BCH_PARITY_BITS 192
-
-template <typename T>
-void bit_vector_to_bitset(const std::vector<T>& in_vec,
-                          std::bitset<MAX_BCH_PARITY_BITS>& out_bitset,
-                          unsigned int len)
+enum DecoderImpl { AFF3CT_IMPL = 0, GR_DVBS2RX_IMPL = 1 };
+std::map<int, std::string> decoder_impl_map = { { AFF3CT_IMPL, "aff3ct" },
+                                                { GR_DVBS2RX_IMPL, "gr-dvbs2rx" } };
+std::string get_decoder_impl_options()
 {
-    for (unsigned int i = 0; i < len; i++)
-        out_bitset[i] = in_vec[i];
+    std::string options = "Decoder implementation: ";
+    for (auto& kv : decoder_impl_map) {
+        options += kv.second + " (" + std::to_string(kv.first) + "), ";
+    }
+    return options;
 }
 
 struct BchEncoder {
 private:
-    int m_K;      // Message length in bits.
-    int m_N;      // Codeword length in bits.
-    int m_t;      // t-error correction capability
-    int m_impl;   // Decoder implementation
-    int m_parity; // Parity bits
+    int m_impl; // Decoder implementation
+    std::unique_ptr<gr::dvbs2::GrBchEncoder> m_gr_encoder;
     std::unique_ptr<module::Encoder_BCH<>> m_aff3ct_encoder;
-    std::bitset<MAX_BCH_PARITY_BITS> m_crc_table[256];
-    std::bitset<MAX_BCH_PARITY_BITS> m_gen_poly;
-
-    void multiply_poly(const std::vector<uint8_t>& in_a,
-                       const std::vector<uint8_t>& in_b,
-                       std::vector<uint8_t>& out)
-    {
-        int len_a = in_a.size();
-        int len_b = in_b.size();
-        out.clear();
-        out.resize(len_a + len_b - 1);
-        for (int i = 0; i < len_a; i++) {
-            for (int j = 0; j < len_b; j++) {
-                out[i + j] ^= in_a[i] & in_b[j];
-            }
-        }
-    }
-
-    void compute_gen_poly(bool normal_fecframe)
-    {
-        // Normal FECFRAME minimal polynomials (Table 6a)
-        const std::vector<std::vector<uint8_t>> normal_min_poly = {
-            { 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // g1(x)
-            { 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1 }, // g2(x)
-            { 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1 }, // g3(x)
-            { 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1 }, // g4(x)
-            { 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1 }, // g5(x)
-            { 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1 }, // g6(x)
-            { 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1 }, // g7(x)
-            { 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1 }, // g8(x)
-            { 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1 }, // g9(x)
-            { 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1 }, // g10(x)
-            { 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1 }, // g11(x)
-            { 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1 }  // g12(x)
-        };
-
-        // Short FECFRAME minimal polynomials (Table 6b)
-        const std::vector<std::vector<uint8_t>> short_min_poly = {
-            { 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // g1(x)
-            { 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1 }, // g2(x)
-            { 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1 }, // g3(x)
-            { 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1 }, // g4(x)
-            { 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1 }, // g5(x)
-            { 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1 }, // g6(x)
-            { 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1 }, // g7(x)
-            { 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1 }, // g8(x)
-            { 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1 }, // g9(x)
-            { 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1 }, // g10(x)
-            { 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1 }, // g11(x)
-            { 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1 }  // g12(x)
-        };
-
-        const std::vector<std::vector<uint8_t>> min_poly =
-            normal_fecframe ? normal_min_poly : short_min_poly;
-
-        // The generator polynomial is the product of the first t minimal polynomials
-        std::vector<uint8_t> gen_poly_vec = { 1 };
-        for (unsigned int i = 0; i < m_t; i++) {
-            std::vector<uint8_t> prev_gen_poly_vec = gen_poly_vec;
-            multiply_poly(min_poly[i], prev_gen_poly_vec, gen_poly_vec);
-        }
-        assert(gen_poly_vec.size() == m_parity + 1);
-
-        // Convert polynomial vector to bitset
-        bit_vector_to_bitset(gen_poly_vec, m_gen_poly, m_parity);
-    }
-
-    void compute_crc_table(void)
-    {
-        // See http://www.sunshine2k.de/articles/coding/crc/understanding_crc.html
-        for (int dividend = 0; dividend < 256; dividend++) {
-            std::bitset<MAX_BCH_PARITY_BITS> shift_reg(dividend);
-            shift_reg <<= m_parity - 8; // put dividend byte on the register's MSB
-            for (unsigned char bit = 0; bit < 8; bit++) {
-                if (shift_reg[m_parity - 1]) {
-                    shift_reg <<= 1;
-                    shift_reg ^= m_gen_poly;
-                } else {
-                    shift_reg <<= 1;
-                }
-            }
-            m_crc_table[dividend] = shift_reg;
-        }
-    }
-
-    void gr_encode(const std::vector<int>& ref_bits, std::vector<int>& enc_bits)
-    {
-        const int* in = ref_bits.data();
-        int* out = enc_bits.data();
-        std::bitset<MAX_BCH_PARITY_BITS> crc; // parity bits
-        // NOTE: call the parity bits the CRC for brevity. The computations of cyclic
-        // redundancy check (CRC) and parity bits of a cyclic code are equivalent.
-
-        // Systematic bits
-        memcpy(out, in, sizeof(int) * m_K);
-        out += m_K;
-
-        // Parity bits
-        for (int i_byte = 0; i_byte < (int)m_K / 8; i_byte++) { // byte-by-byte
-            // Pack the next 8 bits to form the next input (message) byte
-            unsigned char in_byte = 0;
-            for (int i_bit = 7; i_bit >= 0; i_bit--) {
-                in_byte |= *in++ << i_bit;
-            }
-
-            // The CRC "register" holds the remainder from the previous input message
-            // byte. This remainder has length m_parity bits and, therefore, leaks into
-            // the m_parity bits following it in the remainder computation. The first byte
-            // within these m_parity bits (the most significant byte or MSB) aligns with
-            // the next input message byte (in_byte) that we are about to process. Hence,
-            // get the MSB in the CRC "register" and XOR it with the the next input
-            // message byte. The result is the byte whose remainder is to be computed
-            // through a table look-up, namely the dividend (refer to Section 5 in
-            // http://www.sunshine2k.de/articles/coding/crc/understanding_crc.html).
-            unsigned char msb_crc = 0;
-            for (int n = 1; n <= 8; n++) {
-                msb_crc |= crc[m_parity - n] << (8 - n);
-            }
-            unsigned char dividend = (msb_crc ^ in_byte);
-
-            // The first byte from the previous remainder (i.e., msb_crc) is already
-            // included in the dividend. On the other hand, the remaining (m_parity - 8)
-            // bits from the previous remainder are not. These must be added (mod-2) back
-            // in the end. So, next, look-up the remainder from the dividend byte alone
-            // and add back the (m_parity - 8) lower bits from the previous remainder:
-            crc = (crc << 8) ^ m_crc_table[dividend];
-        }
-
-        // Serialize the parity bits to the output
-        for (int n = m_parity - 1; n >= 0; n--) {
-            *out++ = crc[n];
-        }
-    }
 
 public:
     /**
@@ -193,22 +45,17 @@ public:
                bool normal_fecframe,
                const tools::BCH_polynomial_generator<B>& gen_poly)
         : m_impl(impl),
-          m_K(K),
-          m_N(N),
-          m_t(t),
-          m_parity(N - K),
+          m_gr_encoder(new gr::dvbs2::GrBchEncoder(K, N, t, normal_fecframe)),
           m_aff3ct_encoder(new module::Encoder_BCH<>(K, N, gen_poly))
     {
-        compute_gen_poly(normal_fecframe);
-        compute_crc_table();
     }
 
     void encode(const std::vector<int>& ref_bits, std::vector<int>& enc_bits)
     {
-        if (m_impl == 0) {
+        if (m_impl == AFF3CT_IMPL) {
             m_aff3ct_encoder->encode(ref_bits, enc_bits);
-        } else {
-            gr_encode(ref_bits, enc_bits);
+        } else if (m_impl == GR_DVBS2RX_IMPL) {
+            m_gr_encoder->encode(ref_bits, enc_bits);
         }
     }
 };
@@ -218,44 +65,8 @@ private:
     int m_K;    // Message length in bits.
     int m_N;    // Codeword length in bits.
     int m_impl; // Decoder implementation
+    std::unique_ptr<gr::dvbs2::GrBchDecoder> m_gr_decoder;
     std::unique_ptr<module::Decoder_BCH_std<>> m_aff3ct_std_decoder;
-    std::unique_ptr<GF_NORMAL> m_gf_normal;
-    std::unique_ptr<GF_SHORT> m_gf_short;
-    std::unique_ptr<BCH_SHORT_12> m_dvbs2rx_decoder_s12;
-    std::array<uint8_t, 8192> m_packed_code;
-    std::array<uint8_t, 24> m_packed_parity;
-
-    /**
-     * @brief Compute the hard decisions and pack them into bytes.
-     *
-     * Each LLR is converted to a hard decision by comparison to 0. The decision mapping
-     * is bit=1 for llr < 0 and bit=0 for llr >= 0.
-     *
-     * @param llr_vec Vector with log likelihood ratios (LLRs).
-     */
-    void slice_and_pack(const std::vector<float>& llr_vec)
-    {
-        assert(llr_vec.size() == m_N);
-        for (unsigned int j = 0; j < m_K; j++) {
-            CODE::set_be_bit(m_packed_code.data(), j, llr_vec[j] < 0);
-        }
-        for (unsigned int j = 0; j < m_N - m_K; j++) {
-            CODE::set_be_bit(m_packed_parity.data(), j, llr_vec[j + m_K] < 0);
-        }
-    }
-
-    /**
-     * @brief Unpack the BCH decoder result.
-     *
-     * @param dec_bits Resulting (unpacked) vector of decoded bits.
-     */
-    void unpack(std::vector<int>& dec_bits)
-    {
-        assert(dec_bits.size() == m_K);
-        for (unsigned int j = 0; j < m_K; j++) {
-            dec_bits[j] = CODE::get_be_bit(m_packed_code.data(), j);
-        }
-    }
 
 public:
     /**
@@ -270,30 +81,17 @@ public:
         : m_impl(impl),
           m_K(K),
           m_N(N),
-          m_aff3ct_std_decoder(new module::Decoder_BCH_std<>(K, N, gen_poly)),
-          m_gf_normal(new GF_NORMAL()),
-          m_gf_short(new GF_SHORT()),
-          m_dvbs2rx_decoder_s12(new BCH_SHORT_12())
+          m_gr_decoder(new gr::dvbs2::GrBchDecoder(K, N)),
+          m_aff3ct_std_decoder(new module::Decoder_BCH_std<>(K, N, gen_poly))
     {
-        if (impl == 1) {
-            for (int i = 0; i < m_packed_code.size(); i++) {
-                m_packed_code[i] = 0;
-            }
-            for (int i = 0; i < m_packed_parity.size(); i++) {
-                m_packed_parity[i] = 0;
-            }
-        }
-    };
+    }
 
     void decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits)
     {
-        if (m_impl == 0) {
+        if (m_impl == AFF3CT_IMPL) {
             m_aff3ct_std_decoder->decode_siho(llr_vec, dec_bits);
-        } else if (m_impl == 1) {
-            slice_and_pack(llr_vec);
-            (*m_dvbs2rx_decoder_s12)(
-                m_packed_code.data(), m_packed_parity.data(), 0, 0, m_K);
-            unpack(dec_bits);
+        } else if (m_impl == GR_DVBS2RX_IMPL) {
+            m_gr_decoder->decode(llr_vec, dec_bits);
         }
     }
 };
@@ -326,7 +124,7 @@ struct params {
           R((float)K / (float)N),
           impl(impl)
     {
-        if (impl > 1)
+        if (decoder_impl_map.find(impl) == decoder_impl_map.end())
             throw std::runtime_error("Unsupported implementation");
 
         std::cout << "# * Parameters: " << std::endl;
@@ -391,7 +189,7 @@ int parse_opts(int ac, char* av[], po::variables_map& vm)
             "ebn0-step", po::value<float>()->default_value(1), "Eb/N0 step in dB.")(
             "impl",
             po::value<int>()->default_value(0),
-            "Decoder Implementation (0 for AFF3CT and 1 for GR)");
+            get_decoder_impl_options().c_str());
 
         po::store(po::parse_command_line(ac, av, desc), vm);
         po::notify(vm);
