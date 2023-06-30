@@ -9,6 +9,7 @@
 #ifndef INCLUDED_GR_BCH_H
 #define INCLUDED_GR_BCH_H
 
+#include "bch.h"
 #include "bose_chaudhuri_hocquenghem_decoder.hh"
 #include "galois_field.hh"
 #include <bitset>
@@ -88,6 +89,24 @@ private:
 
 public:
     GrBchDecoder(int k, int n);
+    void decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits);
+};
+
+/**
+ * @brief Wrapper for the new BCH Codec implementation
+ *
+ */
+class DVBS2_BENCH_API NewBchCodec
+{
+private:
+    gr::dvbs2rx::galois_field<uint32_t> m_gf;
+    gr::dvbs2rx::bch_codec<uint32_t, gr::dvbs2rx::bitset256_t> m_bch;
+    std::vector<uint8_t> m_packed_msg;
+    std::vector<uint8_t> m_packed_codeword;
+
+public:
+    NewBchCodec(int N, int t);
+    void encode(const std::vector<int>& ref_bits, std::vector<int>& enc_bits);
     void decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits);
 };
 

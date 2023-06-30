@@ -7,13 +7,14 @@
 using namespace aff3ct;
 namespace po = boost::program_options;
 
-enum DecoderImpl { AFF3CT_IMPL = 0, GR_DVBS2RX_IMPL = 1 };
-std::map<int, std::string> decoder_impl_map = { { AFF3CT_IMPL, "aff3ct" },
-                                                { GR_DVBS2RX_IMPL, "gr-dvbs2rx" } };
-std::string get_decoder_impl_options()
+enum CodecImpl { AFF3CT_IMPL = 0, GR_DVBS2RX_IMPL = 1, NEW_IMPL = 2 };
+std::map<int, std::string> codec_impl_map = { { AFF3CT_IMPL, "aff3ct" },
+                                              { GR_DVBS2RX_IMPL, "gr-dvbs2rx" },
+                                              { NEW_IMPL, "new" } };
+std::string get_impl_options(const std::string& name)
 {
-    std::string options = "Decoder implementation: ";
-    for (auto& kv : decoder_impl_map) {
+    std::string options = name + " implementation: ";
+    for (auto& kv : codec_impl_map) {
         options += kv.second + " (" + std::to_string(kv.first) + "), ";
     }
     return options;
@@ -22,6 +23,7 @@ std::string get_decoder_impl_options()
 struct BchEncoder {
 private:
     int m_impl; // Decoder implementation
+    std::unique_ptr<gr::dvbs2::NewBchCodec> m_new_encoder;
     std::unique_ptr<gr::dvbs2::GrBchEncoder> m_gr_encoder;
     std::unique_ptr<module::Encoder_BCH<>> m_aff3ct_encoder;
 
@@ -45,6 +47,7 @@ public:
                bool normal_fecframe,
                const tools::BCH_polynomial_generator<B>& gen_poly)
         : m_impl(impl),
+          m_new_encoder(new gr::dvbs2::NewBchCodec(N, t)),
           m_gr_encoder(new gr::dvbs2::GrBchEncoder(K, N, t, normal_fecframe)),
           m_aff3ct_encoder(new module::Encoder_BCH<>(K, N, gen_poly))
     {
@@ -56,6 +59,8 @@ public:
             m_aff3ct_encoder->encode(ref_bits, enc_bits);
         } else if (m_impl == GR_DVBS2RX_IMPL) {
             m_gr_encoder->encode(ref_bits, enc_bits);
+        } else if (m_impl == NEW_IMPL) {
+            m_new_encoder->encode(ref_bits, enc_bits);
         }
     }
 };
@@ -65,6 +70,7 @@ private:
     int m_K;    // Message length in bits.
     int m_N;    // Codeword length in bits.
     int m_impl; // Decoder implementation
+    std::unique_ptr<gr::dvbs2::NewBchCodec> m_new_encoder;
     std::unique_ptr<gr::dvbs2::GrBchDecoder> m_gr_decoder;
     std::unique_ptr<module::Decoder_BCH_std<>> m_aff3ct_std_decoder;
 
@@ -75,12 +81,15 @@ public:
      * @param impl Decoder implementation: 0 for AFF3CT and 1 for gr-dvbs2rx.
      * @param K Message length in bits.
      * @param N Codeword length in bits.
+     * @param t Error correction capability.
      * @param gen_poly Generator polynomial.
      */
-    BchDecoder(int impl, int K, int N, const tools::BCH_polynomial_generator<B>& gen_poly)
+    BchDecoder(
+        int impl, int K, int N, int t, const tools::BCH_polynomial_generator<B>& gen_poly)
         : m_impl(impl),
           m_K(K),
           m_N(N),
+          m_new_encoder(new gr::dvbs2::NewBchCodec(N, t)),
           m_gr_decoder(new gr::dvbs2::GrBchDecoder(K, N)),
           m_aff3ct_std_decoder(new module::Decoder_BCH_std<>(K, N, gen_poly))
     {
@@ -92,6 +101,8 @@ public:
             m_aff3ct_std_decoder->decode_siho(llr_vec, dec_bits);
         } else if (m_impl == GR_DVBS2RX_IMPL) {
             m_gr_decoder->decode(llr_vec, dec_bits);
+        } else if (m_impl == NEW_IMPL) {
+            m_new_encoder->decode(llr_vec, dec_bits);
         }
     }
 };
@@ -108,24 +119,30 @@ struct params {
     float ebn0_max = 10.01f;      // maximum SNR value
     float ebn0_step = 1.00f;      // SNR step
     float R;                      // code rate (R=K/N)
-    int impl = 0;                 // Decoder implementation
+    int enc_impl = 0;             // Encoder implementation
+    int dec_impl = 0;             // Decoder implementation
 
     params(int fe,
            int max_n_frames,
            float ebn0_min,
            float ebn0_max,
            float ebn0_step,
-           int impl)
+           int enc_impl,
+           int dec_impl)
         : fe(fe),
           max_n_frames(max_n_frames),
           ebn0_min(ebn0_min),
           ebn0_max(ebn0_max),
           ebn0_step(ebn0_step),
           R((float)K / (float)N),
-          impl(impl)
+          enc_impl(enc_impl),
+          dec_impl(dec_impl)
     {
-        if (decoder_impl_map.find(impl) == decoder_impl_map.end())
-            throw std::runtime_error("Unsupported implementation");
+        if (codec_impl_map.find(enc_impl) == codec_impl_map.end())
+            throw std::runtime_error("Unsupported encoder implementation");
+
+        if (codec_impl_map.find(dec_impl) == codec_impl_map.end())
+            throw std::runtime_error("Unsupported decoder implementation");
 
         std::cout << "# * Parameters: " << std::endl;
         std::cout << "#    ** Frame errors   = " << fe << std::endl;
@@ -187,9 +204,11 @@ int parse_opts(int ac, char* av[], po::variables_map& vm)
             "ebn0-min", po::value<float>()->default_value(0), "Starting Eb/N0 in dB.")(
             "ebn0-max", po::value<float>()->default_value(10), "Ending Eb/N0 in dB.")(
             "ebn0-step", po::value<float>()->default_value(1), "Eb/N0 step in dB.")(
-            "impl",
+            "enc-impl",
             po::value<int>()->default_value(0),
-            get_decoder_impl_options().c_str());
+            get_impl_options("Encoder").c_str())("dec-impl",
+                                                 po::value<int>()->default_value(0),
+                                                 get_impl_options("Decoder").c_str());
 
         po::store(po::parse_command_line(ac, av, desc), vm);
         po::notify(vm);
@@ -220,7 +239,8 @@ int main(int argc, char** argv)
              args["ebn0-min"].as<float>(),
              args["ebn0-max"].as<float>(),
              args["ebn0-step"].as<float>(),
-             args["impl"].as<int>());
+             args["enc-impl"].as<int>(),
+             args["dec-impl"].as<int>());
     modules m;
     buffers b;
     utils u;
@@ -289,10 +309,10 @@ void init_modules(const params& p, modules& m)
     m.gen_poly.reset(new tools::BCH_polynomial_generator<>(N_p2_1, p.t, bch_prim_poly));
     m.source.reset(new module::Source_random<>(p.K));
     m.encoder.reset(
-        new BchEncoder(p.impl, p.K, p.N, p.t, p.normal_fecframe, *m.gen_poly.get()));
+        new BchEncoder(p.enc_impl, p.K, p.N, p.t, p.normal_fecframe, *m.gen_poly.get()));
     m.modem.reset(new module::Modem_BPSK<>(p.N));
     m.channel.reset(new module::Channel_AWGN_LLR<>(p.N));
-    m.decoder.reset(new BchDecoder(p.impl, p.K, p.N, *m.gen_poly.get()));
+    m.decoder.reset(new BchDecoder(p.dec_impl, p.K, p.N, p.t, *m.gen_poly.get()));
     m.monitor.reset(new module::Monitor_BFER<>(p.K, p.fe, p.max_n_frames));
     m.channel->set_seed(p.seed);
 

@@ -38,6 +38,41 @@ void multiply_poly(const std::vector<uint8_t>& in_a,
     }
 }
 
+void unpacked_to_packed(const std::vector<int>& in_bits, std::vector<uint8_t>& out_bytes)
+{
+    if (in_bits.size() % 8 != 0)
+        throw std::runtime_error("Input bits must be a multiple of 8");
+    if (in_bits.size() / 8 != out_bytes.size())
+        throw std::runtime_error("Input and output sizes do not match");
+    memset(out_bytes.data(), 0, out_bytes.size());
+    for (unsigned int j = 0; j < in_bits.size(); j++) {
+        out_bytes[j / 8] |= in_bits[j] << (7 - (j % 8));
+    }
+}
+
+void unpacked_to_packed(const std::vector<float>& in_llrs,
+                        std::vector<uint8_t>& out_bytes)
+{
+    if (in_llrs.size() % 8 != 0)
+        throw std::runtime_error("Input LLRs must be a multiple of 8");
+    if (in_llrs.size() / 8 != out_bytes.size())
+        throw std::runtime_error("Input and output sizes do not match");
+    memset(out_bytes.data(), 0, out_bytes.size());
+    for (unsigned int j = 0; j < in_llrs.size(); j++) {
+        // Slice and pack
+        out_bytes[j / 8] |= (in_llrs[j] < 0) << (7 - (j % 8));
+    }
+}
+
+void packed_to_unpacked(const std::vector<uint8_t>& in_bytes, std::vector<int>& out_bits)
+{
+    if (in_bytes.size() * 8 != out_bits.size())
+        throw std::runtime_error("Input and output sizes do not match");
+    for (unsigned int j = 0; j < out_bits.size(); j++) {
+        out_bits[j] = (in_bytes[j / 8] >> (7 - (j % 8))) & 1;
+    }
+}
+
 GrBchEncoder::GrBchEncoder(int k, int n, int t, bool normal_fecframe)
     : m_K(k), m_N(n), m_t(t), m_parity(n - k)
 {
@@ -197,12 +232,41 @@ void GrBchDecoder::unpack(std::vector<int>& dec_bits)
 
 void GrBchDecoder::decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits)
 {
-
     slice_and_pack(llr_vec);
     (*m_dvbs2rx_decoder_s12)(m_packed_code.data(), m_packed_parity.data(), 0, 0, m_K);
     unpack(dec_bits);
 }
 
+
+NewBchCodec::NewBchCodec(int N, int t)
+    : m_gf(N >= 16200 ? 0b10000000000101101 : 0b100000000101011),
+      m_bch(&m_gf, t, N),
+      m_packed_msg(m_bch.get_k() / 8),
+      m_packed_codeword(m_bch.get_n() / 8)
+{
+}
+
+void NewBchCodec::encode(const std::vector<int>& ref_bits, std::vector<int>& enc_bits)
+{
+    if (ref_bits.size() != m_bch.get_k())
+        throw std::runtime_error("Input size does not match");
+    if (enc_bits.size() != m_bch.get_n())
+        throw std::runtime_error("Output size does not match");
+    unpacked_to_packed(ref_bits, m_packed_msg);
+    m_bch.encode(m_packed_msg.data(), m_packed_codeword.data());
+    packed_to_unpacked(m_packed_codeword, enc_bits);
+}
+
+void NewBchCodec::decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits)
+{
+    if (llr_vec.size() != m_bch.get_n())
+        throw std::runtime_error("Input size does not match");
+    if (dec_bits.size() != m_bch.get_k())
+        throw std::runtime_error("Output size does not match");
+    unpacked_to_packed(llr_vec, m_packed_codeword);
+    m_bch.decode(m_packed_codeword.data(), m_packed_msg.data());
+    packed_to_unpacked(m_packed_msg, dec_bits);
+}
 
 } // namespace dvbs2
 } // namespace gr
