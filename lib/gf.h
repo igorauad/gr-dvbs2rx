@@ -11,9 +11,9 @@
 #define INCLUDED_DVBS2RX_GF_H
 
 #include <gnuradio/dvbs2rx/api.h>
+#include <unordered_map>
 #include <bitset>
 #include <cstdint>
-#include <map>
 #include <set>
 #include <vector>
 
@@ -40,7 +40,7 @@ private:
     const uint8_t m_m;                   // dimension of the GF(2^m) field
     const uint32_t m_two_to_m_minus_one; // shortcut for (2^m - 1)
     std::vector<T> m_table;              // field elements
-    std::map<T, uint32_t>
+    std::unordered_map<T, uint32_t>
         m_inv_table; // LUT to map element alpha^i to its GF table index i+1
 
 public:
