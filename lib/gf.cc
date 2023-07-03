@@ -218,6 +218,7 @@ gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, std::vector<T>&& coefs)
     : m_gf(gf), m_poly(std::move(coefs))
 {
     set_degree();
+    set_coef_exponents();
 }
 
 template <typename T>
@@ -233,6 +234,7 @@ gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, const gf2_poly<T>& gf2_
         }
     }
     set_degree();
+    set_coef_exponents();
 }
 
 template <typename T>
@@ -243,6 +245,20 @@ void gf2m_poly<T>::set_degree()
     while (!m_poly.empty() && m_poly[m_degree] == 0) {
         m_poly.pop_back();
         m_degree--;
+    }
+}
+
+template <typename T>
+void gf2m_poly<T>::set_coef_exponents()
+{
+    m_nonzero_coef_idx.clear();
+    m_nonzero_coef_exp.clear();
+    for (int j = 0; j <= m_degree; j++) {
+        const T& coef_j = m_poly[j]; // j-th coefficient (multiplies x^j)
+        if (coef_j) {                // is non-zero
+            m_nonzero_coef_idx.push_back(j);
+            m_nonzero_coef_exp.push_back(m_gf->get_exponent(coef_j));
+        }
     }
 }
 
@@ -309,13 +325,17 @@ T gf2m_poly<T>::operator()(T x) const
     if (x == 0)
         return m_poly[0]; // all other coefficients are zeroed
 
-    // A non-zero x can be represented as a power alpha^i of the primitive element alpha
+    // A non-zero x can be represented as a power alpha^i of the primitive element alpha.
+    // For each non-zero term x^j in the polynomial {1, x, x^2, ...}, the alpha^i to the
+    // power j becomes alpha^(ij). Then, this vector is multiplied by the vector of
+    // coefficients, and this is done for the non-zero coefficients only. Each non-zero
+    // coefficient can also be represented as a power of the primitive element alpha, so
+    // the vector of non-zero coefficient exponents is like {alpha^a, alpha^b, ...}.
+    // Hence, for instance, alpha^a multiplied by alpha^(ij) becomes alpha^(a + ij).
     const T i = m_gf->get_exponent(x);
     T res = 0;
-    for (int j = 0; j <= m_degree; j++) {
-        T coef_j = m_poly[j]; // j-th coefficient (multiplies x^j)
-        if (coef_j)           // is non-zero
-            res ^= m_gf->multiply(coef_j, m_gf->get_alpha_i(i * j));
+    for (size_t j = 0; j < m_nonzero_coef_idx.size(); j++) {
+        res ^= m_gf->get_alpha_i(m_nonzero_coef_exp[j] + i * m_nonzero_coef_idx[j]);
     }
     return res;
 }

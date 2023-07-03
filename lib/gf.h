@@ -231,12 +231,30 @@ private:
     std::vector<T> m_poly;       // Polynomial coefficients
     // NOTE: index 0 has the zero-degree coefficient, index 1 has the coefficient of x,
     // index 2 of x^2, and so on.
+    std::vector<uint32_t> m_nonzero_coef_idx; // Indexes (degrees) of the non-zero
+                                              // polynomial coefficients
+    std::vector<uint32_t> m_nonzero_coef_exp; // Exponents of the non-zero polynomial
+                                              // coefficients
+    // Example: a polynomial "alpha^4 x^3 + alpha^2 x + 1" would have the following data
+    // in the vectors: m_poly = [1, alpha^2, 0, alpha^4], m_nonzero_coef_idx = [0, 1, 3],
+    // m_nonzero_coef_exp = [0, 2, 4].
     int m_degree; // Polynomial degree
 
     /**
      * @brief Set the polynomial degree.
      */
     void set_degree();
+
+    /**
+     * @brief Fill the indexes and exponents of the non-zero polynomial coefficients.
+     *
+     * Each coefficient can be represented as a GF(2^m) element alpha^j, where j is the
+     * exponent and alpha is the primitive element. To speed up computations, this
+     * function caches the exponents associated with the non-zero coefficients on a
+     * dedicated vector. Also, it caches the degrees of the terms associated with such
+     * non-zero coefficients.
+     */
+    void set_coef_exponents();
 
 public:
     /**
