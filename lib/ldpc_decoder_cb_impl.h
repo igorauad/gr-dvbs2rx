@@ -26,10 +26,12 @@ class ldpc_decoder_cb_impl : public ldpc_decoder_cb
 {
 private:
     const int d_debug_level;
-    unsigned int frame_size;
+    unsigned int frame_size;       /**< Codeword length in bits */
+    unsigned int frame_size_bytes; /**< Codeword length in bytes */
     unsigned int signal_constellation;
     unsigned int code_rate;
-    unsigned int nbch;
+    unsigned int nbch;       /**< Message length in bits */
+    unsigned int nbch_bytes; /**< Message length in bytes */
     unsigned int q_val;
     unsigned int dvb_standard;
     unsigned int output_mode;

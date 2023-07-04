@@ -700,11 +700,13 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     aligned_buffer = aligned_alloc(d_simd_size, d_simd_size * ldpc->code_len());
     generate_interleave_lookup();
     generate_deinterleave_lookup();
+    nbch_bytes = nbch / 8;
+    frame_size_bytes = frame_size / 8;
     if (outputmode == OM_MESSAGE) {
-        set_output_multiple(nbch * d_simd_size);
-        set_relative_rate((double)nbch / frame_size);
+        set_output_multiple(nbch_bytes * d_simd_size);
+        set_relative_rate((double)nbch_bytes / frame_size);
     } else {
-        set_output_multiple(frame_size * d_simd_size);
+        set_output_multiple(frame_size_bytes * d_simd_size);
     }
 }
 
@@ -1065,9 +1067,10 @@ void ldpc_decoder_cb_impl::forecast(int noutput_items,
                                     gr_vector_int& ninput_items_required)
 {
     if (output_mode == OM_MESSAGE) {
-        ninput_items_required[0] = (noutput_items / nbch) * (frame_size / mod->bits());
+        unsigned int n_frames = noutput_items / nbch_bytes;
+        ninput_items_required[0] = n_frames * (frame_size / mod->bits());
     } else {
-        ninput_items_required[0] = noutput_items / mod->bits();
+        ninput_items_required[0] = 8 * noutput_items / mod->bits();
     }
 }
 
@@ -1094,7 +1097,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
     int rows, offset, indexin, indexout;
     const int* mux;
     int8_t *c1, *c2, *c3;
-    int output_size = output_mode ? nbch : frame_size;
+    int output_size = output_mode ? nbch_bytes : frame_size_bytes;
 
     for (int i = 0; i < noutput_items; i += output_size * d_simd_size) {
         for (int blk = 0; blk < d_simd_size; blk++) {
@@ -1462,13 +1465,17 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             frame++;
         }
         precision = precision_sum / d_simd_size;
+
+        // Output bit-packed bytes with the hard decisions and with the MSB first
         for (int blk = 0; blk < d_simd_size; blk++) {
             for (int j = 0; j < output_size; j++) {
-                if (code[j + (blk * CODE_LEN)] >= 0) {
-                    *out++ = 0;
-                } else {
-                    *out++ = 1;
+                *out = 0;
+                for (int k = 0; k < 8; k++) {
+                    if (code[(j * 8) + k + (blk * CODE_LEN)] < 0) {
+                        *out |= 1 << (7 - k);
+                    }
                 }
+                out++;
             }
         }
     }
