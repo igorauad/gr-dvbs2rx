@@ -10,10 +10,9 @@
 #ifndef INCLUDED_DVBS2RX_BCH_DECODER_BB_IMPL_H
 #define INCLUDED_DVBS2RX_BCH_DECODER_BB_IMPL_H
 
-#include "bitman.hh"
-#include "bose_chaudhuri_hocquenghem_decoder.hh"
-#include "galois_field.hh"
+#include "bch.h"
 #include <gnuradio/dvbs2rx/bch_decoder_bb.h>
+#include <memory>
 
 namespace gr {
 namespace dvbs2rx {
@@ -22,30 +21,12 @@ class bch_decoder_bb_impl : public bch_decoder_bb
 {
 private:
     const int d_debug_level;
-    unsigned int kbch;
-    unsigned int nbch;
-    unsigned int bch_code;
-    unsigned int output_mode;
+    unsigned int d_k_bytes; // message length in bytes
+    unsigned int d_n_bytes; // codeword length in bytes
+    std::unique_ptr<galois_field<uint32_t>> d_gf;
+    std::unique_ptr<bch_codec<uint32_t, bitset256_t>> d_codec;
     uint64_t d_frame_cnt;
     uint64_t d_frame_error_cnt;
-    typedef CODE::GaloisField<16, 0b10000000000101101, uint16_t> GF_NORMAL;
-    typedef CODE::GaloisField<15, 0b1000000000101101, uint16_t> GF_MEDIUM;
-    typedef CODE::GaloisField<14, 0b100000000101011, uint16_t> GF_SHORT;
-    typedef CODE::BoseChaudhuriHocquenghemDecoder<24, 1, 65343, GF_NORMAL> BCH_NORMAL_12;
-    typedef CODE::BoseChaudhuriHocquenghemDecoder<20, 1, 65375, GF_NORMAL> BCH_NORMAL_10;
-    typedef CODE::BoseChaudhuriHocquenghemDecoder<16, 1, 65407, GF_NORMAL> BCH_NORMAL_8;
-    typedef CODE::BoseChaudhuriHocquenghemDecoder<24, 1, 32587, GF_MEDIUM> BCH_MEDIUM_12;
-    typedef CODE::BoseChaudhuriHocquenghemDecoder<24, 1, 16215, GF_SHORT> BCH_SHORT_12;
-    GF_NORMAL* instance_n;
-    GF_MEDIUM* instance_m;
-    GF_SHORT* instance_s;
-    BCH_NORMAL_12* decode_n_12;
-    BCH_NORMAL_10* decode_n_10;
-    BCH_NORMAL_8* decode_n_8;
-    BCH_MEDIUM_12* decode_m_12;
-    BCH_SHORT_12* decode_s_12;
-    uint8_t* code;
-    uint8_t* parity;
 
 public:
     bch_decoder_bb_impl(dvb_standard_t standard,
