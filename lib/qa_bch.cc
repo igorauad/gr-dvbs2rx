@@ -68,6 +68,20 @@ void flip_bits(u8_vector_t& vec, uint32_t num_bits)
     }
 }
 
+uint32_t count_errors(const u8_vector_t& a, const u8_vector_t& b)
+{
+    if (a.size() != b.size()) {
+        throw std::runtime_error("Vectors must have the same size");
+    }
+    int bit_errors = 0;
+    for (uint32_t i = 0; i < a.size(); i++) {
+        if (a[i] != b[i]) {
+            bit_errors += std::bitset<8>(a[i] ^ b[i]).count();
+        }
+    }
+    return bit_errors;
+}
+
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_gen_poly, type_pair, bch_base_types)
 {
     typedef typename type_pair::first T;
@@ -515,6 +529,52 @@ BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array)
             BOOST_CHECK_EQUAL(msg, from_u8_vector<T>(decoded_msg));
         }
     }
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array_uncorrectable)
+{
+    typedef uint64_t T;
+    typedef uint64_t P;
+
+    // Create a BCH codec with byte-aligned n and k
+    gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
+    galois_field gf(prim_poly);
+    uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
+    bch_codec<T, P> codec(&gf, t, /*n=*/56);
+    uint32_t n_bytes = codec.get_n() / 8;
+    uint32_t k_bytes = codec.get_k() / 8;
+
+    // Confirm the minimum distance (Hamming weight of the generator polynomial)
+    uint8_t d_min = std::bitset<64>(codec.get_gen_poly().get_poly()).count();
+    BOOST_CHECK(d_min >= 2 * t + 1); // valid for BCH with m >= 3 and t < 2^(m -1)
+
+    // Generate a random codeword
+    u8_vector_t msg(k_bytes);
+    u8_vector_t tx_codeword(n_bytes);
+    u8_vector_t rx_codeword(n_bytes);
+    fill_random_bytes(msg);
+    codec.encode(msg.data(), tx_codeword.data());
+    std::copy(tx_codeword.begin(), tx_codeword.end(), rx_codeword.begin());
+
+    // Add a number of random errors that exceeds t but does not exceed d_min so that the
+    // result does not end up being another valid codeword
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(t + 1, d_min - 1);
+    uint32_t num_errors = dis(gen);
+    flip_bits(rx_codeword, num_errors);
+    BOOST_CHECK_EQUAL(count_errors(tx_codeword, rx_codeword), num_errors);
+
+    // Decode with error correction
+    u8_vector_t decoded_msg(k_bytes);
+    int n_corrected = codec.decode(rx_codeword.data(), decoded_msg.data());
+    BOOST_CHECK(n_corrected == -1); // not all errors corrected
+    BOOST_CHECK(from_u8_vector<T>(msg) != from_u8_vector<T>(decoded_msg));
+
+    // Measure the residual errors
+    uint32_t n_uncorrected = count_errors(msg, decoded_msg);
+    BOOST_CHECK(n_uncorrected > 0);           // some errors left
+    BOOST_CHECK(n_uncorrected <= num_errors); // but some could have been corrected
 }
 
 void test_dvbs2(bool normal_fecframe, uint32_t n, uint8_t t)

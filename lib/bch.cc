@@ -471,6 +471,15 @@ int bch_codec<T, P>::decode(u8_cptr_t codeword, u8_ptr_t decoded_msg) const
         const auto poly = err_loc_polynomial(s);
         const auto numbers = err_loc_numbers(poly);
         correct_errors(decoded_msg, m_n, m_k, m_gf, numbers);
+        // Generally, the error location polynomial has degree greater than t when the
+        // codeword has more than t errors, in which case the errors cannot be located.
+        // Also, even if the error location polynomial has degree <= t, not necessarily
+        // all error location numbers can be found. The err_loc_numbers function should
+        // obtain a number of error location numbers equivalent to the degree of the error
+        // location polynomial. Otherwise, not all errors can be corrected.
+        return poly.degree() == static_cast<int>(numbers.size()) ? numbers.size() : -1;
+    } else {
+        return 0;
     }
 }
 
