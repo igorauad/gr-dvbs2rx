@@ -577,12 +577,16 @@ BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array_uncorrectable)
     BOOST_CHECK(n_uncorrected <= num_errors); // but some could have been corrected
 }
 
-void test_dvbs2(bool normal_fecframe, uint32_t n, uint8_t t)
+void test_dvbs2(const std::string& fecframe_size, uint32_t n, uint8_t t)
 {
     // Primitive polynomials
-    // - Normal FECFRAME (Table 6a): x^16 + x^5 + x^3 + x^2 + 1, based on GF(2^16).
-    // - Short FECFRAME (Table 6b): x^14 + x^5 + x^3 + x + 1, based on GF(2^14).
-    uint32_t prim_poly_coefs = normal_fecframe ? 0b10000000000101101 : 0b100000000101011;
+    // - Normal FECFRAME (DVB-S2 Table 6a): x^16 + x^5 + x^3 + x^2 + 1, based on GF(2^16).
+    // - Medium FECFRAME (DVB-S2X Table 7): x^15 + x^5 + x^3 + x^2 + 1, based on GF(2^15).
+    // - Short FECFRAME (DVB-S2 Table 6b): x^14 + x^5 + x^3 + x + 1, based on GF(2^14).
+    uint32_t prim_poly_coefs =
+        fecframe_size == "normal"
+            ? 0b10000000000101101
+            : (fecframe_size == "medium" ? 0b1000000000101101 : 0b100000000101011);
     gf2_poly_u32 prim_poly(prim_poly_coefs);
     galois_field gf(prim_poly);
     bch_codec<uint32_t, bitset256_t> codec(&gf, t, n);
@@ -608,36 +612,63 @@ void test_dvbs2(bool normal_fecframe, uint32_t n, uint8_t t)
 
     // Decode it with error correction
     u8_vector_t decoded_msg(k_bytes);
-    codec.decode(codeword.data(), decoded_msg.data());
+    int n_corrected = codec.decode(codeword.data(), decoded_msg.data());
     BOOST_CHECK_EQUAL_COLLECTIONS(
         msg.begin(), msg.end(), decoded_msg.begin(), decoded_msg.end());
+    BOOST_CHECK_EQUAL(n_corrected, t);
 }
 
 BOOST_AUTO_TEST_CASE(test_bch_dvbs2_encode_decode)
 {
-    const auto params_table = std::vector<std::tuple<bool, uint32_t, uint8_t>>{
-        { true, 16200, 12 },  // Normal 1/4
-        { true, 21600, 12 },  // Normal 1/3
-        { true, 25920, 12 },  // Normal 2/5
-        { true, 32400, 12 },  // Normal 1/2
-        { true, 38880, 12 },  // Normal 3/5
-        { true, 43200, 10 },  // Normal 2/3
-        { true, 48600, 12 },  // Normal 3/4
-        { true, 51840, 12 },  // Normal 4/5
-        { true, 54000, 10 },  // Normal 5/6
-        { true, 57600, 8 },   // Normal 8/9
-        { true, 58320, 8 },   // Normal 9/10
-        { false, 3240, 12 },  // Short 1/4
-        { false, 5400, 12 },  // Short 1/3
-        { false, 6480, 12 },  // Short 2/5
-        { false, 7200, 12 },  // Short 1/2
-        { false, 9720, 12 },  // Short 3/5
-        { false, 10800, 12 }, // Short 2/3
-        { false, 11880, 12 }, // Short 3/4
-        { false, 12600, 12 }, // Short 4/5
-        { false, 13320, 12 }, // Short 5/6
-        { false, 14400, 12 }  // Short 8/9
+    const auto params_table = std::vector<std::tuple<std::string, uint32_t, uint8_t>>{
+        { "normal", 14400, 12 }, // DVB-S2X Normal 2/9
+        { "normal", 16200, 12 }, // DVB-S2 Normal 1/4
+        { "normal", 18720, 12 }, // DVB-S2X Normal 13/45
+        { "normal", 21600, 12 }, // DVB-S2 Normal 1/3
+        { "normal", 25920, 12 }, // DVB-S2 Normal 2/5
+        { "normal", 29160, 12 }, // DVB-S2X Normal 9/20
+        { "normal", 32400, 12 }, // DVB-S2 Normal 1/2 (or DVB-S2X 90/180)
+        { "normal", 34560, 12 }, // DVB-S2X Normal 96/180
+        { "normal", 35640, 12 }, // DVB-S2X Normal 11/20
+        { "normal", 36000, 12 }, // DVB-S2X Normal 100/180
+        { "normal", 37440, 12 }, // DVB-S2X Normal 104/180 and 26/45
+        { "normal", 38880, 12 }, // DVB-S2 Normal 3/5 (or DVB-S2X 18/30)
+        { "normal", 40320, 12 }, // DVB-S2X Normal 28/45
+        { "normal", 41400, 12 }, // DVB-S2X Normal 23/36
+        { "normal", 41760, 12 }, // DVB-S2X Normal 116/180
+        { "normal", 43200, 10 }, // DVB-S2 Normal 2/3
+        { "normal", 43200, 12 }, // DVB-S2X Normal 20/30
+        { "normal", 44640, 12 }, // DVB-S2X Normal 124/180
+        { "normal", 45000, 12 }, // DVB-S2X Normal 25/36
+        { "normal", 46080, 12 }, // DVB-S2X Normal 128/180
+        { "normal", 46800, 12 }, // DVB-S2X Normal 13/18
+        { "normal", 47520, 12 }, // DVB-S2X Normal 132/180 and 22/30
+        { "normal", 48600, 12 }, // DVB-S2 Normal 3/4 (or DVB-S2X 135/180)
+        { "normal", 50400, 12 }, // DVB-S2X Normal 140/180 and 7/9
+        { "normal", 51840, 12 }, // DVB-S2 Normal 4/5
+        { "normal", 54000, 10 }, // DVB-S2 Normal 5/6
+        { "normal", 55440, 12 }, // DVB-S2X Normal 154/180
+        { "normal", 57600, 8 },  // DVB-S2 Normal 8/9
+        { "normal", 58320, 8 },  // DVB-S2 Normal 9/10
+        { "short", 3240, 12 },   // DVB-S2 Short 1/4
+        { "short", 3960, 12 },   // DVB-S2X Short 11/45
+        { "short", 4320, 12 },   // DVB-S2X Short 4/15
+        { "short", 5040, 12 },   // DVB-S2X Short 14/45
+        { "short", 5400, 12 },   // DVB-S2 Short 1/3
+        { "short", 6480, 12 },   // DVB-S2 Short 2/5
+        { "short", 7200, 12 },   // DVB-S2 Short 1/2
+        { "short", 7560, 12 },   // DVB-S2X Short 7/15
+        { "short", 8640, 12 },   // DVB-S2X Short 8/15
+        { "short", 9360, 12 },   // DVB-S2X Short 26/45
+        { "short", 9720, 12 },   // DVB-S2 Short 3/5
+        { "short", 10800, 12 },  // DVB-S2 Short 2/3
+        { "short", 11520, 12 },  // DVB-S2X Short 32/45
+        { "short", 11880, 12 },  // DVB-S2 Short 3/4
+        { "short", 12600, 12 },  // DVB-S2 Short 4/5
+        { "short", 13320, 12 },  // DVB-S2 Short 5/6
+        { "short", 14400, 12 }   // DVB-S2 Short 8/9
     };
+    // TODO support medium FECFRAME with kbch non multiple of 8
     for (const auto& params : params_table) {
         test_dvbs2(std::get<0>(params), std::get<1>(params), std::get<2>(params));
     }
