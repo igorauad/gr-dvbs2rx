@@ -18,7 +18,8 @@
 namespace gr {
 namespace dvbs2rx {
 
-typedef unsigned char* u8_ptr_t;
+typedef unsigned char* u8_ptr_t;        // Pointer to modifiable u8 buffer
+typedef const unsigned char* u8_cptr_t; // Pointer to constant u8 buffer
 
 /**
  * @brief BCH coder/decoder.
@@ -91,7 +92,7 @@ public:
      * data and space.
      * @note This bytes-based encoding is only supported when n and k are multiples of 8.
      */
-    void encode(const u8_ptr_t msg, u8_ptr_t codeword) const;
+    void encode(u8_cptr_t msg, u8_ptr_t codeword) const;
 
     /**
      * @brief Compute syndrome of a receiver codeword.
@@ -105,7 +106,7 @@ public:
      * @overload
      * @param codeword Pointer to u8 array with the received codeword.
      */
-    std::vector<T> syndrome(const u8_ptr_t codeword) const;
+    std::vector<T> syndrome(u8_cptr_t codeword) const;
 
     /**
      * @brief Compute the error-location polynomial.
@@ -147,7 +148,7 @@ public:
      * data and space.
      * @note This bytes-based decoding is only supported when n and k are multiples of 8.
      */
-    void decode(const u8_ptr_t codeword, u8_ptr_t decoded_msg) const;
+    void decode(u8_cptr_t codeword, u8_ptr_t decoded_msg) const;
 
     /**
      * @brief Get the generator polynomial object.

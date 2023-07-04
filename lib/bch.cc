@@ -183,7 +183,7 @@ T bch_codec<T, P>::encode(const T& msg) const
 }
 
 template <typename T, typename P>
-void bch_codec<T, P>::encode(const u8_ptr_t msg, u8_ptr_t codeword) const
+void bch_codec<T, P>::encode(u8_cptr_t msg, u8_ptr_t codeword) const
 {
     // For simplicity, make sure k and n are byte-aligned when representing messages and
     // codewords by byte arrays.
@@ -242,7 +242,7 @@ std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
 }
 
 template <typename T, typename P>
-std::vector<T> bch_codec<T, P>::syndrome(const u8_ptr_t codeword) const
+std::vector<T> bch_codec<T, P>::syndrome(u8_cptr_t codeword) const
 {
     assert_byte_aligned_n_k(m_n, m_k);
     std::vector<T> syndrome_vec;
@@ -462,7 +462,7 @@ T bch_codec<T, P>::decode(T codeword) const
 
 
 template <typename T, typename P>
-void bch_codec<T, P>::decode(const u8_ptr_t codeword, u8_ptr_t decoded_msg) const
+int bch_codec<T, P>::decode(u8_cptr_t codeword, u8_ptr_t decoded_msg) const
 {
     assert_byte_aligned_n_k(m_n, m_k);
     memcpy(decoded_msg, codeword, m_k_bytes); // systematic bytes
