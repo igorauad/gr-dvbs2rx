@@ -20,7 +20,8 @@ class bbdescrambler_bb_impl : public bbdescrambler_bb
 {
 private:
     unsigned int kbch;
-    unsigned char bb_derandomise[FRAME_SIZE_NORMAL];
+    unsigned int kbch_bytes;
+    unsigned char bb_derandomise[FRAME_SIZE_NORMAL / 8];
     void init_bb_derandomiser(void);
 
 public:

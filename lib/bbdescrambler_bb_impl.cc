@@ -235,8 +235,9 @@ bbdescrambler_bb_impl::bbdescrambler_bb_impl(dvb_standard_t standard,
         }
     }
 
+    kbch_bytes = kbch / 8;
     init_bb_derandomiser();
-    set_output_multiple(kbch);
+    set_output_multiple(kbch_bytes);
 }
 
 /*
@@ -246,10 +247,13 @@ bbdescrambler_bb_impl::~bbdescrambler_bb_impl() {}
 
 void bbdescrambler_bb_impl::init_bb_derandomiser(void)
 {
+    memset(bb_derandomise, 0, sizeof(bb_derandomise));
     int sr = 0x4A80;
     for (int i = 0; i < FRAME_SIZE_NORMAL; i++) {
         int b = ((sr) ^ (sr >> 1)) & 1;
-        bb_derandomise[i] = b;
+        int i_byte = i / 8;
+        int i_bit = 7 - (i % 8);
+        bb_derandomise[i_byte] |= b << i_bit;
         sr >>= 1;
         if (b) {
             sr |= 0x4000;
@@ -264,8 +268,8 @@ int bbdescrambler_bb_impl::work(int noutput_items,
     const unsigned char* in = (const unsigned char*)input_items[0];
     unsigned char* out = (unsigned char*)output_items[0];
 
-    for (int i = 0; i < noutput_items; i += kbch) {
-        for (int j = 0; j < (int)kbch; ++j) {
+    for (int i = 0; i < noutput_items; i += kbch_bytes) {
+        for (int j = 0; j < (int)kbch_bytes; ++j) {
             out[i + j] = in[i + j] ^ bb_derandomise[j];
         }
     }
