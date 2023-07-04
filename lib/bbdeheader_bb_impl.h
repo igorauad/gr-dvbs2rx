@@ -11,7 +11,13 @@
 #define INCLUDED_DVBS2RX_BBDEHEADER_BB_IMPL_H
 
 #include "dvb_defines.h"
+#include "gf_util.h"
 #include <gnuradio/dvbs2rx/bbdeheader_bb.h>
+
+namespace gr {
+namespace dvbs2rx {
+
+#define TS_PACKET_LENGTH 188
 
 typedef struct {
     int ts_gs;
@@ -27,34 +33,41 @@ typedef struct {
     unsigned int syncd;
 } BBHeader;
 
-typedef struct {
-    BBHeader bb_header;
-} FrameFormat;
-
-namespace gr {
-namespace dvbs2rx {
-
 class bbdeheader_bb_impl : public bbdeheader_bb
 {
 private:
-    const int d_debug_level;
-    unsigned int kbch;
-    unsigned int max_dfl;
-    unsigned int dvb_standard;
-    unsigned int df_remaining;
-    unsigned int count;
-    unsigned int synched;
-    unsigned char crc;
-    unsigned int distance;
-    unsigned int spanning;
-    unsigned int index;
-    uint64_t d_packet_cnt; /**< total packets received */
-    uint64_t d_error_cnt;  /**< total packets with bit errors */
-    FrameFormat m_format[1];
-    unsigned char crc_tab[256];
-    unsigned char packet[188];
-    void build_crc8_table(void);
-    unsigned int check_crc8_bits(const unsigned char*, int);
+    const int d_debug_level;         /**< Debug level*/
+    unsigned int d_kbch_bytes;       /**< BBFRAME length in bytes */
+    unsigned int d_max_dfl;          /**< Maximum DATAFIELD length in bits */
+    bool d_synched;                  /**< Synchronized to the start of TS packets */
+    unsigned int d_partial_ts_bytes; /**< Byte count of the partial TS packet
+                                        extracted at the end of the previous BBFRAME */
+    unsigned char d_partial_pkt[TS_PACKET_LENGTH]; /**< Partial TS packet storage */
+    BBHeader d_bbheader;                           /**< Parsed BBHEADER */
+    uint64_t d_packet_cnt;         /**< All-time count of received packets  */
+    uint64_t d_error_cnt;          /**< All-time count of packets with bit errors */
+    gf2_poly<uint16_t> d_crc_poly; /**< CRC-8 generator polynomial */
+    std::array<uint16_t, 256> d_crc8_table; /**< CRC-8 remainder look-up table */
+
+    /**
+     * @brief Parse and validate an incoming BBHEADER
+     *
+     * @param in Input bytes carrying the BBHEADER.
+     * @param h Output parsed BBHEADER.
+     * @return true When the BBHEADER is valid.
+     * @return false When the BBHEADER is invalid.
+     */
+    bool parse_bbheader(u8_cptr_t in, BBHeader* h);
+
+    /**
+     * @brief Check the CRC-8 of a sequence of bytes
+     *
+     * @param in Input bytes to check.
+     * @param size Number of bytes to check.
+     * @return true When the CRC-8 is valid.
+     * @return false When the CRC-8 is invalid.
+     */
+    bool check_crc8(u8_cptr_t in, int size);
 
 public:
     bbdeheader_bb_impl(dvb_standard_t standard,
@@ -63,7 +76,6 @@ public:
                        int debug_level);
     ~bbdeheader_bb_impl();
 
-    // Where all the action really happens
     void forecast(int noutput_items, gr_vector_int& ninput_items_required);
 
     int general_work(int noutput_items,

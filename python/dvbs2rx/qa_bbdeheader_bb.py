@@ -194,16 +194,15 @@ class qa_bbdeheader_bb(gr_unittest.TestCase):
     def _set_up_flowgraph(self, in_stream):
         """Set up the flowgraph
 
-        Vector Source -> Packed-to-Unpacked -> BBDEHEADER -> Vector Sink
+        Vector Source -> BBDEHEADER -> Vector Sink
 
         Args:
             in_stream (bytes): Input stream to feed into the vector source.
         """
         src = blocks.vector_source_b(tuple(in_stream))
-        unpack = blocks.packed_to_unpacked_bb(1, gr.GR_MSB_FIRST)
         bbdeheader = bbdeheader_bb(STANDARD_DVBS2, FECFRAME_NORMAL, C1_4)
         self.sink = blocks.vector_sink_b()
-        self.tb.connect(src, unpack, bbdeheader, self.sink)
+        self.tb.connect(src, bbdeheader, self.sink)
 
     def _assert_up_stream(self, up_stream, n_discarded_bbframes=0):
         """Assert the output contains the UPs from the non-discarded BBFRAMEs
@@ -398,8 +397,10 @@ class qa_bbdeheader_bb(gr_unittest.TestCase):
         self._set_up_flowgraph(bbframe_stream)
         self.tb.run()
 
-        # The entire UP stream should be processed despite the zero-padding
-        expected_out = list(up_stream)
+        # All UPs but the last should be processed despite the zero-padding.
+        # The last UP cannot be processed because its CRC only comes in the
+        # next BBFRAME.
+        expected_out = list(up_stream[:-188])
         observed_out = self.sink.data()
         self.assertListEqual(expected_out, observed_out)
 

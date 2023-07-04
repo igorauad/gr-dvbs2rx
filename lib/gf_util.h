@@ -20,6 +20,8 @@ namespace gr {
 namespace dvbs2rx {
 
 typedef std::vector<unsigned char> u8_vector_t;
+typedef unsigned char* u8_ptr_t;        // Pointer to modifiable u8 buffer
+typedef const unsigned char* u8_cptr_t; // Pointer to constant u8 buffer
 
 /**
  * @brief Get bitmask for the least significant bits of a type T
@@ -118,6 +120,26 @@ inline u8_vector_t to_u8_vector(T val, size_t n_bytes = sizeof(T))
 }
 
 /**
+ * @brief Convert u8 array in network byte order (big-endian) to type
+ *
+ * @tparam T Bit storage type.
+ * @param in u8 array to be converted.
+ * @param size Number of bytes to be converted.
+ * @return T Resulting value.
+ */
+template <typename T>
+inline T from_u8_array(u8_cptr_t in, size_t size)
+{
+    if (size > sizeof(T))
+        throw std::invalid_argument("u8 array too large for type T");
+    T val = 0;
+    for (size_t i = 0; i < size; i++) {
+        val |= static_cast<T>(in[i]) << ((size - 1 - i) * 8);
+    }
+    return val;
+}
+
+/**
  * @brief Convert u8 vector in network byte order (big-endian) to type
  *
  * @tparam T Bit storage type.
@@ -127,13 +149,7 @@ inline u8_vector_t to_u8_vector(T val, size_t n_bytes = sizeof(T))
 template <typename T>
 inline T from_u8_vector(const u8_vector_t& vec)
 {
-    if (vec.size() > sizeof(T))
-        throw std::invalid_argument("u8 vector too large for type T");
-    T val = 0;
-    for (size_t i = 0; i < vec.size(); i++) {
-        val |= static_cast<T>(vec[i]) << ((vec.size() - 1 - i) * 8);
-    }
-    return val;
+    return from_u8_array<T>(vec.data(), vec.size());
 }
 
 /**
@@ -193,7 +209,7 @@ std::array<T, 256> build_gf2_poly_rem_lut(const gf2_poly<T>& x)
  * @return gf2_poly<T> Resulting remainder.
  */
 template <typename T>
-gf2_poly<T> gf2_poly_rem(const unsigned char* y,
+gf2_poly<T> gf2_poly_rem(u8_cptr_t y,
                          const int y_size,
                          const gf2_poly<T>& x,
                          const std::array<T, 256>& x_lut)
@@ -229,10 +245,8 @@ gf2_poly<T> gf2_poly_rem(const unsigned char* y,
     //   be converted into an unsigned int equal to 0x0A0B0C0D.
     // - The last n_leak_bytes are guaranteed to fit in T, otherwise
     //   build_gf2_poly_rem_lut would have thrown an exception.
-    T y_last_bytes = 0;
-    for (int i = 0; i < std::min(n_leak_bytes, y_size); i++) {
-        y_last_bytes ^= static_cast<T>(y[y_size - i - 1]) << (i * 8);
-    }
+    unsigned int n_last_bytes = std::min(n_leak_bytes, y_size);
+    T y_last_bytes = from_u8_array<T>(y + y_size - n_last_bytes, n_last_bytes);
 
     // Incorporate the leak from the preceding bytes, if any
     y_last_bytes ^= leak;

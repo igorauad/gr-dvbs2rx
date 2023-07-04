@@ -17,7 +17,7 @@
 #include <gnuradio/logger.h>
 #include <boost/format.hpp>
 
-#define TRANSPORT_PACKET_LENGTH 188
+#define MPEG_TS_SYNC_BYTE 0x47
 #define TRANSPORT_ERROR_INDICATOR 0x80
 
 namespace gr {
@@ -43,9 +43,14 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
                 gr::io_signature::make(1, 1, sizeof(unsigned char)),
                 gr::io_signature::make(1, 1, sizeof(unsigned char))),
       d_debug_level(debug_level),
+      d_synched(false),
+      d_partial_ts_bytes(0),
       d_packet_cnt(0),
-      d_error_cnt(0)
+      d_error_cnt(0),
+      d_crc_poly(0b111010101), // x^8 + x^7 + x^6 + x^4 + x^2 + 1
+      d_crc8_table(build_gf2_poly_rem_lut(d_crc_poly))
 {
+    unsigned int kbch;
     if (framesize == FECFRAME_NORMAL) {
         switch (rate) {
         case C1_4:
@@ -245,14 +250,9 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
             break;
         }
     }
-    max_dfl = kbch - BB_HEADER_LENGTH_BITS;
-    build_crc8_table();
-    dvb_standard = standard;
-    count = 0;
-    index = 0;
-    synched = FALSE;
-    spanning = FALSE;
-    set_output_multiple((max_dfl / 8) * 2);
+    d_kbch_bytes = kbch / 8;
+    d_max_dfl = kbch - BB_HEADER_LENGTH_BITS;
+    set_output_multiple(d_max_dfl / 8); // ensure full BBFRAMEs on the input
 }
 
 /*
@@ -260,54 +260,79 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
  */
 bbdeheader_bb_impl::~bbdeheader_bb_impl() {}
 
-#define CRC_POLY 0xAB
-// Reversed
-#define CRC_POLYR 0xD5
-
-void bbdeheader_bb_impl::build_crc8_table(void)
-{
-    int r, crc;
-
-    for (int i = 0; i < 256; i++) {
-        r = i;
-        crc = 0;
-        for (int j = 7; j >= 0; j--) {
-            if ((r & (1 << j) ? 1 : 0) ^ ((crc & 0x80) ? 1 : 0)) {
-                crc = (crc << 1) ^ CRC_POLYR;
-            } else {
-                crc <<= 1;
-            }
-        }
-        crc_tab[i] = crc;
-    }
-}
-
-/*
- * MSB is sent first
- *
- * The polynomial has been reversed
- */
-unsigned int bbdeheader_bb_impl::check_crc8_bits(const unsigned char* in, int length)
-{
-    int crc = 0;
-    int b;
-    int i = 0;
-
-    for (int n = 0; n < length; n++) {
-        b = in[i++] ^ (crc & 0x01);
-        crc >>= 1;
-        if (b) {
-            crc ^= CRC_POLY;
-        }
-    }
-
-    return (crc);
-}
-
 void bbdeheader_bb_impl::forecast(int noutput_items, gr_vector_int& ninput_items_required)
 {
-    unsigned int n_bbframes = noutput_items / (max_dfl / 8);
-    ninput_items_required[0] = n_bbframes * kbch;
+    unsigned int n_bbframes =
+        std::ceil(static_cast<double>(noutput_items * 8) / d_max_dfl);
+    ninput_items_required[0] = n_bbframes * d_kbch_bytes;
+}
+
+bool bbdeheader_bb_impl::parse_bbheader(u8_cptr_t in, BBHeader* h)
+{
+    // Integrity check
+    if (!check_crc8(in, BB_HEADER_LENGTH_BYTES)) {
+        GR_LOG_DEBUG_LEVEL(1, "Baseband header crc failed.");
+        return false;
+    }
+
+    // MATYPE-1
+    h->ts_gs = (*in >> 6) & 0x3;
+    h->sis_mis = *in >> 5 & 0x1;
+    h->ccm_acm = *in >> 4 & 0x1;
+    h->issyi = *in >> 3 & 0x1;
+    h->npd = *in >> 2 & 0x1;
+    h->ro = *in++ & 0x3;
+    // MATYPE-2
+    h->isi = 0;
+    if (h->sis_mis == 0) {
+        h->isi = *in++;
+    } else {
+        in++;
+    }
+    // UPL
+    h->upl = from_u8_array<uint16_t>(in, 2);
+    in += 2;
+    // DFL
+    h->dfl = from_u8_array<uint16_t>(in, 2);
+    in += 2;
+    // SYNC
+    h->sync = *in++;
+    // SYNCD
+    h->syncd = from_u8_array<uint16_t>(in, 2);
+
+    // Validate the UPL, DFL and the SYNCD fields
+    if (h->dfl > d_max_dfl) {
+        d_logger->warn("Baseband header invalid (dfl > kbch - 80).");
+        return false;
+    }
+
+    if (h->dfl % 8 != 0) {
+        d_logger->warn("Baseband header invalid (dfl not a multiple of 8).");
+        return false;
+    }
+
+    if (h->syncd > h->dfl) {
+        d_logger->warn("Baseband header invalid (syncd > dfl).");
+        return false;
+    }
+
+    if (h->upl != (TS_PACKET_LENGTH * 8)) {
+        d_logger->warn("Baseband header unsupported (upl != 188 bytes).");
+        return false;
+    }
+
+    if (h->syncd % 8 != 0) {
+        d_logger->warn("Baseband header unsupported (syncd not byte-aligned).");
+        return false;
+    }
+
+    return true;
+}
+
+bool bbdeheader_bb_impl::check_crc8(u8_cptr_t in, int size)
+{
+    const auto rem = gf2_poly_rem(in, size, d_crc_poly, d_crc8_table);
+    return rem.get_poly() == 0;
 }
 
 int bbdeheader_bb_impl::general_work(int noutput_items,
@@ -317,267 +342,89 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
 {
     const unsigned char* in = (const unsigned char*)input_items[0];
     unsigned char* out = (unsigned char*)output_items[0];
-    unsigned char* tei = out;
-    unsigned int check, errors = 0;
-    unsigned int mode;
     unsigned int produced = 0;
-    unsigned char tmp;
-    BBHeader* h = &m_format[0].bb_header;
+    unsigned int errors = 0;
 
-    const unsigned int n_bbframes = noutput_items / (max_dfl / 8);
+    // Process as many BBFRAMES as possible, as long as these are available on the input
+    // buffer and fit on the output buffer
+    const unsigned int in_bbframes = ninput_items[0] / d_kbch_bytes;
+    const unsigned int out_bbframes =
+        std::ceil(static_cast<double>(noutput_items * 8) / d_max_dfl);
+    const unsigned int n_bbframes = std::min(in_bbframes, out_bbframes);
+
     for (unsigned int i = 0; i < n_bbframes; i++) {
-        // Check the BBHEADER integrity
-        check = check_crc8_bits(in, BB_HEADER_LENGTH_BITS);
-        if (dvb_standard == STANDARD_DVBS2) {
-            mode = INPUTMODE_NORMAL;
-            if (check == 0) {
-                check = TRUE;
-            } else {
-                check = FALSE;
-            }
-        } else {
-            mode = INPUTMODE_NORMAL;
-            if (check == 0) {
-                check = TRUE;
-            } else if (check == CRC_POLY) {
-                check = TRUE;
-                mode = INPUTMODE_HIEFF;
-            } else {
-                check = FALSE;
-            }
-        }
-
-        if (check != TRUE) {
-            synched = FALSE;
-            GR_LOG_DEBUG_LEVEL(1, "Baseband header crc failed.");
-            in += kbch;
+        // Parse and validate the BBHEADER
+        const bool bbheader_valid = parse_bbheader(in, &d_bbheader);
+        if (!bbheader_valid) {
+            d_synched = false;
+            in += d_kbch_bytes; // jump to the next BBFRAME
             continue;
-        }
-
-        // Parse the BBHEADER
-        h->ts_gs = *in++ << 1;
-        h->ts_gs |= *in++;
-        h->sis_mis = *in++;
-        h->ccm_acm = *in++;
-        h->issyi = *in++;
-        h->npd = *in++;
-        h->ro = *in++ << 1;
-        h->ro |= *in++;
-        h->isi = 0;
-        if (h->sis_mis == 0) {
-            for (int n = 7; n >= 0; n--) {
-                h->isi |= *in++ << n;
-            }
-        } else {
-            in += 8;
-        }
-        h->upl = 0;
-        for (int n = 15; n >= 0; n--) {
-            h->upl |= *in++ << n;
-        }
-        h->dfl = 0;
-        for (int n = 15; n >= 0; n--) {
-            h->dfl |= *in++ << n;
-        }
-        df_remaining = h->dfl;
-        h->sync = 0;
-        for (int n = 7; n >= 0; n--) {
-            h->sync |= *in++ << n;
-        }
-        h->syncd = 0;
-        for (int n = 15; n >= 0; n--) {
-            h->syncd |= *in++ << n;
-        }
-        in += 8; // Skip the last byte (CRC-8), processed in the beginning.
-
-        // Validate the UPL, DFL and the SYNCD fields of the BBHEADER
-        if (h->dfl > max_dfl) {
-            synched = FALSE;
-            d_logger->warn("Baseband header invalid (dfl > kbch - 80).");
-            in += max_dfl;
-            continue;
-        }
-
-        if (h->dfl % 8 != 0) {
-            synched = FALSE;
-            d_logger->warn("Baseband header invalid (dfl not a multiple of 8).");
-            in += max_dfl;
-            continue;
-        }
-
-        if (h->syncd > h->dfl) {
-            synched = FALSE;
-            d_logger->warn("Baseband header invalid (syncd > dfl).");
-            in += max_dfl;
-            continue;
-        }
-
-        if (h->upl != (TRANSPORT_PACKET_LENGTH * 8)) {
-            synched = FALSE;
-            d_logger->warn("Baseband header unsupported (upl != 188 bytes).");
-            in += max_dfl;
-            continue;
-        }
-
-        if (h->syncd % 8 != 0) {
-            synched = FALSE;
-            d_logger->warn("Baseband header unsupported (syncd not byte-aligned).");
-            in += max_dfl;
-            continue;
-        }
-
-        // Skip the initial SYNCD bits of the DATAFIELD if re-synchronizing
-        if (synched == FALSE) {
-            GR_LOG_DEBUG_LEVEL(1, "Baseband header resynchronizing.");
-            if (mode == INPUTMODE_NORMAL) {
-                in += h->syncd + 8;
-                df_remaining -= h->syncd + 8;
-            } else {
-                in += h->syncd;
-                df_remaining -= h->syncd;
-            }
-            count = 0;
-            synched = TRUE;
-            index = 0;
-            spanning = FALSE;
-            distance = h->syncd;
         }
 
         GR_LOG_DEBUG_LEVEL(3,
                            "MATYPE: TS/GS={:b}; SIS/MIS={}; CCM/ACM={}; ISSYI={}; "
                            "NPD={}; RO={:b}; ISI={}",
-                           h->ts_gs,
-                           h->sis_mis,
-                           h->ccm_acm,
-                           h->issyi,
-                           h->npd,
-                           h->ro,
-                           h->isi);
+                           d_bbheader.ts_gs,
+                           d_bbheader.sis_mis,
+                           d_bbheader.ccm_acm,
+                           d_bbheader.issyi,
+                           d_bbheader.npd,
+                           d_bbheader.ro,
+                           d_bbheader.isi);
 
-        // Process the DATAFIELD
-        if (mode == INPUTMODE_NORMAL) {
-            while (df_remaining) {
-                if (count == 0) {
-                    crc = 0;
-                    if (index == TRANSPORT_PACKET_LENGTH) {
-                        for (int j = 0; j < TRANSPORT_PACKET_LENGTH; j++) {
-                            *out++ = packet[j];
-                            produced++;
-                        }
-                        index = 0;
-                        spanning = FALSE;
-                    }
-                    if (df_remaining < (TRANSPORT_PACKET_LENGTH - 1) * 8) {
-                        index = 0;
-                        packet[index++] = 0x47;
-                        spanning = TRUE;
-                    } else {
-                        *out++ = 0x47;
-                        produced++;
-                        tei = out;
-                    }
-                    count++;
-                    if (check == TRUE) {
-                        if (distance != (unsigned int)h->syncd) {
-                            synched = FALSE;
-                        }
-                        check = FALSE;
-                    }
-                } else if (count == TRANSPORT_PACKET_LENGTH) {
-                    tmp = 0;
-                    for (int n = 7; n >= 0; n--) {
-                        tmp |= *in++ << n;
-                    }
-                    if (tmp != crc) {
-                        errors++;
-                        if (spanning) {
-                            packet[1] |= TRANSPORT_ERROR_INDICATOR;
-                        } else {
-                            *tei |= TRANSPORT_ERROR_INDICATOR;
-                        }
-                        d_error_cnt++;
-                    }
-                    count = 0;
-                    d_packet_cnt++;
-                    df_remaining -= 8;
-                    if (df_remaining == 0) {
-                        distance = (TRANSPORT_PACKET_LENGTH - 1) * 8;
-                    }
-                }
-                if (df_remaining >= 8 && count > 0) {
-                    tmp = 0;
-                    for (int n = 7; n >= 0; n--) {
-                        tmp |= *in++ << n;
-                        distance++;
-                    }
-                    crc = crc_tab[tmp ^ crc];
-                    if (spanning == TRUE) {
-                        packet[index++] = tmp;
-                    } else {
-                        *out++ = tmp;
-                        produced++;
-                    }
-                    count++;
-                    df_remaining -= 8;
-                    if (df_remaining == 0) {
-                        distance = 0;
-                    }
-                }
-            }
-            in += max_dfl - h->dfl; // Skip the DATAFIELD padding, if any
-        } else {
-            while (df_remaining) {
-                if (count == 0) {
-                    if (index == TRANSPORT_PACKET_LENGTH) {
-                        for (int j = 0; j < TRANSPORT_PACKET_LENGTH; j++) {
-                            *out++ = packet[j];
-                            produced++;
-                        }
-                        index = 0;
-                        spanning = FALSE;
-                    }
-                    if (df_remaining < (TRANSPORT_PACKET_LENGTH - 1) * 8) {
-                        index = 0;
-                        packet[index++] = 0x47;
-                        spanning = TRUE;
-                    } else {
-                        *out++ = 0x47;
-                        produced++;
-                    }
-                    count++;
-                    if (check == TRUE) {
-                        if (distance != (unsigned int)h->syncd) {
-                            synched = FALSE;
-                        }
-                        check = FALSE;
-                    }
-                } else if (count == TRANSPORT_PACKET_LENGTH) {
-                    count = 0;
-                    if (df_remaining == 0) {
-                        distance = 0;
-                    }
-                }
-                if (df_remaining >= 8 && count > 0) {
-                    tmp = 0;
-                    for (int n = 7; n >= 0; n--) {
-                        tmp |= *in++ << n;
-                        distance++;
-                    }
-                    if (spanning == TRUE) {
-                        packet[index++] = tmp;
-                    } else {
-                        *out++ = tmp;
-                        produced++;
-                    }
-                    count++;
-                    df_remaining -= 8;
-                    if (df_remaining == 0) {
-                        distance = 0;
-                    }
-                }
-            }
-            in += max_dfl - h->dfl; // Skip the DATAFIELD padding, if any
+        // Skip the BBHEADER
+        in += BB_HEADER_LENGTH_BYTES;
+        unsigned int df_remaining = d_bbheader.dfl / 8; // DATAFIELD bytes remaining
+
+        // Skip the initial SYNCD bits of the DATAFIELD if re-synchronizing. Skip also the
+        // first sync byte, as it contains the CRC8 of a lost or missed TS packet.
+        if (!d_synched) {
+            GR_LOG_DEBUG_LEVEL(1, "Baseband header resynchronizing.");
+            in += (d_bbheader.syncd / 8) + 1;
+            df_remaining -= (d_bbheader.syncd / 8) + 1;
+            d_synched = true;
+            d_partial_ts_bytes = 0; // Reset the count
         }
+
+        // Process the TS packets available on the DATAFIELD
+        while (df_remaining >= TS_PACKET_LENGTH) {
+            u8_cptr_t packet;
+            // Start by completing a partial TS packet from the previous BBFRAME (if any)
+            if (d_partial_ts_bytes > 0) {
+                unsigned int remaining = TS_PACKET_LENGTH - d_partial_ts_bytes;
+                memcpy(d_partial_pkt + d_partial_ts_bytes, in, remaining);
+                d_partial_ts_bytes = 0; // Reset the count
+                in += remaining;
+                df_remaining -= remaining;
+                packet = d_partial_pkt;
+            } else {
+                packet = in;
+                in += TS_PACKET_LENGTH;
+                df_remaining -= TS_PACKET_LENGTH;
+            }
+
+            const bool crc_valid = check_crc8(packet, TS_PACKET_LENGTH);
+            out[0] = MPEG_TS_SYNC_BYTE; // Restore the sync byte
+            memcpy(out + 1, packet, TS_PACKET_LENGTH - 1);
+            if (!crc_valid) {
+                out[1] |= TRANSPORT_ERROR_INDICATOR;
+                d_error_cnt++;
+                errors++;
+            }
+            out += TS_PACKET_LENGTH;
+            produced += TS_PACKET_LENGTH;
+            d_packet_cnt++;
+        }
+
+        // If a partial TS packet remains on the DATAFIELD, store it
+        if (df_remaining > 0) {
+            d_partial_ts_bytes = df_remaining;
+            memcpy(d_partial_pkt, in, df_remaining);
+            in += df_remaining;
+        }
+
+        // Skip the DATAFIELD padding, if any
+        in += (d_max_dfl - d_bbheader.dfl) / 8;
     }
 
     if (errors != 0) {
@@ -587,11 +434,7 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
                            ((double)d_error_cnt / d_packet_cnt));
     }
 
-    // Tell runtime system how many input items we consumed on
-    // each input stream.
-    consume_each(n_bbframes * kbch);
-
-    // Tell runtime system how many output items we produced.
+    consume_each(n_bbframes * d_kbch_bytes);
     return produced;
 }
 

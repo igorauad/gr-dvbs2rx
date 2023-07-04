@@ -14,6 +14,7 @@
 #define FALSE 0
 
 #define BB_HEADER_LENGTH_BITS 80
+#define BB_HEADER_LENGTH_BYTES 10
 
 // BB HEADER fields
 #define TS_GS_TRANSPORT 3

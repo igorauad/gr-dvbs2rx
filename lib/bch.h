@@ -18,9 +18,6 @@
 namespace gr {
 namespace dvbs2rx {
 
-typedef unsigned char* u8_ptr_t;        // Pointer to modifiable u8 buffer
-typedef const unsigned char* u8_cptr_t; // Pointer to constant u8 buffer
-
 /**
  * @brief BCH coder/decoder.
  *
