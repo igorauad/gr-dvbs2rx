@@ -8,8 +8,11 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["3.10.3-ubuntu-focal", "3.10.5.1-ubuntu-jammy"]
     container:
-      image: igorfreire/gnuradio-oot-dev:3.10.3-ubuntu-focal
+      image: igorfreire/gnuradio-oot-dev:${{ matrix.container }}
     steps:
       - uses: actions/checkout@v2
         with:
