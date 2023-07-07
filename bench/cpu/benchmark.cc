@@ -17,28 +17,28 @@ BENCHMARK(BM_map_bpsk);
 static void BM_demap_bpsk(benchmark::State& state)
 {
     std::vector<gr_complex> bpsk = {
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i)
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 }
     };
 
     for (auto _ : state) {
@@ -50,29 +50,29 @@ BENCHMARK(BM_demap_bpsk);
 static void BM_demap_bpsk_diff(benchmark::State& state)
 {
     std::vector<gr_complex> bpsk = {
-        (-SQRT2_2 + SQRT2_2i), // last SOF symbol
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i)
+        { -SQRT2_2, SQRT2_2 }, // last SOF symbol
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 }
     };
 
     for (auto _ : state) {
@@ -84,28 +84,28 @@ BENCHMARK(BM_demap_bpsk_diff);
 static void BM_derotate_bpsk(benchmark::State& state)
 {
     std::vector<gr_complex> pi2_bpsk = {
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i)
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 }
     };
     std::vector<float> bpsk(64);
 
@@ -120,10 +120,10 @@ static void BM_pl_descrambler(benchmark::State& state)
     // Vector with arbitrary QPSK symbols and max length
     int nsyms = MAX_PLFRAME_PAYLOAD;
     std::vector<gr_complex> qpsk_syms(nsyms);
-    constexpr gr_complex qpsk_lut[4] = { (+SQRT2_2 + SQRT2_2i),
-                                         (-SQRT2_2 + SQRT2_2i),
-                                         (-SQRT2_2 - SQRT2_2i),
-                                         (+SQRT2_2 - SQRT2_2i) };
+    constexpr gr_complex qpsk_lut[4] = { { SQRT2_2, SQRT2_2 },
+                                         { -SQRT2_2, SQRT2_2 },
+                                         { -SQRT2_2, -SQRT2_2 },
+                                         { SQRT2_2, -SQRT2_2 } };
     for (int i = 0; i < nsyms; i++) {
         qpsk_syms[i] = qpsk_lut[i % 4];
     }

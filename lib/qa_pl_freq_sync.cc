@@ -253,7 +253,7 @@ BOOST_DATA_TEST_CASE_F(
         { (-M_PI / 2), (-3 * M_PI / 4), (M_PI / 2), (3 * M_PI / 4), (M_PI - 1e-5) }),
     phase_0)
 {
-    volk::vector<gr_complex> pilot_blk(PILOT_BLK_LEN, (+SQRT2_2 + SQRT2_2i));
+    volk::vector<gr_complex> pilot_blk(PILOT_BLK_LEN, { SQRT2_2, SQRT2_2 });
 
     // Add frequency offset and a non-zero initial phase
     volk::vector<gr_complex> rotated(PILOT_BLK_LEN);
@@ -287,7 +287,7 @@ BOOST_DATA_TEST_CASE_F(
     uint8_t n_pilot_blks = 3;
     uint32_t plframe_len =
         PLHEADER_LEN + (n_slots * SLOT_LEN) + (n_pilot_blks * PILOT_BLK_LEN);
-    volk::vector<gr_complex> pilot_blk(PILOT_BLK_LEN, (+SQRT2_2 + SQRT2_2i));
+    volk::vector<gr_complex> pilot_blk(PILOT_BLK_LEN, { SQRT2_2, SQRT2_2 });
     volk::vector<gr_complex> plframe(plframe_len);
     memcpy(plframe.data(), plheader.data(), PLHEADER_LEN * sizeof(gr_complex));
     for (int i = 0; i < n_pilot_blks; i++) {

@@ -30,7 +30,6 @@
 
 // Math macros
 #define SQRT2_2 0.7071067811865476
-#define SQRT2_2i 0.7071067811865476j
 
 namespace gr {
 namespace dvbs2rx {

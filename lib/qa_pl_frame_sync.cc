@@ -138,7 +138,7 @@ BOOST_DATA_TEST_CASE_F(F, test_sof_detection, bdata::xrange(n_plsc_codewords), p
     // Process one more symbol (e.g., the first payload symbol). The
     // almost-locked status should remain, but the symbol should not lead to a
     // cross-correlation peak.
-    is_peak = p_frame_sync->step(1j);
+    is_peak = p_frame_sync->step({ 0, 1.0 });
     BOOST_CHECK_EQUAL(is_peak, false);
     BOOST_CHECK_EQUAL(p_frame_sync->is_locked_or_almost(), true);
 
@@ -184,7 +184,7 @@ BOOST_DATA_TEST_CASE_F(F,
 
     // Process one more symbol (e.g., the first payload symbol). It should not
     // lead to a cross-correlation peak.
-    is_peak = p_frame_sync->step(1j);
+    is_peak = p_frame_sync->step({ 0, 1.0 });
     BOOST_CHECK_EQUAL(is_peak, false);
 }
 
@@ -247,7 +247,7 @@ BOOST_FIXTURE_TEST_CASE(test_locking_unlocking, F)
     // At this point, the frame synchronizer expects the third PLHEADER. If the
     // PLHEADER doesn't come, and if the unlock_thresh parameter is set to 1,
     // the frame synchronizer should unlock.
-    volk::vector<gr_complex> non_plheader(PLHEADER_LEN, 1j);
+    volk::vector<gr_complex> non_plheader(PLHEADER_LEN, { 0, 1.0 });
     for (int i = 0; i < PLHEADER_LEN; i++)
         p_frame_sync->step(non_plheader[i]);
 

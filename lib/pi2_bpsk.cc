@@ -23,13 +23,13 @@ void map_bpsk(uint64_t code, gr_complex* out, unsigned int N)
     constexpr gr_complex pi2_bpsk_map[2][2] = {
         // even index here (odd index mapping from the standard)
         {
-            (SQRT2_2 + SQRT2_2i), // bit 0
-            (-SQRT2_2 - SQRT2_2i) // bit 1
+            { SQRT2_2, SQRT2_2 },  // bit 0
+            { -SQRT2_2, -SQRT2_2 } // bit 1
         },
         // odd index here (even index mapping from the standard)
         {
-            (-SQRT2_2 + SQRT2_2i), // bit 0
-            (SQRT2_2 - SQRT2_2i)   // bit 1
+            { -SQRT2_2, SQRT2_2 }, // bit 0
+            { SQRT2_2, -SQRT2_2 }  // bit 1
         }
     };
 
@@ -55,8 +55,8 @@ uint64_t demap_bpsk(const gr_complex* in, unsigned int N)
      * rotated pi/2 BPSK symbol.
      */
     constexpr gr_complex rot[2] = {
-        (SQRT2_2 - SQRT2_2i), // rotation factor for even indexes
-        (-SQRT2_2 - SQRT2_2i) // rotation factor for odd indexes
+        { SQRT2_2, -SQRT2_2 }, // rotation factor for even indexes
+        { -SQRT2_2, -SQRT2_2 } // rotation factor for odd indexes
     };
 
     if (N > 64) {
@@ -182,8 +182,8 @@ void derotate_bpsk(const gr_complex* in, float* out, unsigned int N)
 {
     // Refer to the notes in the implementation of demap_bpsk.
     constexpr gr_complex rot[2] = {
-        (SQRT2_2 - SQRT2_2i), // rotation factor for even indexes
-        (-SQRT2_2 - SQRT2_2i) // rotation factor for odd indexes
+        { SQRT2_2, -SQRT2_2 }, // rotation factor for even indexes
+        { -SQRT2_2, -SQRT2_2 } // rotation factor for odd indexes
     };
 
     if (N > 64) {

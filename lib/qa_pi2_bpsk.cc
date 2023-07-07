@@ -20,15 +20,15 @@ BOOST_AUTO_TEST_CASE(test_sof_map_demap)
     map_bpsk(sof_big_endian, sof_bpsk.data(), SOF_LEN);
 
     std::vector<gr_complex> expected = {
-        (+SQRT2_2 + SQRT2_2i), (+SQRT2_2 - SQRT2_2i), (-SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 + SQRT2_2i), (+SQRT2_2 + SQRT2_2i), (-SQRT2_2 + SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (+SQRT2_2 - SQRT2_2i), (+SQRT2_2 + SQRT2_2i),
-        (+SQRT2_2 - SQRT2_2i), (+SQRT2_2 + SQRT2_2i), (-SQRT2_2 + SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (-SQRT2_2 + SQRT2_2i), (-SQRT2_2 - SQRT2_2i),
-        (+SQRT2_2 - SQRT2_2i), (-SQRT2_2 - SQRT2_2i), (-SQRT2_2 + SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (-SQRT2_2 + SQRT2_2i), (+SQRT2_2 + SQRT2_2i),
-        (-SQRT2_2 + SQRT2_2i), (+SQRT2_2 + SQRT2_2i), (-SQRT2_2 + SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (-SQRT2_2 + SQRT2_2i)
+        { SQRT2_2, SQRT2_2 },   { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, SQRT2_2 },  { SQRT2_2, SQRT2_2 },   { -SQRT2_2, SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { SQRT2_2, SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { SQRT2_2, SQRT2_2 },   { -SQRT2_2, SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { -SQRT2_2, SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { -SQRT2_2, SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { -SQRT2_2, SQRT2_2 },  { SQRT2_2, SQRT2_2 },
+        { -SQRT2_2, SQRT2_2 },  { SQRT2_2, SQRT2_2 },   { -SQRT2_2, SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { -SQRT2_2, SQRT2_2 }
     };
 
     BOOST_CHECK_EQUAL_COLLECTIONS(
@@ -41,10 +41,10 @@ BOOST_AUTO_TEST_CASE(test_sof_map_demap)
 BOOST_AUTO_TEST_CASE(test_pi2bpsk_to_bpsk)
 {
     // Binary sequence: 0, 0, 1, 1
-    std::vector<gr_complex> pi2_bpsk_syms = { (SQRT2_2 + SQRT2_2i),
-                                              (-SQRT2_2 + SQRT2_2i),
-                                              (-SQRT2_2 - SQRT2_2i),
-                                              (SQRT2_2 - SQRT2_2i) };
+    std::vector<gr_complex> pi2_bpsk_syms = { { SQRT2_2, SQRT2_2 },
+                                              { -SQRT2_2, SQRT2_2 },
+                                              { -SQRT2_2, -SQRT2_2 },
+                                              { SQRT2_2, -SQRT2_2 } };
     std::vector<float> expected_bpsk_syms = { +1, +1, -1, -1 };
     std::vector<float> out_bpsk_syms(4);
     derotate_bpsk(pi2_bpsk_syms.data(), out_bpsk_syms.data(), pi2_bpsk_syms.size());
@@ -62,7 +62,7 @@ BOOST_AUTO_TEST_CASE(test_mapping_range)
     map_bpsk(0x8000000000000000, bpsk.data(), 1);
 
     // Expect the second element to remain null
-    std::vector<gr_complex> expected = { (-SQRT2_2 - SQRT2_2i), 0 };
+    std::vector<gr_complex> expected = { { -SQRT2_2, -SQRT2_2 }, 0 };
 
     BOOST_CHECK_EQUAL_COLLECTIONS(
         bpsk.begin(), bpsk.end(), expected.begin(), expected.end());
@@ -86,29 +86,29 @@ BOOST_AUTO_TEST_CASE(test_demapping_range)
     // symbols mapped from an all-ones bit sequence. This configuration
     // (including the last SOF symbol) allows for differential demapping.
     std::vector<gr_complex> symbols = {
-        (-SQRT2_2 + SQRT2_2i), // last SOF symbol
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),
-        (-SQRT2_2 - SQRT2_2i), (SQRT2_2 - SQRT2_2i),  (-SQRT2_2 - SQRT2_2i),
-        (SQRT2_2 - SQRT2_2i)
+        { -SQRT2_2, SQRT2_2 }, // last SOF symbol
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },
+        { -SQRT2_2, -SQRT2_2 }, { SQRT2_2, -SQRT2_2 },  { -SQRT2_2, -SQRT2_2 },
+        { SQRT2_2, -SQRT2_2 }
     };
 
     // Demap a single symbol:
