@@ -54,7 +54,9 @@ void pl_descrambler::compute_descrambling_sequence()
     //
     // The descrambling is achieved by multiplying the input symbols by the complex
     // conjugate of the scrambling factors, which take the following possible values:
-    constexpr gr_complex descrambling_lut[4] = {{ 1.0, 0 }, { 0, -1.0 }, { -1.0, 0 }, { 0, 1.0 }};
+    constexpr gr_complex descrambling_lut[4] = {
+        { 1.0, 0 }, { 0, -1.0 }, { -1.0, 0 }, { 0, 1.0 }
+    };
 
     // In the sequel, compute Rn[i] over MAX_PLFRAME_PAYLOAD. Reuse the implementation
     // from gr-dtv's dvbs2_physical_cc_impl.cc.
