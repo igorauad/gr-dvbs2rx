@@ -16,6 +16,7 @@
 #include <gnuradio/expj.h>
 #include <gnuradio/io_signature.h>
 #include <gnuradio/math.h>
+#include <set>
 
 namespace gr {
 namespace dvbs2rx {
