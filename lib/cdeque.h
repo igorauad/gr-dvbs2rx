@@ -127,7 +127,6 @@ public:
      * element on the new tail index.
      *
      * @param in New element.
-     * @return Void.
      */
     void push_back(const T& in)
     {
@@ -147,7 +146,6 @@ public:
      * the new head index.
      *
      * @param in New element.
-     * @return Void.
      */
     void push_front(const T& in)
     {

@@ -211,7 +211,6 @@ public:
      *                               processed.
      * \param plsc (uint8_t) PLSC corresponding to the PLHEADER being
      *                       processed. Must be within the range from 0 to 127.
-     * \return Void.
      *
      * \note The fine frequency offset estimate is kept internally. It can be
      * fetched using the `get_fine_foffset()` method.
@@ -266,8 +265,6 @@ public:
      * assumed the most recent frequency offset estimate is still uncorrected
      * and disturbing the input PLHEADER, so this method attempts to compensate
      * for this frequency offset when derotating the PLHEADER.
-     *
-     * \return Void.
      *
      * \note The de-rotated PLHEADER is saved internally and can be accessed
      * using the `get_plheader()` method.

@@ -127,7 +127,6 @@ DVBS2RX_API uint64_t demap_bpsk_diff(const gr_complex* in, unsigned int N);
  * @param in (const gr_complex *) Input complex pi/2 BPSK symbols.
  * @param out (float *) Output real-valued BPSK symbols.
  * @param N (unsigned int) Number of pi/2 BPSK symbols to derotate.
- * @return Void.
  */
 DVBS2RX_API void derotate_bpsk(const gr_complex* in, float* out, unsigned int N);
 

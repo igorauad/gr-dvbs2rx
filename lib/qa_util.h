@@ -69,7 +69,6 @@ public:
 
     /**
      * \brief Set a random phase uniformly distributed from [-pi, pi).
-     * \return Void.
      */
     void set_random_phase()
     {
@@ -81,7 +80,6 @@ public:
      * \brief Add AWG noise to a vector of complex symbols.
      * \param in (gr_complex* in) Pointer to input symbol buffer.
      * \param n_symbols (int) Number of symbols to process.
-     * \return Void.
      */
     void add_noise(gr_complex* in, unsigned int n_symbols)
     {
@@ -95,7 +93,6 @@ public:
      * \param in (gr_complex* out) Pointer to the output buffer.
      * \param in (const gr_complex* in) Pointer to the input buffer.
      * \param n_symbols (int) Number of symbols to process.
-     * \return Void.
      * \note The phase obtained after rotation is kept internally such that, in
      * the next call, it starts from where it stopped.
      */

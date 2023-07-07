@@ -230,7 +230,6 @@ private:
      * @param frame_info (plframe_info&) Reference to the plframe_info_t object
      *                   on which the frame information should be cached once
      *                   the PLHEADER is decoded.
-     * @return Void.
      */
     void handle_plheader(uint64_t abs_sof_idx,
                          const gr_complex* p_plheader,

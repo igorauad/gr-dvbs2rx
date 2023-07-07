@@ -38,7 +38,6 @@ private:
 
     /**
      * \brief Pre-compute the complex descrambling sequence
-     * \return Void
      */
     void compute_descrambling_sequence();
 
@@ -59,7 +58,6 @@ public:
      * \note The payload length must be equal to the PLFRAME length minus 90
      * (the PLHEADER length). This means that pilots are part of the payload,
      * since the pilot symbols must be descrambled.
-     * \return Void.
      */
     void descramble(const gr_complex* in, uint16_t payload_len);
 

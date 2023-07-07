@@ -110,7 +110,6 @@ public:
      *                 pi/2 BPSK symbols, even if soft=true (see note 2).
      * \param soft (bool) Whether to decode the PLSC dataword using soft pi/2
      *             BPSK decisions instead of hard decisions.
-     * \return Void.
      *
      * \note 1 - The last SOF symbol is required when coherent=false. In
      * contrast, when coherent=true, the implementation simply skips this

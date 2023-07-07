@@ -169,7 +169,6 @@ private:
      * \param res Pointer to result.
      * \note The tap vector should consist of the folded version of the target
      * sequence (SOF or PLSC scrambler differentials).
-     * \return Void.
      */
     void correlate(delay_line<gr_complex>& d_line,
                    volk::vector<gr_complex>& taps,
@@ -218,7 +217,6 @@ public:
      * SOF index, the synchronizer achieves frame lock.
      *
      * \param len (uint32_t) Current PLFRAME length.
-     * \return Void.
      */
     void set_frame_len(uint32_t len);
 

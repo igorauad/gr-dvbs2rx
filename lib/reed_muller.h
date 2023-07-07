@@ -79,7 +79,6 @@ public:
      * @param codeword 64-bit (64, 7, 32) Reed-Muller codeword to be mapped.
      * @note This is the default Euclidean-space mapping if another custom
      *       mapping is not provided through the constructor.
-     * @return Void.
      */
     static void default_euclidean_map(float* dptr, uint64_t codeword);
 
