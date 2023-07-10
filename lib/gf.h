@@ -20,6 +20,9 @@
 namespace gr {
 namespace dvbs2rx {
 
+// Non-int types for storing GF(2) coefficients or GF(2^m) elements:
+typedef std::bitset<256> bitset256_t;
+
 template <typename T>
 class DVBS2RX_API gf2_poly;
 
@@ -133,6 +136,26 @@ public:
 };
 
 /**
+ * @brief Get the maximum degree a GF2 polynomial can have with type T.
+ *
+ * @return int Maximum degree.
+ */
+template <typename T>
+inline constexpr size_t get_max_gf2_poly_degree()
+{
+    return (sizeof(T) * 8 - 1);
+}
+
+/**
+ * @overload for T = bitset256_t.
+ */
+template <>
+inline constexpr size_t get_max_gf2_poly_degree<bitset256_t>()
+{
+    return bitset256_t().size() - 1;
+}
+
+/**
  * @brief Polynomial over GF(2).
  *
  * A polynomial whose coefficients are elements from GF(2), i.e., binary.
@@ -143,7 +166,7 @@ template <typename T>
 class DVBS2RX_API gf2_poly
 {
 private:
-    static constexpr int m_max_degree = (sizeof(T) * 8 - 1);
+    static constexpr int m_max_degree = get_max_gf2_poly_degree<T>();
 
     T m_poly; // Polynomial coefficients
     // NOTE: the LSB (bit 0) has the zero-degree coefficient, bit 1 has the coefficient of
@@ -346,7 +369,6 @@ public:
 typedef gf2_poly<uint16_t> gf2_poly_u16;
 typedef gf2_poly<uint32_t> gf2_poly_u32;
 typedef gf2_poly<uint64_t> gf2_poly_u64;
-typedef std::bitset<256> bitset256_t;
 typedef gf2_poly<bitset256_t> gf2_poly_b256;
 
 } // namespace dvbs2rx

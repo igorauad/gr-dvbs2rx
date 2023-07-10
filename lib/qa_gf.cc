@@ -321,11 +321,11 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2_poly_multiplication, T, gf2_poly_base_typ
     BOOST_CHECK(a * 2 == gf2_poly<T>(a)); // 2 is treated as a bool
 
     // The * operator must check if the product fits in T
-    uint32_t max_degree = sizeof(T) * 8 - 1;
+    size_t max_degree = get_max_gf2_poly_degree<T>();
     auto d = gf2_poly<T>(static_cast<T>(1) << max_degree); // x^max_degree
     BOOST_CHECK_THROW(d * d, std::runtime_error);
 
-    uint32_t half_max_degree = sizeof(T) * 4 - 1;
+    uint32_t half_max_degree = max_degree / 2;
     auto e = gf2_poly<T>(static_cast<T>(1) << half_max_degree); // x^half_max_degree
     BOOST_CHECK_NO_THROW(e * e);
 }
