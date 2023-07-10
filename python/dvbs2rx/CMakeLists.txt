@@ -23,8 +23,9 @@ add_subdirectory(bindings)
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-	defs.py
-	params.py
+    defs.py
+    params.py
+    utils.py
     DESTINATION ${GR_PYTHON_DIR}/gnuradio/dvbs2rx
 )
 

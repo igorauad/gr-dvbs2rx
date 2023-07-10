@@ -11,7 +11,6 @@ import os
 import signal
 import sys
 import time
-import subprocess
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from datetime import datetime
 from math import pi, sqrt
@@ -35,21 +34,11 @@ from gnuradio.fft import window
 from gnuradio.filter import firdes
 
 from gnuradio import dvbs2rx
+from gnuradio.dvbs2rx.utils import parse_version
 
 MAX_TX_GAIN = {'usrp': 65, 'bladeRF': 60, 'plutosdr': 89.75}
 MAX_FREQ = {'usrp': 6e9, 'bladeRF': 6e9, 'plutosdr': 6e9}
 MIN_FREQ = {'usrp': 10e6, 'bladeRF': 47e6, 'plutosdr': 70e6}
-
-
-def parse_version():
-    cpython_lib = dvbs2rx.dvbs2rx_python.__file__
-    ldd_out = subprocess.check_output(['ldd', cpython_lib]).decode()
-    dvbs2rx_lib_version = "Not Found"
-    for line in ldd_out.splitlines():
-        if "libgnuradio-dvbs2rx" in line:
-            dvbs2rx_lib_version = line.split()[0].replace(
-                "libgnuradio-dvbs2rx.so.", "")
-    return dvbs2rx_lib_version
 
 
 def scale_rrc_taps(taps: list, sps: int, fullscale: float) -> list:
@@ -779,7 +768,7 @@ def argument_parser():
     parser.add_argument('-v',
                         '--version',
                         action='version',
-                        version=parse_version())
+                        version=parse_version(dvbs2rx))
     parser.add_argument("--frame-size",
                         type=str,
                         choices=['normal', 'short'],
