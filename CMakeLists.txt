@@ -111,9 +111,10 @@ if(APPLE)
 endif(APPLE)
 
 ########################################################################
-# Find gnuradio build dependencies
+# Find OOT build dependencies
 ########################################################################
 find_package(Doxygen)
+find_package(Boost REQUIRED unit_test_framework)
 
 ########################################################################
 # PyBind11 Related
