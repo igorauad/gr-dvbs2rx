@@ -117,6 +117,17 @@ find_package(Doxygen)
 find_package(Boost REQUIRED unit_test_framework)
 
 ########################################################################
+# Find OOT test dependencies
+########################################################################
+execute_process(
+  COMMAND "${PYTHON_EXECUTABLE}" -c "import scipy"
+  RESULT_VARIABLE ret
+  OUTPUT_QUIET)
+if(ret EQUAL "1")
+  message(FATAL_ERROR "Failed to find Python QA dependencies")
+endif()
+
+########################################################################
 # PyBind11 Related
 ########################################################################
 
