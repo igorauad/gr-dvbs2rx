@@ -10,15 +10,13 @@ This is the GNU Radio DVBS2RX module. Place your Python package
 description here (python/__init__.py).
 '''
 from __future__ import unicode_literals
-import os
 
-# import pybind11 generated symbols into the dvbs2rx namespace
+# import pybind11 generated symbols into the dvbs2rx namespace. Try from
+# bindings/ first, which works when importing from the build dir.
 try:
-    from .dvbs2rx_python import *  # noqa: F403
+    from .bindings.dvbs2rx_python import *  # noqa: F401,F403
 except ImportError:
-    dirname, filename = os.path.split(os.path.abspath(__file__))
-    __path__.append(os.path.join(dirname, "bindings"))  # noqa: F405
-    from .dvbs2rx_python import *  # noqa: F403
+    from .dvbs2rx_python import *  # noqa: F401,F403
 
 # import any pure python here
 from .params import *  # noqa: F401, F403

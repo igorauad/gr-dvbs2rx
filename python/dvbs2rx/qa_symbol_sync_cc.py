@@ -10,17 +10,11 @@ from scipy.signal import upfirdn, convolve
 from gnuradio import gr, gr_unittest
 from gnuradio import blocks
 from gnuradio.filter import firdes
+
 try:
     from gnuradio.dvbs2rx import symbol_sync_cc
 except ImportError:
-    import os
-    import sys
-    dirname, filename = os.path.split(os.path.abspath(__file__))
-    sys.path.append(os.path.join(dirname, "bindings"))
-    try:
-        from gnuradio.dvbs2rx import symbol_sync_cc
-    except ImportError:
-        from python.dvbs2rx import symbol_sync_cc
+    from python.dvbs2rx import symbol_sync_cc
 
 
 def randQpskSyms(nsyms):

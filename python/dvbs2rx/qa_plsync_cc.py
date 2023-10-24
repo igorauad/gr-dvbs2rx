@@ -16,14 +16,7 @@ from gnuradio import blocks, digital, analog
 try:
     from gnuradio.dvbs2rx import plsync_cc, rotator_cc
 except ImportError:
-    import os
-    import sys
-    dirname, filename = os.path.split(os.path.abspath(__file__))
-    sys.path.append(os.path.join(dirname, "bindings"))
-    try:
-        from gnuradio.dvbs2rx import plsync_cc, rotator_cc
-    except ImportError:
-        from python.dvbs2rx import plsync_cc, rotator_cc
+    from python.dvbs2rx import plsync_cc, rotator_cc
 
 SQRT2_2 = sqrt(2) / 2
 JSQRT2_2 = SQRT2_2 * 1j

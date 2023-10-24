@@ -16,14 +16,7 @@ import pmt
 try:
     from gnuradio.dvbs2rx import rotator_cc
 except ImportError:
-    import os
-    import sys
-    dirname, filename = os.path.split(os.path.abspath(__file__))
-    sys.path.append(os.path.join(dirname, "bindings"))
-    try:
-        from gnuradio.dvbs2rx import rotator_cc
-    except ImportError:
-        from python.dvbs2rx import rotator_cc
+    from python.dvbs2rx import rotator_cc
 
 
 class qa_rotator_cc(gr_unittest.TestCase):
