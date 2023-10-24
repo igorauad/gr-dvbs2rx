@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: ["3.10.3-ubuntu-focal", "3.10.5.1-ubuntu-jammy", "3.10.4-fedora-38"]
+        container: ["3.10.3-ubuntu-focal", "3.10.4-fedora-38", "3.10.7.0-ubuntu-jammy"]
     container:
       image: igorfreire/gnuradio-oot-dev:${{ matrix.container }}
     steps:
