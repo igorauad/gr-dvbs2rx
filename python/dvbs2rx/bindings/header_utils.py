@@ -1,7 +1,7 @@
 # Utilities for reading values in header files
 
-from argparse import ArgumentParser
 import re
+from argparse import ArgumentParser
 
 
 class PybindHeaderParser:

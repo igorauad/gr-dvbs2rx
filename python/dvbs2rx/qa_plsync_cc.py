@@ -7,12 +7,12 @@
 #
 
 import random
-from math import sqrt, pi, floor
+from math import floor, pi, sqrt
 
-import pmt
 import numpy as np
-from gnuradio import gr, gr_unittest
-from gnuradio import blocks, digital, analog
+import pmt
+from gnuradio import analog, blocks, digital, gr, gr_unittest
+
 try:
     from gnuradio.dvbs2rx import plsync_cc, rotator_cc
 except ImportError:

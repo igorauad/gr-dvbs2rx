@@ -10,11 +10,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
       - name: Install dependencies
-        run: python3 -m pip install flake8 yapf
+        run: python3 -m pip install flake8 yapf isort
       - name: Lint with flake8
         run: flake8 . --exclude docs/doxygen/
       - name: Check Python formatting
         run: yapf --diff --recursive --verbose apps/ python/
+      - name: Check Python imports
+        run: isort --check-only apps/ python/
       - name: Check C++ formatting
         uses: DoozyX/clang-format-lint-action@v0.16.1
         with:

@@ -6,10 +6,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 import numpy as np
-from scipy.signal import upfirdn, convolve
-from gnuradio import gr, gr_unittest
-from gnuradio import blocks
+from gnuradio import blocks, gr, gr_unittest
 from gnuradio.filter import firdes
+from scipy.signal import convolve, upfirdn
 
 try:
     from gnuradio.dvbs2rx import symbol_sync_cc

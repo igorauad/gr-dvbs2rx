@@ -1,6 +1,7 @@
-import warnings
 import argparse
 import os
+import warnings
+
 from gnuradio.bindtool import BindingGenerator
 
 parser = argparse.ArgumentParser(description='Bind a GR Out of Tree Block')

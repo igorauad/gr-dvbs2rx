@@ -12,28 +12,23 @@ import os
 import signal
 import sys
 import time
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from packaging.version import Version as StrictVersion
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 
+from packaging.version import Version as StrictVersion
 from PyQt5 import Qt, QtCore
+
 try:
     from PyQt5 import sip
 except ImportError:
     import sip
-from gnuradio import analog
-from gnuradio import blocks
-from gnuradio import digital
-from gnuradio import eng_notation
-from gnuradio import gr
-from gnuradio import uhd
+
+from gnuradio import analog, blocks, digital, dvbs2rx, eng_notation, gr, uhd
+from gnuradio.dvbs2rx.utils import parse_version
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio.fft import window
 from gnuradio.filter import firdes
-
-from gnuradio import dvbs2rx
-from gnuradio.dvbs2rx.utils import parse_version
 
 MAX_RX_GAIN = {'usrp': 75, 'rtl': 50, 'bladeRF': 60, 'plutosdr': 71}
 MAX_FREQ = {'usrp': 6e9, 'rtl': 2.2e9, 'bladeRF': 6e9, 'plutosdr': 6e9}

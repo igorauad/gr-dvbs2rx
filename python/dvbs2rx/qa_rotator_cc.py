@@ -7,11 +7,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-from gnuradio import gr, gr_unittest
-from gnuradio import blocks
 import numpy as np
-from numpy.random import uniform
 import pmt
+from gnuradio import blocks, gr, gr_unittest
+from numpy.random import uniform
 
 try:
     from gnuradio.dvbs2rx import rotator_cc

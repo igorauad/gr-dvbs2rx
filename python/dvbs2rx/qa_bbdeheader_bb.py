@@ -6,14 +6,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 import struct
+from math import ceil, floor
 
 import numpy as np
-from gnuradio import gr, gr_unittest
-from gnuradio import blocks
-from math import ceil, floor
+from gnuradio import blocks, gr, gr_unittest
+
 try:
-    from gnuradio.dvbs2rx import (bbdeheader_bb, STANDARD_DVBS2,
-                                  FECFRAME_NORMAL, C1_4)
+    from gnuradio.dvbs2rx import (C1_4, FECFRAME_NORMAL, STANDARD_DVBS2,
+                                  bbdeheader_bb)
 except ImportError:
     from python.dvbs2rx import (C1_4, FECFRAME_NORMAL, STANDARD_DVBS2,
                                 bbdeheader_bb)

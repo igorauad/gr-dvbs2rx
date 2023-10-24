@@ -11,30 +11,25 @@ import os
 import signal
 import sys
 import time
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from datetime import datetime
 from math import pi, sqrt
-from packaging.version import Version as StrictVersion
 from threading import Thread
 
 import pmt
+from packaging.version import Version as StrictVersion
 from PyQt5 import Qt, QtCore
+
 try:
     from PyQt5 import sip
 except ImportError:
     import sip
-from gnuradio import analog
-from gnuradio import blocks
-from gnuradio import dtv
-from gnuradio import eng_notation
-from gnuradio import filter
-from gnuradio import gr
+
+from gnuradio import analog, blocks, dtv, dvbs2rx, eng_notation, filter, gr
+from gnuradio.dvbs2rx.utils import parse_version
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio.fft import window
 from gnuradio.filter import firdes
-
-from gnuradio import dvbs2rx
-from gnuradio.dvbs2rx.utils import parse_version
 
 MAX_TX_GAIN = {'usrp': 65, 'bladeRF': 60, 'plutosdr': 89.75}
 MAX_FREQ = {'usrp': 6e9, 'bladeRF': 6e9, 'plutosdr': 6e9}
