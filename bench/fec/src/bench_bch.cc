@@ -20,12 +20,31 @@ std::string get_impl_options(const std::string& name)
     return options;
 }
 
+void set_aff3ct_gen_poly(int N,
+                         int t,
+                         std::unique_ptr<tools::BCH_polynomial_generator<>>& p_gen_poly)
+{
+    std::vector<int> bch_prim_poly;
+    if (N < 16200) { // for short FECFRAME
+        bch_prim_poly = {
+            1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        }; // g1(x) from Table 6b
+    } else {
+        bch_prim_poly = {
+            1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        }; // g1(x) from Table 6a
+    }
+    int N_p2_1 = tools::next_power_of_2(N) - 1;
+    p_gen_poly.reset(new tools::BCH_polynomial_generator<int>(N_p2_1, t, bch_prim_poly));
+}
+
 struct BchEncoder {
 private:
     int m_impl; // Decoder implementation
     std::unique_ptr<gr::dvbs2::NewBchCodec> m_new_encoder;
     std::unique_ptr<gr::dvbs2::GrBchEncoder> m_gr_encoder;
     std::unique_ptr<module::Encoder_BCH<>> m_aff3ct_encoder;
+    std::unique_ptr<tools::BCH_polynomial_generator<>> m_aff3ct_gen_poly;
 
 public:
     /**
@@ -37,20 +56,18 @@ public:
      * @param K Message length in bits.
      * @param N Codeword length in bits.
      * @param t Error correction capability.
-     * @param normal_fecframe Whether to use normal FECFRAMEs.
-     * @param gen_poly Generator polynomial.
      */
-    BchEncoder(int impl,
-               int K,
-               int N,
-               int t,
-               bool normal_fecframe,
-               const tools::BCH_polynomial_generator<B>& gen_poly)
-        : m_impl(impl),
-          m_new_encoder(new gr::dvbs2::NewBchCodec(N, t)),
-          m_gr_encoder(new gr::dvbs2::GrBchEncoder(K, N, t, normal_fecframe)),
-          m_aff3ct_encoder(new module::Encoder_BCH<>(K, N, gen_poly))
+    BchEncoder(int impl, int K, int N, int t) : m_impl(impl)
     {
+        if (m_impl == AFF3CT_IMPL) {
+            set_aff3ct_gen_poly(N, t, m_aff3ct_gen_poly);
+            m_aff3ct_encoder.reset(
+                new module::Encoder_BCH<>(K, N, *m_aff3ct_gen_poly.get()));
+        } else if (m_impl == GR_DVBS2RX_IMPL) {
+            m_gr_encoder.reset(new gr::dvbs2::GrBchEncoder(K, N, t));
+        } else if (m_impl == NEW_IMPL) {
+            m_new_encoder.reset(new gr::dvbs2::NewBchCodec(N, t));
+        }
     }
 
     void encode(const std::vector<int>& ref_bits, std::vector<int>& enc_bits)
@@ -73,6 +90,7 @@ private:
     std::unique_ptr<gr::dvbs2::NewBchCodec> m_new_encoder;
     std::unique_ptr<gr::dvbs2::GrBchDecoder> m_gr_decoder;
     std::unique_ptr<module::Decoder_BCH_std<>> m_aff3ct_std_decoder;
+    std::unique_ptr<tools::BCH_polynomial_generator<>> m_aff3ct_gen_poly;
 
 public:
     /**
@@ -82,17 +100,18 @@ public:
      * @param K Message length in bits.
      * @param N Codeword length in bits.
      * @param t Error correction capability.
-     * @param gen_poly Generator polynomial.
      */
-    BchDecoder(
-        int impl, int K, int N, int t, const tools::BCH_polynomial_generator<B>& gen_poly)
-        : m_impl(impl),
-          m_K(K),
-          m_N(N),
-          m_new_encoder(new gr::dvbs2::NewBchCodec(N, t)),
-          m_gr_decoder(new gr::dvbs2::GrBchDecoder(K, N)),
-          m_aff3ct_std_decoder(new module::Decoder_BCH_std<>(K, N, gen_poly))
+    BchDecoder(int impl, int K, int N, int t) : m_impl(impl), m_K(K), m_N(N)
     {
+        if (m_impl == AFF3CT_IMPL) {
+            set_aff3ct_gen_poly(N, t, m_aff3ct_gen_poly);
+            m_aff3ct_std_decoder.reset(
+                new module::Decoder_BCH_std<>(K, N, *m_aff3ct_gen_poly.get()));
+        } else if (m_impl == GR_DVBS2RX_IMPL) {
+            m_gr_decoder.reset(new gr::dvbs2::GrBchDecoder(K, N, t));
+        } else if (m_impl == NEW_IMPL) {
+            m_new_encoder.reset(new gr::dvbs2::NewBchCodec(N, t));
+        }
     }
 
     void decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits)
@@ -108,35 +127,40 @@ public:
 };
 
 struct params {
-    int K = 9552;                 // number of information bits
-    int N = 9720;                 // codeword size
-    int t = 12;                   // t-error correction capability
-    bool normal_fecframe = false; // whether to use normal FECFRAME
-    int fe = 100;                 // target frame errors
-    int max_n_frames = 10000;     // max frames to simulate per ebn0
-    int seed = 0;                 // PRNG seed for the AWGN channel
-    float ebn0_min = 0.00f;       // minimum SNR value
-    float ebn0_max = 10.01f;      // maximum SNR value
-    float ebn0_step = 1.00f;      // SNR step
-    float R;                      // code rate (R=K/N)
-    int enc_impl = 0;             // Encoder implementation
-    int dec_impl = 0;             // Decoder implementation
+    int N;            // codeword size
+    int K;            // number of information bits
+    int t;            // t-error correction capability
+    int fe;           // target frame errors
+    int max_n_frames; // max frames to simulate per ebn0
+    float ebn0_min;   // minimum SNR value
+    float ebn0_max;   // maximum SNR value
+    float ebn0_step;  // SNR step
+    int enc_impl;     // Encoder implementation
+    int dec_impl;     // Decoder implementation
+    float R;          // code rate (R=K/N)
+    int seed = 0;     // PRNG seed for the AWGN channel
 
-    params(int fe,
+    params(int N,
+           int K,
+           int t,
+           int fe,
            int max_n_frames,
            float ebn0_min,
            float ebn0_max,
            float ebn0_step,
            int enc_impl,
            int dec_impl)
-        : fe(fe),
+        : N(N),
+          K(K),
+          t(t),
+          fe(fe),
           max_n_frames(max_n_frames),
           ebn0_min(ebn0_min),
           ebn0_max(ebn0_max),
           ebn0_step(ebn0_step),
-          R((float)K / (float)N),
           enc_impl(enc_impl),
-          dec_impl(dec_impl)
+          dec_impl(dec_impl),
+          R((float)K / (float)N)
     {
         if (codec_impl_map.find(enc_impl) == codec_impl_map.end())
             throw std::runtime_error("Unsupported encoder implementation");
@@ -150,6 +174,7 @@ struct params {
         std::cout << "#    ** Noise seed     = " << seed << std::endl;
         std::cout << "#    ** Info. bits (K) = " << K << std::endl;
         std::cout << "#    ** Frame size (N) = " << N << std::endl;
+        std::cout << "#    ** Err. Corr. (t) = " << t << std::endl;
         std::cout << "#    ** Code rate  (R) = " << R << std::endl;
         std::cout << "#    ** SNR min   (dB) = " << ebn0_min << std::endl;
         std::cout << "#    ** SNR max   (dB) = " << ebn0_max << std::endl;
@@ -159,7 +184,6 @@ struct params {
 };
 
 struct modules {
-    std::unique_ptr<tools::BCH_polynomial_generator<>> gen_poly;
     std::unique_ptr<module::Source_random<>> source;
     std::unique_ptr<BchEncoder> encoder;
     std::unique_ptr<module::Modem_BPSK<>> modem;
@@ -181,9 +205,9 @@ struct buffers {
 struct utils {
     std::unique_ptr<tools::Sigma<>> noise; // a sigma noise type
     std::vector<std::unique_ptr<tools::Reporter>>
-        reporters;                         // list of reporters dispayed in the terminal
+        reporters; // list of reporters dispayed in the terminal
     std::unique_ptr<tools::Terminal_std>
-        terminal;                          // manage the output text in the terminal
+        terminal; // manage the output text in the terminal
 };
 
 void init_modules(const params& p, modules& m);
@@ -195,6 +219,9 @@ int parse_opts(int ac, char* av[], po::variables_map& vm)
     try {
         po::options_description desc("Program options");
         desc.add_options()("help,h", "produce help message")(
+            "n", po::value<int>()->default_value(9720), "Codeword length.")(
+            "k", po::value<int>()->default_value(9552), "Message length.")(
+            "t", po::value<int>()->default_value(12), "Error correction capability.")(
             "fe",
             po::value<int>()->default_value(1e2),
             "Max number of frame errors to simulate per Eb/N0.")(
@@ -204,9 +231,9 @@ int parse_opts(int ac, char* av[], po::variables_map& vm)
             "ebn0-min", po::value<float>()->default_value(0), "Starting Eb/N0 in dB.")(
             "ebn0-max", po::value<float>()->default_value(10), "Ending Eb/N0 in dB.")(
             "ebn0-step", po::value<float>()->default_value(1), "Eb/N0 step in dB.")(
-            "enc-impl",
+            "enc",
             po::value<int>()->default_value(0),
-            get_impl_options("Encoder").c_str())("dec-impl",
+            get_impl_options("Encoder").c_str())("dec",
                                                  po::value<int>()->default_value(0),
                                                  get_impl_options("Decoder").c_str());
 
@@ -234,13 +261,16 @@ int main(int argc, char** argv)
     if (opt_parser_res < 1)
         return opt_parser_res;
 
-    params p(args["fe"].as<int>(),
+    params p(args["n"].as<int>(),
+             args["k"].as<int>(),
+             args["t"].as<int>(),
+             args["fe"].as<int>(),
              args["nframes"].as<int>(),
              args["ebn0-min"].as<float>(),
              args["ebn0-max"].as<float>(),
              args["ebn0-step"].as<float>(),
-             args["enc-impl"].as<int>(),
-             args["dec-impl"].as<int>());
+             args["enc"].as<int>(),
+             args["dec"].as<int>());
     modules m;
     buffers b;
     utils u;
@@ -295,24 +325,11 @@ int main(int argc, char** argv)
 
 void init_modules(const params& p, modules& m)
 {
-    std::vector<int> bch_prim_poly;
-    if (p.N < 16200) { // for short FECFRAME
-        bch_prim_poly = {
-            1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1
-        }; // g1(x) from Table 6b
-    } else {
-        bch_prim_poly = {
-            1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
-        }; // g1(x) from Table 6a
-    }
-    int N_p2_1 = tools::next_power_of_2(p.N) - 1;
-    m.gen_poly.reset(new tools::BCH_polynomial_generator<>(N_p2_1, p.t, bch_prim_poly));
     m.source.reset(new module::Source_random<>(p.K));
-    m.encoder.reset(
-        new BchEncoder(p.enc_impl, p.K, p.N, p.t, p.normal_fecframe, *m.gen_poly.get()));
+    m.encoder.reset(new BchEncoder(p.enc_impl, p.K, p.N, p.t));
     m.modem.reset(new module::Modem_BPSK<>(p.N));
     m.channel.reset(new module::Channel_AWGN_LLR<>(p.N));
-    m.decoder.reset(new BchDecoder(p.dec_impl, p.K, p.N, p.t, *m.gen_poly.get()));
+    m.decoder.reset(new BchDecoder(p.dec_impl, p.K, p.N, p.t));
     m.monitor.reset(new module::Monitor_BFER<>(p.K, p.fe, p.max_n_frames));
     m.channel->set_seed(p.seed);
 

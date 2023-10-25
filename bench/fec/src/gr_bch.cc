@@ -73,9 +73,9 @@ void packed_to_unpacked(const std::vector<uint8_t>& in_bytes, std::vector<int>& 
     }
 }
 
-GrBchEncoder::GrBchEncoder(int k, int n, int t, bool normal_fecframe)
-    : m_K(k), m_N(n), m_t(t), m_parity(n - k)
+GrBchEncoder::GrBchEncoder(int k, int n, int t) : m_K(k), m_N(n), m_t(t), m_parity(n - k)
 {
+    const bool normal_fecframe = (n >= 16200);
     compute_gen_poly(normal_fecframe);
     compute_crc_table();
 }
@@ -196,11 +196,15 @@ void GrBchEncoder::encode(const std::vector<int>& ref_bits, std::vector<int>& en
     }
 }
 
-GrBchDecoder::GrBchDecoder(int k, int n)
+GrBchDecoder::GrBchDecoder(int k, int n, int t)
     : m_K(k),
       m_N(n),
+      m_t(t),
       m_gf_normal(new GF_NORMAL()),
       m_gf_short(new GF_SHORT()),
+      m_dvbs2rx_decoder_n12(new BCH_NORMAL_12()),
+      m_dvbs2rx_decoder_n10(new BCH_NORMAL_10()),
+      m_dvbs2rx_decoder_n8(new BCH_NORMAL_8()),
       m_dvbs2rx_decoder_s12(new BCH_SHORT_12())
 {
     for (int i = 0; i < m_packed_code.size(); i++) {
@@ -233,7 +237,20 @@ void GrBchDecoder::unpack(std::vector<int>& dec_bits)
 void GrBchDecoder::decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits)
 {
     slice_and_pack(llr_vec);
-    (*m_dvbs2rx_decoder_s12)(m_packed_code.data(), m_packed_parity.data(), 0, 0, m_K);
+    if (m_N >= 16200) {
+        if (m_t == 12) {
+            (*m_dvbs2rx_decoder_n12)(
+                m_packed_code.data(), m_packed_parity.data(), 0, 0, m_K);
+        } else if (m_t == 10) {
+            (*m_dvbs2rx_decoder_n10)(
+                m_packed_code.data(), m_packed_parity.data(), 0, 0, m_K);
+        } else {
+            (*m_dvbs2rx_decoder_n8)(
+                m_packed_code.data(), m_packed_parity.data(), 0, 0, m_K);
+        }
+    } else {
+        (*m_dvbs2rx_decoder_s12)(m_packed_code.data(), m_packed_parity.data(), 0, 0, m_K);
+    }
     unpack(dec_bits);
 }
 

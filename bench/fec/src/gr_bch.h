@@ -50,7 +50,7 @@ private:
     void compute_crc_table();
 
 public:
-    GrBchEncoder(int k, int n, int t, bool normal_fecframe);
+    GrBchEncoder(int k, int n, int t);
     void encode(const std::vector<int>& ref_bits, std::vector<int>& enc_bits);
 };
 
@@ -63,8 +63,12 @@ class DVBS2_BENCH_API GrBchDecoder
 private:
     int m_K; // Message length in bits.
     int m_N; // Codeword length in bits.
+    int m_t; // Error correction capability.
     std::unique_ptr<GF_NORMAL> m_gf_normal;
     std::unique_ptr<GF_SHORT> m_gf_short;
+    std::unique_ptr<BCH_NORMAL_12> m_dvbs2rx_decoder_n12;
+    std::unique_ptr<BCH_NORMAL_10> m_dvbs2rx_decoder_n10;
+    std::unique_ptr<BCH_NORMAL_8> m_dvbs2rx_decoder_n8;
     std::unique_ptr<BCH_SHORT_12> m_dvbs2rx_decoder_s12;
     std::array<uint8_t, 8192> m_packed_code;
     std::array<uint8_t, 24> m_packed_parity;
@@ -88,7 +92,7 @@ private:
     void unpack(std::vector<int>& dec_bits);
 
 public:
-    GrBchDecoder(int k, int n);
+    GrBchDecoder(int k, int n, int t);
     void decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits);
 };
 
