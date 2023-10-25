@@ -181,7 +181,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encoder, type_pair, bch_base_types)
     // BCH code over GF(2^4)
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec<T, P> codec(&gf, 2);  // Double-error-correcting code
+    bch_codec<T, P> codec(&gf, 2); // Double-error-correcting code
 
     std::vector<T> expected_codewords = {
         0b000000000000000, 0b000000111010001, 0b000001001110011, 0b000001110100010,
@@ -267,8 +267,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_syndrome, type_pair, bch_base_types)
     // BCH code over GF(2^4)
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec<T, P> codec(&gf, 2);  // Double-error-correcting code
-    T rx_codeword = 0b100000001;    // r(x) = x^8 + 1
+    bch_codec<T, P> codec(&gf, 2); // Double-error-correcting code
+    T rx_codeword = 0b100000001;   // r(x) = x^8 + 1
     auto syndrome = codec.syndrome(rx_codeword);
     std::vector<T> expected_syndrome = {
         gf.get_alpha_i(2), gf.get_alpha_i(4), gf.get_alpha_i(7), gf.get_alpha_i(8)
@@ -330,7 +330,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_syndrome_error_free, type_pair, bch_base_
     if (sizeof(T) * 8 >= 16) {
         gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
         galois_field gf(prim_poly);
-        bch_codec<T, P> codec(&gf, 2);  // Double-error-correcting code
+        bch_codec<T, P> codec(&gf, 2); // Double-error-correcting code
         check_err_free_syndrome(codec, gf);
     }
 
@@ -338,7 +338,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_syndrome_error_free, type_pair, bch_base_
     if (sizeof(T) * 8 >= 64) {
         gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
         galois_field gf(prim_poly);
-        bch_codec<T, P> codec(&gf, 15);   // t = 15
+        bch_codec<T, P> codec(&gf, 15); // t = 15
         check_err_free_syndrome(codec, gf);
     }
 }
@@ -353,7 +353,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_loc_poly_and_numbers,
     // BCH code over GF(2 ^ 4)
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec<T, P> codec(&gf, 3);  // Triple-error-correcting code
+    bch_codec<T, P> codec(&gf, 3); // Triple-error-correcting code
 
     // Received codeword and syndrome
     T rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
@@ -384,7 +384,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_loc_poly_error_free, type_pair, bch_b
     // BCH code over GF(2 ^ 4)
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec<T, P> codec(&gf, 3);  // Triple-error-correcting code
+    bch_codec<T, P> codec(&gf, 3); // Triple-error-correcting code
 
     // Test with error-free codewords. The syndrome should be zero, and the
     // error-location polynomial should be sigma(x)=1, a polynomial of zero degree
@@ -411,7 +411,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_correction, type_pair, bch_base_types
     // BCH code over GF(2 ^ 4)
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec<T, P> codec(&gf, 3);  // Triple-error-correcting code
+    bch_codec<T, P> codec(&gf, 3); // Triple-error-correcting code
 
     // Received codeword and syndrome
     T rx_codeword = 0b1000000101000; // r(x) = x^12 + x^5 + x^3
@@ -443,7 +443,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode, type_pair, bch_base_types)
     if (sizeof(T) * 8 >= 16) {
         gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
         galois_field gf(prim_poly);
-        uint8_t t = 2;                  // Double-error-correcting code
+        uint8_t t = 2; // Double-error-correcting code
         bch_codec<T, P> codec(&gf, t);
 
         // Error free
@@ -481,7 +481,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_encode_decode_shortened_bch,
 
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    uint8_t t = 2;                  // Double-error-correcting code
+    uint8_t t = 2; // Double-error-correcting code
     uint32_t n_nominal = (1 << gf.get_m()) - 1;
     uint32_t max_s = n_nominal - (gf.get_m() * t);
     // The generator polynomial has degree less than or equal to m*t. Hence, the maximum

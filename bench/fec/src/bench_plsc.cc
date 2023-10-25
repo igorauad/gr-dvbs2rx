@@ -136,9 +136,9 @@ struct buffers {
 struct utils {
     std::unique_ptr<tools::Sigma<>> noise; // a sigma noise type
     std::vector<std::unique_ptr<tools::Reporter>>
-        reporters;                         // list of reporters displayed on the terminal
+        reporters; // list of reporters displayed on the terminal
     std::unique_ptr<tools::Terminal_std>
-        terminal;                          // manage the output text on the terminal
+        terminal; // manage the output text on the terminal
 };
 
 void init_modules(const params& p, modules& m)
@@ -281,7 +281,7 @@ int main(int argc, char** argv)
     buffers b;
     init_buffers(p, b); // create and initialize the buffers required by the modules
     utils u;
-    init_utils(m, u);   // create and initialize the utils
+    init_utils(m, u); // create and initialize the utils
 
     // display the legend in the terminal
     u.terminal->legend();

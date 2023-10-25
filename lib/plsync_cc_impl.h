@@ -47,7 +47,7 @@ struct rot_ctrl_t {
     rot_state_t current;         /** Frequency state at the current PLFRAME */
     std::queue<tag_t> tag_queue; /** Queue of rot_phase_inc tags */
     std::map<uint64_t, rot_phase_adj_t>
-        update_map;              /** Map of scheduled phase increment updates */
+        update_map; /** Map of scheduled phase increment updates */
 };
 
 /** @brief Index tracking for various segments of a PLFRAME */

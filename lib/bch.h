@@ -43,7 +43,7 @@ private:
     std::vector<int> m_conjugate_map; // LUT mapping each GF(2^m) element to a conjugate
                                       // of lower exponent (if existing)
     std::vector<std::array<T, 256>>
-        m_min_poly_rem_lut;           // Remainder LUT for each minimal polynomial in g(x)
+        m_min_poly_rem_lut; // Remainder LUT for each minimal polynomial in g(x)
     std::array<P, 256> m_gen_poly_rem_lut; // Remainder LUT for the generator polynomial
     bool m_gen_poly_lut_generated; // Whether the generator polynomial remainder LUT has
                                    // been generated already

@@ -19,7 +19,7 @@ namespace dvbs2rx {
 
 #define BITS_AFTER_MSB(T) ((sizeof(T) - 1) * 8) // bits after the most significant byte
 #define MSB_MASK(T) \
-    (static_cast<T>(1) << (sizeof(T) * 8 - 1))  // mask to check the most significant bit
+    (static_cast<T>(1) << (sizeof(T) * 8 - 1)) // mask to check the most significant bit
 
 /**
  * @brief Build the CRC computation look-up table (LUT)

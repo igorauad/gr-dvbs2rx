@@ -192,8 +192,9 @@ void bch_codec<T, P>::encode(u8_cptr_t msg, u8_ptr_t codeword) const
     if (!m_gen_poly_lut_generated)
         throw std::runtime_error("Generator polynomial remainder LUT not generated.");
 
-    memcpy(codeword, msg, m_k_bytes);                // systematic bytes
-    memset(codeword + m_k_bytes, 0, m_parity_bytes); // zero-initialize the parity bytes
+    memcpy(codeword, msg, m_k_bytes); // systematic bytes
+    memset(codeword + m_k_bytes, 0,
+           m_parity_bytes); // zero-initialize the parity bytes
     const auto parity_poly = gf2_poly_rem(codeword, m_n_bytes, m_g, m_gen_poly_rem_lut);
     const auto parity_poly_u8_vec = to_u8_vector(parity_poly.get_poly(), m_parity_bytes);
     memcpy(codeword + m_k_bytes, parity_poly_u8_vec.data(), m_parity_bytes);
@@ -305,7 +306,7 @@ gf2m_poly<T> bch_codec<T, P>::err_loc_polynomial(const std::vector<T>& syndrome)
         // S_(2*mu + 1)". Also, note the formulation considers syndrome components S_1 to
         // S_2t, which is S[0] to S[2*t - 1] here. Thus, in the end, S_(2mu + 3) from
         // (6.42) becomes S[2*mu] below, while S_(2mu + 2) becomes S[2*mu - 1], and so on.
-        d[row] = syndrome[two_mu];                  // e.g., for mu=1, pick S[2]
+        d[row] = syndrome[two_mu]; // e.g., for mu=1, pick S[2]
         const auto& sigma = sigma_vec[row].get_poly();
         for (size_t j = 1; j < sigma.size(); j++) { // exclude the zero-degree term
             if (sigma[j] != 0)                      // j-th coefficient
@@ -319,8 +320,8 @@ gf2m_poly<T> bch_codec<T, P>::err_loc_polynomial(const std::vector<T>& syndrome)
             // Find another row rho prior to the μ-th row such that the rho-th discrepancy
             // d[rho] is not zero and the difference between twice the row number (2*rho)
             // and the degree of sigma at this row has the largest value
-            int row_rho = 0;     // row number where mu = rho
-            int max_diff = -2;   // maximum diff "2*rho - sigma[row_rho].degree"
+            int row_rho = 0;   // row number where mu = rho
+            int max_diff = -2; // maximum diff "2*rho - sigma[row_rho].degree"
             for (int j = row - 1; j >= 0; j--) {
                 if (d[j] != 0) { // discrepancy is not zero
                     int diff = (2 * mu_vec[j]) - sigma_vec[j].degree();
@@ -437,7 +438,7 @@ void correct_errors(u8_ptr_t decoded_msg,
         // lower n-k coefficients from x^(n-k-1) down to x^0 are the parity bits, which
         // should not be in the array pointed by the decoded_msg argument.
         uint32_t bit_idx = gf->get_exponent(number);
-        if (bit_idx >= n)      // should be up to n -1 only
+        if (bit_idx >= n) // should be up to n -1 only
             throw std::runtime_error("Error location number out of range");
         if (bit_idx < (n - k)) // error in the parity bits (no need to correct)
             continue;

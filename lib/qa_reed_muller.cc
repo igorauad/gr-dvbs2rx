@@ -80,7 +80,7 @@ BOOST_DATA_TEST_CASE(test_reed_muller_codeword_subset, bdata::make({ false, true
 
         // The decoder can only return results within the selected codeword subset
         if (i != 0 && i != 32 && i != 64 && i != 96) {
-            BOOST_CHECK(i != dataword);     // i not in the subset
+            BOOST_CHECK(i != dataword); // i not in the subset
         } else {
             BOOST_CHECK_EQUAL(dataword, i); // i in the subset
         }

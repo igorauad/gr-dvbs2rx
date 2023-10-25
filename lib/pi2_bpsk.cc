@@ -162,7 +162,7 @@ uint64_t demap_bpsk_diff(const gr_complex* in, unsigned int N)
         throw std::runtime_error("N has to be <= 64");
     }
 
-    uint64_t bit = 0;                      // last SOF bit is 0
+    uint64_t bit = 0; // last SOF bit is 0
     uint64_t code = 0;
     for (unsigned int j = 0; j < N; j++) { // index of the PLSC symbols only
         gr_complex diff = conj(in[j + 1]) * in[j];
