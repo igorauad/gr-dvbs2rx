@@ -269,7 +269,7 @@ gf2m_poly<T> gf2m_poly<T>::operator+(const gf2m_poly<T>& x) const
     auto b = x.get_poly();
 
     // Pad the shortest polynomial if they don't have the same length
-    int n_pad = abs(a.size() - b.size());
+    int n_pad = abs(static_cast<int>(a.size()) - static_cast<int>(b.size()));
     auto& pad_poly = (a.size() > b.size()) ? b : a;
     while (n_pad--) {
         pad_poly.push_back(0);
