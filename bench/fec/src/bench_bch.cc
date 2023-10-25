@@ -1,3 +1,5 @@
+#include "Decoder_BCH_DVBS2.hpp"
+#include "Encoder_BCH_DVBS2.hpp"
 #include "gr_bch.h"
 #include <aff3ct.hpp>
 #include <boost/program_options.hpp>
@@ -43,7 +45,7 @@ private:
     int m_impl; // Decoder implementation
     std::unique_ptr<gr::dvbs2::NewBchCodec> m_new_encoder;
     std::unique_ptr<gr::dvbs2::GrBchEncoder> m_gr_encoder;
-    std::unique_ptr<module::Encoder_BCH<>> m_aff3ct_encoder;
+    std::unique_ptr<module::Encoder_BCH_DVBS2<>> m_aff3ct_encoder;
     std::unique_ptr<tools::BCH_polynomial_generator<>> m_aff3ct_gen_poly;
 
 public:
@@ -62,7 +64,7 @@ public:
         if (m_impl == AFF3CT_IMPL) {
             set_aff3ct_gen_poly(N, t, m_aff3ct_gen_poly);
             m_aff3ct_encoder.reset(
-                new module::Encoder_BCH<>(K, N, *m_aff3ct_gen_poly.get()));
+                new module::Encoder_BCH_DVBS2<>(K, N, *m_aff3ct_gen_poly.get()));
         } else if (m_impl == GR_DVBS2RX_IMPL) {
             m_gr_encoder.reset(new gr::dvbs2::GrBchEncoder(K, N, t));
         } else if (m_impl == NEW_IMPL) {
@@ -89,8 +91,9 @@ private:
     int m_impl; // Decoder implementation
     std::unique_ptr<gr::dvbs2::NewBchCodec> m_new_encoder;
     std::unique_ptr<gr::dvbs2::GrBchDecoder> m_gr_decoder;
-    std::unique_ptr<module::Decoder_BCH_std<>> m_aff3ct_std_decoder;
+    std::unique_ptr<module::Decoder_BCH_DVBS2<>> m_aff3ct_std_decoder;
     std::unique_ptr<tools::BCH_polynomial_generator<>> m_aff3ct_gen_poly;
+    std::vector<int> m_hard_dec;
 
 public:
     /**
@@ -101,12 +104,13 @@ public:
      * @param N Codeword length in bits.
      * @param t Error correction capability.
      */
-    BchDecoder(int impl, int K, int N, int t) : m_impl(impl), m_K(K), m_N(N)
+    BchDecoder(int impl, int K, int N, int t)
+        : m_impl(impl), m_K(K), m_N(N), m_hard_dec(N)
     {
         if (m_impl == AFF3CT_IMPL) {
             set_aff3ct_gen_poly(N, t, m_aff3ct_gen_poly);
             m_aff3ct_std_decoder.reset(
-                new module::Decoder_BCH_std<>(K, N, *m_aff3ct_gen_poly.get()));
+                new module::Decoder_BCH_DVBS2<>(K, N, *m_aff3ct_gen_poly.get()));
         } else if (m_impl == GR_DVBS2RX_IMPL) {
             m_gr_decoder.reset(new gr::dvbs2::GrBchDecoder(K, N, t));
         } else if (m_impl == NEW_IMPL) {
@@ -116,12 +120,17 @@ public:
 
     void decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits)
     {
+        // Convert the LLR vector into hard decisions. Assume the BCH decoder would take
+        // hard decisions output by the LDPC decoder even though there is no LDPC block in
+        // this setup. Importantly, make the same assumption for all implementations.
+        tools::hard_decide(llr_vec.data(), m_hard_dec.data(), m_N);
+
         if (m_impl == AFF3CT_IMPL) {
-            m_aff3ct_std_decoder->decode_siho(llr_vec, dec_bits);
+            m_aff3ct_std_decoder->decode_hiho(m_hard_dec, dec_bits);
         } else if (m_impl == GR_DVBS2RX_IMPL) {
-            m_gr_decoder->decode(llr_vec, dec_bits);
+            m_gr_decoder->decode(m_hard_dec, dec_bits);
         } else if (m_impl == NEW_IMPL) {
-            m_new_encoder->decode(llr_vec, dec_bits);
+            m_new_encoder->decode(m_hard_dec, dec_bits);
         }
     }
 };

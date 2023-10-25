@@ -9,6 +9,7 @@
 #ifndef INCLUDED_GR_BCH_H
 #define INCLUDED_GR_BCH_H
 
+#include "api.h"
 #include "bch.h"
 #include "bose_chaudhuri_hocquenghem_decoder.hh"
 #include "galois_field.hh"
@@ -16,7 +17,6 @@
 #include <memory>
 #include <vector>
 
-#define DVBS2_BENCH_API __attribute__((visibility("default")))
 #define MAX_BCH_PARITY_BITS 192
 
 namespace gr {
@@ -36,7 +36,7 @@ typedef CODE::BoseChaudhuriHocquenghemDecoder<24, 1, 16215, GF_SHORT> BCH_SHORT_
  *
  * Based on gr-dtv/lib/dvb/dvb_bch_bb_impl.cc from the GR sources.
  */
-class DVBS2_BENCH_API GrBchEncoder
+class DVBS2_GR_BCH_BENCH_API GrBchEncoder
 {
 private:
     int m_K;      // Message length in bits.
@@ -58,7 +58,7 @@ public:
  * @brief Wrapper for gr-dvbs2rx's original BCH Decoder
  *
  */
-class DVBS2_BENCH_API GrBchDecoder
+class DVBS2_GR_BCH_BENCH_API GrBchDecoder
 {
 private:
     int m_K; // Message length in bits.
@@ -75,32 +75,29 @@ private:
 
 
     /**
-     * @brief Compute the hard decisions and pack them into bytes.
+     * @brief Pack bits into bytes.
      *
-     * Each LLR is converted to a hard decision by comparison to 0. The decision mapping
-     * is bit=1 for llr < 0 and bit=0 for llr >= 0.
-     *
-     * @param llr_vec Vector with log likelihood ratios (LLRs).
+     * @param in_bits Vector with the input bits.
      */
-    void slice_and_pack(const std::vector<float>& llr_vec);
+    void pack_bits(const std::vector<int>& in_bits);
 
     /**
-     * @brief Unpack the BCH decoder result.
+     * @brief Unpack bits from bytes.
      *
-     * @param dec_bits Resulting (unpacked) vector of decoded bits.
+     * @param dec_bits Vector to hold the resulting (unpacked) decoded bits.
      */
-    void unpack(std::vector<int>& dec_bits);
+    void unpack_bits(std::vector<int>& dec_bits);
 
 public:
     GrBchDecoder(int k, int n, int t);
-    void decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits);
+    void decode(const std::vector<int>& in_bits, std::vector<int>& dec_bits);
 };
 
 /**
  * @brief Wrapper for the new BCH Codec implementation
  *
  */
-class DVBS2_BENCH_API NewBchCodec
+class DVBS2_GR_BCH_BENCH_API NewBchCodec
 {
 private:
     gr::dvbs2rx::galois_field<uint32_t> m_gf;
@@ -111,7 +108,7 @@ private:
 public:
     NewBchCodec(int N, int t);
     void encode(const std::vector<int>& ref_bits, std::vector<int>& enc_bits);
-    void decode(const std::vector<float>& llr_vec, std::vector<int>& dec_bits);
+    void decode(const std::vector<int>& in_bits, std::vector<int>& dec_bits);
 };
 
 } // namespace dvbs2
