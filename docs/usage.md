@@ -312,7 +312,7 @@ The other arguments are saved as metadata only. With them, you can go back to th
 - The `--description` option provides a short description of the recording.
 - The `--hardware` option describes the hardware used to capture the recording.
 
-On completion, `dvbs2-rec` saves the IQ file following the [Signal Metadata Format (SigMF)](https://github.com/sigmf/SigMF/blob/sigmf-v1.x/sigmf-spec.md) and using the proposed [SigMF Extension for DVB-S2](dvbs2.sigmf-ext.md). Hence, the application saves the IQ data into a file with extension `.sigmf-data` and the metadata into a file with extension `.sigmf-meta`. The metadata file is a JSON-formatted file that any SigMF-compliant application can read.
+On completion, `dvbs2-rec` saves the IQ file following the [Signal Metadata Format (SigMF)](https://github.com/sigmf/SigMF/blob/sigmf-v1.x/sigmf-spec.md) and using the proposed [SigMF Extension for DVB-S2](dvbs2.sigmf-ext.md). Hence, the application saves the IQ data into a file with extension `.sigmf-data` and the metadata into a file with extension `.sigmf-meta`. The metadata file is a JSON-formatted file that any SigMF-compliant application can read. For example, you can use the `iq-rec-cli` [utility tool](../util/README.md) available in the repository to manage the recordings produced by `dvbs2-rec` and play them back into the receiver application for testing and benchmarking purposes.
 
 Aside from using `dvbs2-rec`, you can also use `dvbs2-tx` to produce a simulated IQ file since the Tx application can save output IQ samples into a file. For example, the following command saves a signal with 10 dB SNR and 10 kHz frequency offset into a file named `example.iq`:
 
