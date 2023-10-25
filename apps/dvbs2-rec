@@ -1,0 +1,911 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+#
+# SPDX-License-Identifier: GPL-3.0
+#
+# DVB-S2 Receiver
+
+import ctypes
+import hashlib
+import json
+import os
+import signal
+import sys
+import time
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from datetime import datetime
+
+import click
+from packaging.version import Version as StrictVersion
+from PyQt5 import Qt, QtCore
+
+try:
+    from PyQt5 import sip
+except ImportError:
+    import sip
+
+from gnuradio import blocks, dvbs2rx, eng_notation, gr, uhd
+from gnuradio.dvbs2rx.utils import parse_version
+from gnuradio.eng_arg import eng_float
+from gnuradio.fft import window
+
+MAX_RX_GAIN = {'usrp': 75, 'rtl': 50, 'bladeRF': 60, 'plutosdr': 71}
+MAX_FREQ = {'usrp': 6e9, 'rtl': 2.2e9, 'bladeRF': 6e9, 'plutosdr': 6e9}
+MIN_FREQ = {'usrp': 10e6, 'rtl': 22e6, 'bladeRF': 47e6, 'plutosdr': 70e6}
+
+
+class DVBS2RecTopBlock(gr.top_block, Qt.QWidget):
+
+    def __init__(self, options, rec_meta):
+        gr.top_block.__init__(self, "DVB-S2 Rec", catch_exceptions=True)
+
+        ##################################################
+        # Parameters
+        ##################################################
+        self.debug = options.debug
+        self.frame_size = options.frame_size
+        self.freq = options.freq
+        self.gui = options.gui
+        self.gui_ctrl_panel = options.gui_ctrl_panel
+        self.gui_fft_size = options.gui_fft_size
+        self.iq_format = options.iq_format
+        self.modcod = options.modcod
+        self.pilots = options.pilots
+        self.rec_meta = rec_meta
+        self.rec_meta_saved = False
+        self.rec_name = str(time.time()).replace('.', '')
+        self.rolloff = options.rolloff
+        self.source = options.source
+        self.sps = (options.samp_rate / options.sym_rate) \
+            if options.samp_rate is not None else options.sps
+        self.start_time = datetime.utcnow()
+        self.sym_rate = options.sym_rate
+
+        self.rtl = {
+            'agc': options.rtl_agc,
+            'gain': options.rtl_gain,
+            'idx': options.rtl_idx,
+            'serial': options.rtl_serial,
+            'ipport': options.rtl_ipport,
+        }
+        self.usrp = {
+            'antenna': options.usrp_antenna,
+            'args': options.usrp_args,
+            'channels': [0],
+            'clock_source': options.usrp_clock_source,
+            'gain': options.usrp_gain,
+            'lo_offset': options.usrp_lo_offset,
+            'otw_format': options.usrp_otw_format,
+            'stream_args': options.usrp_stream_args or '',
+            'subdev': options.usrp_subdev,
+            'sync': options.usrp_sync,
+            'time_source': options.usrp_time_source,
+        }
+        self.blade_rf = {
+            'bandwidth': options.bladerf_bw,
+            'bias_tee': {
+                0: options.bladerf_bias_tee and options.bladerf_chan == 0,
+                1: options.bladerf_bias_tee and options.bladerf_chan == 1,
+            },
+            'channel': options.bladerf_chan,
+            'dev': options.bladerf_dev,
+            'if_gain': options.bladerf_if_gain,
+            'ref_clk': options.bladerf_ref_clk,
+            'rf_gain': options.bladerf_rf_gain
+        }
+        self.plutosdr = {
+            'address': options.plutosdr_addr,
+            'buffer_size': options.plutosdr_buf_size,
+            'gain_mode': options.plutosdr_gain_mode,
+            'manual_gain': options.plutosdr_gain
+        }
+
+        ##################################################
+        # Objects
+        ##################################################
+        self.rtlsdr_source = None
+        self.usrp_source = None
+
+        ##################################################
+        # Variables
+        ##################################################
+        self.samp_rate = self.sym_rate * self.sps
+        self.flowgraph_connected = False
+        self.gui_setup_complete = False
+
+        # Adjust the sample rate to an integer if necessary
+        if self.source == 'plutosdr' and not self.samp_rate.is_integer():
+            self.samp_rate = int(round(self.samp_rate))
+            gr.log.warn("An integer sample rate is required by the PlutoSDR. "
+                        "Setting rate to {:d} samples/sec.".format(
+                            self.samp_rate))
+            self.sym_rate = self.samp_rate / self.sps
+
+        ##################################################
+        # Flowgraph
+        ##################################################
+        source_block = self.connect_source()
+        if (self.gui):
+            self.setup_gui()
+        sink_block = self.connect_sink()
+        self.connect_dvbs2rx(source_block, sink_block)
+
+    def _get_waterfall_sink(self, qtgui, name, fftsize):
+        waterfall_sink = qtgui.waterfall_sink_c(
+            fftsize,  # size
+            window.WIN_BLACKMAN_hARRIS,  # wintype
+            self.freq,  # fc
+            self.samp_rate,  # bw
+            name,  # name
+            1,  # number of inputs
+            None  # parent
+        )
+        waterfall_sink.set_update_time(0.10)
+        waterfall_sink.enable_grid(True)
+        waterfall_sink.enable_axis_labels(True)
+
+        labels = ['', '', '', '', '', '', '', '', '', '']
+        colors = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        alphas = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+        for i in range(1):
+            if len(labels[i]) == 0:
+                waterfall_sink.set_line_label(i, "Data {0}".format(i))
+            else:
+                waterfall_sink.set_line_label(i, labels[i])
+            waterfall_sink.set_color_map(i, colors[i])
+            waterfall_sink.set_line_alpha(i, alphas[i])
+
+        waterfall_sink.set_intensity_range(-140, 10)
+
+        return waterfall_sink
+
+    def _add_gui_block(self, name, gui_obj, pos):
+        self.gui_blocks[name] = gui_obj
+
+        # For compatibility with GR 3.9 and 3.10, check both pyqwidget() and
+        # qwidget() from the QT GUI object.
+        if hasattr(gui_obj, 'pyqwidget'):
+            gui_obj_win = sip.wrapinstance(gui_obj.pyqwidget(), Qt.QWidget)
+        else:
+            gui_obj_win = sip.wrapinstance(gui_obj.qwidget(), Qt.QWidget)
+
+        self.top_grid_layout.addWidget(gui_obj_win, *pos)
+
+    def setup_gui(self):
+        from gnuradio import qtgui
+
+        Qt.QWidget.__init__(self)
+        self.setWindowTitle("DVB-S2 Rec")
+        qtgui.util.check_set_qss()
+        try:
+            self.setWindowIcon(Qt.QIcon.fromTheme('gnuradio-grc'))
+        except:
+            pass
+        self.top_scroll_layout = Qt.QVBoxLayout()
+        self.setLayout(self.top_scroll_layout)
+        self.top_scroll = Qt.QScrollArea()
+        self.top_scroll.setFrameStyle(Qt.QFrame.NoFrame)
+        self.top_scroll_layout.addWidget(self.top_scroll)
+        self.top_scroll.setWidgetResizable(True)
+        self.top_widget = Qt.QWidget()
+        self.top_scroll.setWidget(self.top_widget)
+        self.top_layout = Qt.QVBoxLayout(self.top_widget)
+        self.top_grid_layout = Qt.QGridLayout()
+        self.top_layout.addLayout(self.top_grid_layout)
+
+        self.settings = Qt.QSettings("GNU Radio", "dvbs2-rx")
+
+        try:
+            if StrictVersion(Qt.qVersion()) < StrictVersion("5.0.0"):
+                self.restoreGeometry(
+                    self.settings.value("geometry").toByteArray())
+            else:
+                self.restoreGeometry(self.settings.value("geometry"))
+        except:
+            pass
+
+        ##################################################
+        # Blocks
+        ##################################################
+        self.gui_blocks = {}
+
+        # Start with a 3x2 grid and extend it if necessary depending on the
+        # optional blocks and widgets below.
+        n_rows = 2
+        n_columns = 1
+
+        # Waterfall sink observing the signal directly out of the source
+        waterfall_sink = self._get_waterfall_sink(qtgui, "Input Signal",
+                                                  self.gui_fft_size)
+
+        self._add_gui_block('waterfall_sink', waterfall_sink, (0, 0, 2, 0))
+
+        # Optional SDR controls
+        if self.source in ['usrp', 'rtl', 'bladeRF', 'plutosdr']:
+            n_rows += 2  # Place them at the bottom on a new row
+
+            # Gain
+            if self.source == 'usrp':
+                initial_gain = self.usrp['gain']
+            elif self.source == 'rtl':
+                initial_gain = self.rtl['gain']
+            elif self.source == 'bladeRF':
+                initial_gain = self.blade_rf['rf_gain']
+            elif self.source == 'plutosdr':
+                initial_gain = self.plutosdr['manual_gain']
+
+            # With the PlutoSDR, show the gain widget only in manual gain mode
+            if not (self.source == 'plutosdr'
+                    and self.plutosdr['gain_mode'] != 'manual'):
+                qt_gain_range = qtgui.Range(0, MAX_RX_GAIN[self.source], 1,
+                                            initial_gain, 200)
+                gui_gain_widget = qtgui.RangeWidget(qt_gain_range,
+                                                    self.set_gui_gain, "Gain",
+                                                    "counter_slider", float,
+                                                    QtCore.Qt.Horizontal)
+                self.top_grid_layout.addWidget(gui_gain_widget, 2, 0)
+
+            # Center Frequency
+            qt_freq_range = qtgui.Range(MIN_FREQ[self.source],
+                                        MAX_FREQ[self.source], 100e3,
+                                        self.freq, 200)
+            gui_freq_widget = qtgui.RangeWidget(qt_freq_range,
+                                                self.set_gui_freq,
+                                                "Center Frequency",
+                                                "counter_slider", float,
+                                                QtCore.Qt.Horizontal)
+            self.top_grid_layout.addWidget(gui_freq_widget, 3, 0)
+
+        # Stretch columns and rows
+        for r in range(0, n_rows):
+            self.top_grid_layout.setRowStretch(r, 1)
+        for c in range(0, n_columns):
+            self.top_grid_layout.setColumnStretch(c, 1)
+
+        self.gui_setup_complete = True
+
+    def setup_usrp_source(self):
+        self.usrp_source = usrp_source = uhd.usrp_source(
+            self.usrp['args'],
+            uhd.stream_args(
+                cpu_format="fc32",
+                otw_format=self.usrp['otw_format'],
+                args=self.usrp['stream_args'],
+                channels=self.usrp['channels'],
+            ))
+
+        chan = 0
+        if self.usrp['clock_source'] is not None:
+            usrp_source.set_clock_source(self.usrp['clock_source'], chan)
+        if self.usrp['time_source'] is not None:
+            usrp_source.set_time_source(self.usrp['time_source'], chan)
+        if self.usrp['subdev'] is not None:
+            usrp_source.set_subdev_spec(self.usrp['subdev'], chan)
+        usrp_source.set_samp_rate(self.samp_rate)
+        usrp_source.set_antenna(self.usrp['antenna'], chan)
+        usrp_source.set_gain(self.usrp['gain'], chan)
+
+        # Get the sample rate actually set on the USRP and adjust the
+        # oversampling ratio applied by the software decimator (symbol sync
+        # block) so that the nominal symbol rate is reasonably accurate. Make
+        # sure to apply this adjustment before calling "connect_dvbs2rx" and
+        # "setup_gui" so that these can use the actual sampling rate.
+        assert not self.flowgraph_connected and not self.gui_setup_complete, \
+            "Source must be connected before the flowgraph"
+        actual_samp_rate = usrp_source.get_samp_rate()
+        self.sps = actual_samp_rate / self.sym_rate
+        self.samp_rate = actual_samp_rate
+
+        # Tune the RF frontend with an offset relative to the target center
+        # frequency. In other words, tune the LO to "freq - lo_offset" instead
+        # of "freq". By default, set the LO offset to the sampling rate and let
+        # the FPGA's DSP apply the remaining frequency shift of
+        # "exp(j*2*pi*n*samp_rate/master_clock_rate)". With that, the DC
+        # component due to LO leakage ends up out of the observed band. Just
+        # make sure to use an LO offset within +-master_clock_rate/2.
+        if self.usrp['lo_offset'] is None:
+            self.usrp['lo_offset'] = self.samp_rate
+        usrp_source.set_center_freq(
+            uhd.tune_request(self.freq, self.usrp['lo_offset']), chan)
+
+        # Set the device time
+        if self.usrp['sync'] == 'unknown_pps':
+            usrp_source.set_time_unknown_pps(uhd.time_spec(0))
+        elif self.usrp['sync'] == 'pc_clock':
+            usrp_source.set_time_now(uhd.time_spec(time.time()),
+                                     uhd.ALL_MBOARDS)
+        elif self.usrp['sync'] == 'pc_clock_next_pps':
+            last_pps = usrp_source.get_time_last_pps().get_real_secs()
+            while (usrp_source.get_time_last_pps().get_real_secs() == last_pps
+                   ):
+                time.sleep(0.05)
+            usrp_source.set_time_next_pps(
+                uhd.time_spec(int(time.time()) + 1.0))
+            time.sleep(1)
+        elif self.usrp['sync'] == 'gps_time':
+            usrp_source.set_time_next_pps(
+                uhd.time_spec(
+                    usrp_source.get_mboard_sensor("gps_time").to_int() + 1.0))
+            time.sleep(1)
+
+        return usrp_source
+
+    def setup_blade_rf_source(self):
+        import bladeRF
+
+        self.blade_rf_source = blade_rf_source = bladeRF.source(
+            args="numchan=" + str(1) + ",metadata=" + 'False' + ",bladerf=" +
+            self.blade_rf['dev'] + ",verbosity=" + 'verbose' + ",feature=" +
+            'default' + ",sample_format=" + '16bit' + ",fpga=" + str('') +
+            ",fpga-reload=" + 'False' + ",use_ref_clk=" + 'False' +
+            ",ref_clk=" + str(int(self.blade_rf['ref_clk'])) + ",in_clk=" +
+            'ONBOARD' + ",out_clk=" + str(False) + ",use_dac=" + 'False' +
+            ",dac=" + str(10000) + ",xb200=" + 'none' + ",tamer=" +
+            'internal' + ",sampling=" + 'internal' + ",lpf_mode=" +
+            'disabled' + ",smb=" + str(int(0)) + ",dc_calibration=" +
+            'LPF_TUNING' + ",trigger0=" + 'False' + ",trigger_role0=" +
+            'master' + ",trigger_signal0=" + 'J51_1' + ",trigger1=" + 'False' +
+            ",trigger_role1=" + 'master' + ",trigger_signal1=" + 'J51_1' +
+            ",bias_tee0=" + str(self.blade_rf['bias_tee'][0]) + ",bias_tee1=" +
+            str(self.blade_rf['bias_tee'][1]))
+
+        chan = self.blade_rf['channel']
+        blade_rf_source.set_sample_rate(self.samp_rate)
+        blade_rf_source.set_center_freq(self.freq, chan)
+        blade_rf_source.set_bandwidth(self.blade_rf['bandwidth'], chan)
+        blade_rf_source.set_dc_offset_mode(0, chan)
+        blade_rf_source.set_iq_balance_mode(0, chan)
+        blade_rf_source.set_gain_mode(False, chan)
+        blade_rf_source.set_gain(self.blade_rf['rf_gain'], chan)
+        blade_rf_source.set_if_gain(self.blade_rf['if_gain'], chan)
+
+        return blade_rf_source
+
+    def setup_plutosdr_source(self):
+        from gnuradio import iio
+
+        self.iio_pluto_source = iio_pluto_source = iio.fmcomms2_source_fc32(
+            self.plutosdr['address'] if self.plutosdr['address'] else
+            iio.get_pluto_uri(), [True, True], self.plutosdr['buffer_size'])
+
+        iio_pluto_source.set_len_tag_key('packet_len')
+        iio_pluto_source.set_frequency(self.freq)
+        iio_pluto_source.set_samplerate(self.samp_rate)
+        iio_pluto_source.set_gain_mode(0, self.plutosdr['gain_mode'])
+        iio_pluto_source.set_gain(0, self.plutosdr['manual_gain'])
+        iio_pluto_source.set_quadrature(True)
+        iio_pluto_source.set_rfdc(True)
+        iio_pluto_source.set_bbdc(True)
+        iio_pluto_source.set_filter_params('Auto', '', 0, 0)
+
+        return iio_pluto_source
+
+    def connect_source(self):
+        """Connect the IQ sample source
+
+        Returns:
+            block: Last block object on the source pipeline.
+        """
+
+        if (self.source == "rtl"):
+            import osmosdr  # lazy import to avoid failure if source != rtl
+            if self.rtl['ipport'] is None:
+                rtl_arg = self.rtl['serial'] if self.rtl[
+                    'serial'] is not None else str(self.rtl['idx'])
+                self.rtlsdr_source = rtlsdr = osmosdr.source(
+                    args="numchan=" + str(1) + " " + "rtl={}".format(rtl_arg))
+            else:
+                self.rtlsdr_source = rtlsdr = osmosdr.source(
+                    args="numchan=" + str(1) + " " +
+                    "rtl_tcp={}".format(self.rtl['ipport']))
+            rtlsdr.set_time_unknown_pps(osmosdr.time_spec_t())
+            rtlsdr.set_sample_rate(self.samp_rate)
+            rtlsdr.set_center_freq(self.freq, 0)
+            rtlsdr.set_freq_corr(0, 0)
+            rtlsdr.set_dc_offset_mode(0, 0)
+            rtlsdr.set_iq_balance_mode(0, 0)
+            rtlsdr.set_gain_mode(self.rtl['agc'], 0)
+            rtlsdr.set_gain(self.rtl['gain'], 0)
+            rtlsdr.set_if_gain(20, 0)
+            rtlsdr.set_bb_gain(20, 0)
+            rtlsdr.set_antenna('', 0)
+            rtlsdr.set_bandwidth(0, 0)
+            source = rtlsdr
+        elif self.source == "usrp":
+            source = self.setup_usrp_source()
+        elif self.source == 'bladeRF':
+            source = self.setup_blade_rf_source()
+        elif self.source == 'plutosdr':
+            source = self.setup_plutosdr_source()
+
+        return source
+
+    def connect_sink(self):
+        """Connect the MPEG TS Sink
+
+        Returns:
+            block: First block on the sink pipeline, which should connect to
+            the DVB-S2 Rec output.
+        """
+        self.out_file_name = self.rec_name + ".sigmf-data"
+        gr.log.info(f"IQ recording will be saved on file {self.out_file_name}")
+
+        out_size = gr.sizeof_char if self.iq_format == "u8" else \
+            gr.sizeof_gr_complex
+        bytes_per_sample = 2 * gr.sizeof_char if self.iq_format == "u8" else \
+            gr.sizeof_gr_complex  # u8 has interleaved IQ (two u8 per sample)
+        mb_per_sec = (bytes_per_sample * self.samp_rate) / (2**20)
+        gr.log.info(f"The recording is expected to grow by ~ {mb_per_sec:.2f} "
+                    "MBytes/second.")
+
+        file_sink = blocks.file_sink(out_size, self.out_file_name)
+
+        if (self.iq_format == "u8"):
+            # Convert the complex stream into an interleaved uchar stream.
+            complex_to_float_0 = blocks.complex_to_float(1)
+            multiply_const_0 = blocks.multiply_const_ff(128)
+            multiply_const_1 = blocks.multiply_const_ff(128)
+            add_const_0 = blocks.add_const_ff(127)
+            add_const_1 = blocks.add_const_ff(127)
+            float_to_uchar_0 = blocks.float_to_uchar()
+            float_to_uchar_1 = blocks.float_to_uchar()
+            interleaver = blocks.interleave(gr.sizeof_char, 1)
+            self.connect((complex_to_float_0, 0), (multiply_const_0, 0))
+            self.connect((complex_to_float_0, 1), (multiply_const_1, 0))
+            self.connect((multiply_const_0, 0), (add_const_0, 0),
+                         (float_to_uchar_0, 0), (interleaver, 0))
+            self.connect((multiply_const_1, 0), (add_const_1, 0),
+                         (float_to_uchar_1, 0), (interleaver, 1))
+            self.connect((interleaver, 0), (file_sink, 0))
+            return complex_to_float_0
+        else:
+            return file_sink
+
+    def connect_dvbs2rx(self, source_block, sink_block):
+        """Connect the DVB-S2 Recording Pipeline
+
+        Args:
+            source_block : The block providing IQ samples.
+            sink_block : The block consuming the IQ stream.
+
+        """
+        # Connect the source directly to the sink
+        self.connect((source_block, 0), (sink_block, 0))
+
+        if (self.gui):
+            self.connect((source_block, 0),
+                         (self.gui_blocks['waterfall_sink'], 0))
+
+        # Connection state
+        self.flowgraph_connected = True
+
+    def closeEvent(self, event):
+        self.settings = Qt.QSettings("GNU Radio", "dvbs2_rec")
+        self.settings.setValue("geometry", self.saveGeometry())
+        self.stop()
+        self.wait()
+        self.save_rec_meta()
+        event.accept()
+
+    def setStyleSheetFromFile(self, theme):
+        try:
+            prefixes = [gr.prefix(), "/usr/local", "/usr"]
+            found = False
+            for prefix in prefixes:
+                filename = os.path.join(prefix, "share", "gnuradio", "themes",
+                                        theme)
+                if os.path.exists(filename):
+                    found = True
+                    break
+            if (not found):
+                gr.log.error("Failed to locate theme {}".format(theme))
+                return False
+            with open(filename) as ss:
+                self.setStyleSheet(ss.read())
+        except Exception as e:
+            gr.log.error(str(e))
+            return False
+        return True
+
+    def set_gui_gain(self, new_gain):
+        if self.source == 'usrp':
+            self.usrp['gain'] = new_gain
+            self.usrp_source.set_gain(self.usrp['gain'], 0)
+        elif self.source == 'rtl':
+            self.rtl['gain'] = new_gain
+            self.rtlsdr_source.set_gain(self.rtl['gain'], 0)
+        elif self.source == 'bladeRF':
+            self.blade_rf['rf_gain'] = new_gain
+            self.blade_rf_source.set_gain(self.blade_rf['rf_gain'],
+                                          self.blade_rf['channel'])
+        elif self.source == 'plutosdr' and \
+                self.plutosdr['gain_mode'] == 'manual':
+            self.plutosdr['manual_gain'] = new_gain
+            self.iio_pluto_source.set_gain(0, self.plutosdr['manual_gain'])
+
+    def set_gui_freq(self, new_freq):
+        self.freq = new_freq
+        if self.source == 'usrp':
+            self.usrp_source.set_center_freq(
+                uhd.tune_request(self.freq, self.usrp['lo_offset']), 0)
+        elif self.source == 'rtl':
+            self.rtlsdr_source.set_center_freq(self.freq, 0)
+        elif self.source == 'bladeRF':
+            self.blade_rf_source.set_center_freq(self.freq,
+                                                 self.blade_rf['channel'])
+        elif self.source == 'plutosdr':
+            self.iio_pluto_source.set_frequency(self.freq)
+
+        for gui_block in ['waterfall_sink', 'freq_sink_agc_rotator_out']:
+            if gui_block in self.gui_blocks:
+                self.gui_blocks[gui_block].set_frequency_range(
+                    self.freq, self.samp_rate)
+
+    def save_rec_meta(self):
+        if self.rec_meta_saved:
+            return
+
+        file_sha512 = hashlib.sha512()
+        with open(self.out_file_name, "rb") as f:
+            while True:
+                data = f.read(65536)
+                if not data:
+                    break
+                file_sha512.update(data)
+
+        rec_meta = {
+            "global": {
+                "core:author": self.rec_meta["author"],
+                "core:datatype":
+                "cu8" if self.iq_format == "u8" else "cf32_le",
+                "core:description": self.rec_meta["description"],
+                "core:hw": self.rec_meta["hw"],
+                "core:recorder": self.source,
+                "core:sample_rate": self.samp_rate,
+                "core:sha512": file_sha512.hexdigest(),
+                "core:version": "1.0.0",
+                "dvbs2:fecframe_size": [self.frame_size],
+                "dvbs2:modcod": [self.modcod],
+                "dvbs2:rolloff": self.rolloff,
+                "dvbs2:symbol_rate": self.sym_rate,
+            },
+            "captures": [{
+                "core:datetime": self.start_time.isoformat(),
+                "core:frequency": self.freq,
+                "core:sample_start": 0,
+            }],
+            "annotations": []
+        }
+
+        if self.pilots is not None:
+            rec_meta["global"]["dvbs2:pilots"] = self.pilots
+
+        if not click.confirm("Keep recording?", default=True):
+            os.remove(self.out_file_name)
+            return
+
+        meta_file_name = self.rec_name + ".sigmf-meta"
+        gr.log.info(f"Saving metadata at {meta_file_name}")
+
+        with open(meta_file_name, "w") as f:
+            json.dump(rec_meta, f, indent=4, sort_keys=True)
+
+        self.rec_meta_saved = True
+
+
+def argument_parser():
+    description = 'DVB-S2 IQ Recorder'
+    parser = ArgumentParser(prog="dvbs2-rec",
+                            description=description,
+                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-d",
+                        "--debug",
+                        type=int,
+                        default=0,
+                        help="Debugging level")
+    parser.add_argument('-v',
+                        '--version',
+                        action='version',
+                        version=parse_version(dvbs2rx))
+    parser.add_argument('-f',
+                        "--freq",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1e9)),
+                        help="Carrier or intermediate frequency in Hz")
+    samp_rate_group = parser.add_mutually_exclusive_group()
+    samp_rate_group.add_argument(
+        "-o",
+        "--sps",
+        type=eng_float,
+        default=eng_notation.num_to_str(float(2)),
+        help="Oversampling ratio in samples per symbol")
+    samp_rate_group.add_argument("--samp-rate",
+                                 type=eng_float,
+                                 help="Sampling rate in samples per second")
+    parser.add_argument("-s",
+                        "--sym-rate",
+                        type=eng_float,
+                        default=eng_notation.num_to_str(float(1000000)),
+                        help="Symbol rate in bauds")
+    parser.add_argument("--iq-format",
+                        choices=['fc32', 'u8'],
+                        default='fc32',
+                        help="Recording IQ format")
+
+    gui_group = parser.add_argument_group('GUI Options')
+    gui_group.add_argument("--gui",
+                           action='store_true',
+                           default=False,
+                           help="Launch a graphical user interface (GUI).")
+    gui_group.add_argument("--gui-dark",
+                           action='store_true',
+                           default=False,
+                           help="Launch the GUI in dark mode.")
+    gui_group.add_argument(
+        "--gui-fft-size",
+        type=int,
+        default=1024,
+        help="FFT size used by the GUI frequency and waterfall sink blocks")
+    gui_group.add_argument('--gui-ctrl-panel',
+                           action='store_true',
+                           default=False,
+                           help="Enable the available widget control panels")
+
+    rec_group = parser.add_argument_group('Recording Metadata')
+    rec_group.add_argument("--author",
+                           type=str,
+                           help="Author of the recording")
+    rec_group.add_argument(
+        "--description",
+        type=str,
+        help="Signal description (e.g., Live carrier from Satellite XYZ)")
+    rec_group.add_argument(
+        "--hardware",
+        type=str,
+        help="Description of the hardware used to capture the signal")
+    rec_group.add_argument("-r",
+                           "--rolloff",
+                           type=eng_float,
+                           choices=[0.35, 0.25, 0.2],
+                           default=eng_notation.num_to_str(float(0.2)),
+                           help="Signal's rolloff factor")
+    rec_group.add_argument("-m",
+                           "--modcod",
+                           type=str,
+                           default='QPSK1/4',
+                           help="Signal's MODCOD")
+    rec_group.add_argument("--frame-size",
+                           type=str,
+                           choices=['normal', 'short'],
+                           default='normal',
+                           help="FECFRAME size")
+    rec_group.add_argument('-p',
+                           "--pilots",
+                           choices=['on', 'off'],
+                           help="Whether the signal has PL pilots enabled")
+
+    src_group = parser.add_argument_group('Source Options')
+    src_group.add_argument("--source",
+                           choices=["rtl", "usrp", "bladeRF", "plutosdr"],
+                           default="fd",
+                           help="Source of the input IQ sample stream")
+
+    rtl_group = parser.add_argument_group('RTL-SDR Options')
+    rtl_group.add_argument(
+        "--rtl-agc",
+        action='store_true',
+        default=False,
+        help="Enable the RTL-SDR's tuner and demodulator AGC")
+    rtl_group.add_argument("--rtl-gain",
+                           type=float,
+                           default=40,
+                           help="RTL-SDR's tuner RF gain (LNA + mixer gain)")
+    rtl_dev_group = rtl_group.add_mutually_exclusive_group()
+    rtl_dev_group.add_argument("--rtl-idx",
+                               type=int,
+                               default=0,
+                               help="RTL-SDR device index")
+    rtl_dev_group.add_argument("--rtl-serial",
+                               type=str,
+                               help="RTL-SDR serial number")
+    rtl_dev_group.add_argument("--rtl-ipport",
+                               type=str,
+                               help="rtl_tcp IP:port string")
+
+    usrp_group = parser.add_argument_group('USRP Options')
+    usrp_group.add_argument(
+        "--usrp-args",
+        type=str,
+        help="USRP device address arguments as a comma-delimited string with "
+        "key=value pairs")
+    usrp_group.add_argument("--usrp-antenna",
+                            type=str,
+                            default="TX/RX",
+                            help="USRP antenna")
+    usrp_group.add_argument("--usrp-clock-source",
+                            type=str,
+                            choices=['internal', 'external', 'mimo', 'gpsdo'],
+                            help="USRP clock source")
+    usrp_group.add_argument("--usrp-gain",
+                            type=float,
+                            default=0,
+                            help="USRP Rx gain")
+    usrp_group.add_argument(
+        "--usrp-lo-offset",
+        type=eng_float,
+        help="USRP\'s tune request LO offset frequency in Hz")
+    usrp_group.add_argument("--usrp-otw-format",
+                            type=str,
+                            choices=['sc16', 'sc12', 'sc8'],
+                            default='sc16',
+                            help="USRP over-the-wire data format")
+    usrp_group.add_argument(
+        "--usrp-stream-args",
+        type=str,
+        help="USRP Rx streaming arguments as a comma-delimited string with "
+        "key=value pairs")
+    usrp_group.add_argument("--usrp-subdev",
+                            type=str,
+                            help="USRP subdevice specification")
+    usrp_group.add_argument("--usrp-sync",
+                            type=str,
+                            choices=[
+                                'unknown_pps', 'pc_clock', 'pc_clock_next_pps',
+                                'gps_time', 'none'
+                            ],
+                            default='unknown_pps',
+                            help="USRP device time synchronization method")
+    usrp_group.add_argument("--usrp-time-source",
+                            type=str,
+                            choices=['external', 'mimo', 'gpsdo'],
+                            help="USRP time source")
+
+    brf_group = parser.add_argument_group('bladeRF Options')
+    brf_group.add_argument('--bladerf-rf-gain',
+                           type=float,
+                           default=10,
+                           help="RF gain in dB")
+    brf_group.add_argument('--bladerf-if-gain',
+                           type=float,
+                           default=20,
+                           help="Intermediate frequency gain in dB")
+    brf_group.add_argument(
+        '--bladerf-bw',
+        type=eng_float,
+        default=2e6,
+        help="Bandwidth in Hz of the radio frontend's bandpass filter. "
+        "Set to zero to use the default (automatic) setting.")
+    brf_group.add_argument(
+        '--bladerf-dev',
+        type=str,
+        default='0',
+        help="Device serial id. When not specified, the first "
+        "available device is used.")
+    brf_group.add_argument('--bladerf-bias-tee',
+                           action='store_true',
+                           default=False,
+                           help="Enable the Rx bias tee")
+    brf_group.add_argument('--bladerf-chan',
+                           type=int,
+                           choices=[0, 1],
+                           default=0,
+                           help='Channel')
+    brf_group.add_argument('--bladerf-ref-clk',
+                           type=eng_float,
+                           default=10e6,
+                           help="Reference clock in Hz")
+
+    pluto_group = parser.add_argument_group('PlutoSDR Options')
+    pluto_group.add_argument('--plutosdr-addr',
+                             type=str,
+                             help="IP address of the unit")
+    pluto_group.add_argument('--plutosdr-buf-size',
+                             type=int,
+                             default=32768,
+                             help="Size of the internal buffer in samples")
+    pluto_group.add_argument(
+        '--plutosdr-gain-mode',
+        type=str,
+        choices=['manual', 'slow_attack', 'fast_attack', 'hybrid'],
+        default='slow_attack',
+        help="Gain mode")
+    pluto_group.add_argument('--plutosdr-gain',
+                             type=int,
+                             default=64,
+                             help="Gain in dB used in manual mode")
+
+    options = parser.parse_args()
+
+    if (options.source == "usrp" and options.usrp_args is None):
+        parser.error("argument --usrp-args is required when --source=\"usrp\"")
+
+    min_bw = (1 + options.rolloff) * options.sym_rate
+    if (options.source == "bladeRF" and options.bladerf_bw != 0
+            and options.bladerf_bw < min_bw):
+        parser.error(
+            "argument --bladerf-bw should be greater than {} Hz".format(
+                min_bw))
+
+    return options
+
+
+def init_rec_metadata(args):
+    author = args.author
+    description = args.description
+    hardware = args.hardware
+
+    if author is None:
+        author = click.prompt("Author")
+
+    if description is None:
+        description = click.prompt("Recording Description")
+
+    if hardware is None:
+        hardware = click.prompt("Recording Hardware")
+
+    return {
+        'author': author,
+        'description': description,
+        'hw': hardware,
+    }
+
+
+def main():
+    options = argument_parser()
+
+    rec_metadata = init_rec_metadata(options)
+
+    gr.log.info("Starting DVB-S2 Rec")
+
+    gui_mode = options.gui
+    if (gui_mode):
+        if sys.platform.startswith('linux'):
+            try:
+                x11 = ctypes.cdll.LoadLibrary('libX11.so')
+                x11.XInitThreads()
+            except:
+                gr.log.warn("Warning: failed to XInitThreads()")
+
+        if StrictVersion("4.5.0") <= StrictVersion(
+                Qt.qVersion()) < StrictVersion("5.0.0"):
+            style = gr.prefs().get_string('qtgui', 'style', 'raster')
+            Qt.QApplication.setGraphicsSystem(style)
+        qapp = Qt.QApplication(sys.argv)
+
+    tb = DVBS2RecTopBlock(options, rec_metadata)
+    tb.start()
+
+    if (gui_mode):
+        if (options.gui_dark):
+            if not tb.setStyleSheetFromFile("dvbs2_dark.qss"):
+                tb.setStyleSheetFromFile("dark.qss")
+        tb.show()
+    else:
+        tb.wait()
+
+    def sig_handler(sig=None, frame=None):
+        tb.stop()
+        tb.wait()
+        tb.save_rec_meta()
+        if (gui_mode):
+            Qt.QApplication.quit()
+        else:
+            sys.exit(0)
+
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
+
+    if (gui_mode):
+        timer = Qt.QTimer()
+        timer.start(500)
+        timer.timeout.connect(lambda: None)
+        qapp.exec_()
+
+    tb.save_rec_meta()
+    gr.log.info("Stopping DVB-S2 Rec")
+
+
+if __name__ == '__main__':
+    main()

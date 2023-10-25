@@ -9,6 +9,7 @@ The `dvbs2-tx` and `dvbs2-rx` applications implement full DVB-S2 transmitter and
   - [Graphical User Interface](#graphical-user-interface)
   - [Processing the MPEG Transport Stream](#processing-the-mpeg-transport-stream)
   - [Logging and Receiver Monitoring](#logging-and-receiver-monitoring)
+  - [Recording and Playback](#recording-and-playback)
   - [Further Information](#further-information)
 
 
@@ -279,6 +280,48 @@ dvbs2-rx --source rtl --freq 1316.9e6 --sym-rate 1e6 --log
 ```
 
 By default, this option prints a short set of metrics. However, you can switch to a more comprehensive JSON-formatted logging mode using option `--log-all`. Furthermore, you can control the logging periodicity with option `--log-period`.
+
+## Recording and Playback
+
+A dedicated application is available for recording DVB-S2 IQ received from an SDR device. The `dvbs2-rec` application can be used as follows:
+
+```
+dvbs2-rec
+--source rtl \
+--freq 1316.9e6 \
+--sym-rate 1e6 \
+--sps 2 \
+--modcod qpsk3/5 \
+--pilots on \
+--author "Author Name" \
+--description "Signal X from Satellite Y" \
+--hardware "SDR X connected to LNB Y on antenna Z"
+```
+
+Among the above arguments, the following are meant to configure the SDR interface:
+
+- The `--source` option specifies the SDR device, which can be `rtl`, `usrp`, `bladeRF`, or `plutosdr`.
+- The `--freq` option specifies the tuner central frequency in Hz.
+- The `--sym-rate` option specifies the symbol rate in symbols per second (bauds), while the `--sps` option specifies the number of samples per symbol. The two options combined determine the sample rate. Alternatively, you can set the sample rate directly using option `--samp-rate`.
+
+The other arguments are saved as metadata only. With them, you can go back to the recording later and know the signal's origin and characteristics to play it back into the receiver application with the correct parameters. The above example defines the following parameters:
+
+- The `--modcod` option specifies the CCM MODCOD carried by the signal.
+- The `--pilots` option indicates the signal contains PL pilots. Alternatively, if you are unsure, you can omit this option and let the receiver application detect the pilots automatically. Also, if you know for sure the signal does not have pilots, you can set `--pilots off`.
+- The `--author` option specifies the author of the recording.
+- The `--description` option provides a short description of the recording.
+- The `--hardware` option describes the hardware used to capture the recording.
+
+On completion, `dvbs2-rec` saves the IQ file following the [Signal Metadata Format (SigMF)](https://github.com/sigmf/SigMF/blob/sigmf-v1.x/sigmf-spec.md) and using the proposed [SigMF Extension for DVB-S2](dvbs2.sigmf-ext.md). Hence, the application saves the IQ data into a file with extension `.sigmf-data` and the metadata into a file with extension `.sigmf-meta`. The metadata file is a JSON-formatted file that any SigMF-compliant application can read.
+
+Aside from using `dvbs2-rec`, you can also use `dvbs2-tx` to produce a simulated IQ file since the Tx application can save output IQ samples into a file. For example, the following command saves a signal with 10 dB SNR and 10 kHz frequency offset into a file named `example.iq`:
+
+```bash
+tsp -I craft --pid 100 | \
+dvbs2-tx --snr 10 --freq-offset 1e4 --sink file --out-file example.iq
+```
+
+However, note `dvbs2-tx` does not save the metadata. Also, `dvbs2-tx` can only produce simulated recordings, not real ones. In contrast, `dvbs2-rec` is meant to capture real signals from an SDR device while saving them in SigMF format for better cataloging and sharing.
 
 ## Further Information
 

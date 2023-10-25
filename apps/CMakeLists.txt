@@ -12,5 +12,6 @@ GR_PYTHON_INSTALL(
     PROGRAMS
     dvbs2-tx
     dvbs2-rx
+    dvbs2-rec
     DESTINATION bin
 )
