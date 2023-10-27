@@ -236,8 +236,7 @@ std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
         // over GF(2^m) to allow for the evaluation b_i(alpha^i) for alpha^i in
         // GF(2^m).
         const auto bi_gf2m = gf2m_poly(m_gf, bi);
-        const T alpha_i = m_gf->get_alpha_i(i);
-        syndrome_vec.push_back(bi_gf2m(alpha_i));
+        syndrome_vec.push_back(bi_gf2m.eval_by_exp(i));
     }
     return syndrome_vec;
 }
@@ -259,8 +258,7 @@ std::vector<T> bch_codec<T, P>::syndrome(u8_cptr_t codeword) const
         const int bi_idx = (m_conjugate_map[i] == 0) ? i : m_conjugate_map[i];
         const auto& bi = bi_map.at(bi_idx);
         const auto bi_gf2m = gf2m_poly(m_gf, bi);
-        const T alpha_i = m_gf->get_alpha_i(i);
-        syndrome_vec.push_back(bi_gf2m(alpha_i));
+        syndrome_vec.push_back(bi_gf2m.eval_by_exp(i));
     }
     return syndrome_vec;
 }
@@ -358,9 +356,8 @@ std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
     // TODO: optimize this computation using a strategy like the one in Fig. 6.1.
     std::vector<T> numbers;
     for (uint32_t i = m_s + 1; i < (m_n + m_s); i++) {
-        const T elem = m_gf->get_alpha_i(i);
-        if (sigma(elem) == 0)
-            numbers.push_back(m_gf->inverse(elem));
+        if (sigma.eval_by_exp(i) == 0)
+            numbers.push_back(m_gf->inverse_by_exp(i));
     }
     return numbers;
 }

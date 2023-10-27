@@ -117,6 +117,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_inverse, T, gf_elem_types)
         T elem = gf.get_alpha_i(element_exponents[i]);
         T expected_inv = gf.get_alpha_i(inverse_exponents[i]);
         BOOST_CHECK_EQUAL(gf.inverse(elem), expected_inv);
+        BOOST_CHECK_EQUAL(gf.inverse_by_exp(element_exponents[i]), expected_inv);
     }
 }
 
@@ -458,15 +459,20 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_eval, T, gf_elem_types)
 
     // a(x) = x^3 + alpha^4
     auto a = gf2m_poly(&gf, { alpha_4, 0, 0, 1 });
-    BOOST_CHECK(a(0) == alpha_4);
-    BOOST_CHECK(a(unit) == (unit ^ alpha_4));
-    BOOST_CHECK(a(alpha) == (alpha_3 ^ alpha_4));
+    BOOST_CHECK(a.eval(0) == alpha_4);
+    // Note: for x = 0 only eval works. eval_by_exp does not work.
+    BOOST_CHECK(a.eval(unit) == (unit ^ alpha_4));
+    BOOST_CHECK(a.eval_by_exp(0) == a.eval(unit));
+    BOOST_CHECK(a.eval(alpha) == (alpha_3 ^ alpha_4));
+    BOOST_CHECK(a.eval_by_exp(1) == a.eval(alpha));
 
     // b(x) = alpha^2 x^2 + alpha^5
     auto b = gf2m_poly(&gf, { alpha_5, 0, alpha_2 });
-    BOOST_CHECK(b(0) == alpha_5);
-    BOOST_CHECK(b(unit) == (alpha_2 ^ alpha_5));
-    BOOST_CHECK(b(alpha) == (alpha_4 ^ alpha_5));
+    BOOST_CHECK(b.eval(0) == alpha_5);
+    BOOST_CHECK(b.eval(unit) == (alpha_2 ^ alpha_5));
+    BOOST_CHECK(b.eval_by_exp(0) == b.eval(unit));
+    BOOST_CHECK(b.eval(alpha) == (alpha_4 ^ alpha_5));
+    BOOST_CHECK(b.eval_by_exp(1) == b.eval(alpha));
 }
 
 } // namespace dvbs2rx

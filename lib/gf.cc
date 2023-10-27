@@ -100,6 +100,13 @@ T galois_field<T>::inverse(const T& beta) const
 }
 
 template <typename T>
+T galois_field<T>::inverse_by_exp(uint32_t i) const
+{
+    // See the comments on inverse() above.
+    return get_alpha_i(m_two_to_m_minus_one - i);
+}
+
+template <typename T>
 T galois_field<T>::divide(const T& a, const T& b) const
 {
     return multiply(a, inverse(b));
@@ -260,6 +267,9 @@ void gf2m_poly<T>::set_coef_exponents()
             m_nonzero_coef_exp.push_back(m_gf->get_exponent(coef_j));
         }
     }
+    // Cache the number of non-zero coefficients for performance so that we don't need to
+    // call size() on every polynomial evaluation via operator().
+    m_n_nonzero_coef = m_nonzero_coef_idx.size();
 }
 
 template <typename T>
@@ -320,7 +330,7 @@ bool gf2m_poly<T>::operator==(const gf2m_poly& x) const
 }
 
 template <typename T>
-T gf2m_poly<T>::operator()(T x) const
+T gf2m_poly<T>::eval(T x) const
 {
     if (x == 0)
         return m_poly[0]; // all other coefficients are zeroed
@@ -332,9 +342,20 @@ T gf2m_poly<T>::operator()(T x) const
     // coefficient can also be represented as a power of the primitive element alpha, so
     // the vector of non-zero coefficient exponents is like {alpha^a, alpha^b, ...}.
     // Hence, for instance, alpha^a multiplied by alpha^(ij) becomes alpha^(a + ij).
-    const T i = m_gf->get_exponent(x);
+    const uint32_t i = m_gf->get_exponent(x);
     T res = 0;
-    for (size_t j = 0; j < m_nonzero_coef_idx.size(); j++) {
+    for (size_t j = 0; j < m_n_nonzero_coef; j++) {
+        res ^= m_gf->get_alpha_i(m_nonzero_coef_exp[j] + i * m_nonzero_coef_idx[j]);
+    }
+    return res;
+}
+
+template <typename T>
+T gf2m_poly<T>::eval_by_exp(uint32_t i) const
+{
+    // See comments on eval() above.
+    T res = 0;
+    for (size_t j = 0; j < m_n_nonzero_coef; j++) {
         res ^= m_gf->get_alpha_i(m_nonzero_coef_exp[j] + i * m_nonzero_coef_idx[j]);
     }
     return res;

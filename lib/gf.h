@@ -78,6 +78,9 @@ public:
      *
      * @param beta Element beta that is a power of the primitive element alpha.
      * @return T Exponent i.
+     * @note This function cannot obtain the exponent of the zero (additive identity)
+     * element, given the zero element cannot be expressed as a power of the primitive
+     * element alpha. A runtime error exception is raised if beta is the zero element.
      */
     uint32_t get_exponent(const T& beta) const;
 
@@ -97,6 +100,14 @@ public:
      * @return T Inverse beta^-1.
      */
     T inverse(const T& beta) const;
+
+    /**
+     * @brief Get the inverse from a GF(2^m) element alpha^i given by its exponent i.
+     *
+     * @param i Exponent i of the element beta = alpha^i to be inverted.
+     * @return T Inverse beta^-1.
+     */
+    T inverse_by_exp(uint32_t i) const;
 
     /**
      * @brief Divide two elements from GF(2^m).
@@ -258,6 +269,7 @@ private:
                                               // polynomial coefficients
     std::vector<uint32_t> m_nonzero_coef_exp; // Exponents of the non-zero polynomial
                                               // coefficients
+    size_t m_n_nonzero_coef;                  // Number of non-zero coefficients
     // Example: a polynomial "alpha^4 x^3 + alpha^2 x + 1" would have the following data
     // in the vectors: m_poly = [1, alpha^2, 0, alpha^4], m_nonzero_coef_idx = [0, 1, 3],
     // m_nonzero_coef_exp = [0, 2, 4].
@@ -337,7 +349,23 @@ public:
      * @param x GF(2^m) value for which the polynomial should be evaluated.
      * @return T Evaluation result within GF(2^m).
      */
-    T operator()(T x) const;
+    T eval(T x) const;
+
+    /**
+     * @brief Evaluate the polynomial for an element alpha^i given by its exponent i.
+     *
+     * Assuming the underlying polynomial is p(x), this function evaluates p(x) for a
+     * given x from GF(2^m). The difference to the operator() is that this function takes
+     * x by its exponent i. If x = alpha^i, this function takes i as input instead of x.
+     *
+     * @param i Exponent of the GF(2^m) value for which the polynomial should be
+     * evaluated.
+     * @return T Evaluation result within GF(2^m).
+     * @note Since the zero element (additive identity) cannot be represented as a power
+     * of the primitive element, there is no exponent i for the zero element. Hence, this
+     * function can only evaluate the polynomial for non-zero elements.
+     */
+    T eval_by_exp(uint32_t i) const;
 
     /**
      * @brief Get the polynomial coefficients.
