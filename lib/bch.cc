@@ -355,7 +355,7 @@ std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
     //
     // TODO: optimize this computation using a strategy like the one in Fig. 6.1.
     std::vector<T> numbers;
-    for (uint32_t i = m_s + 1; i < (m_n + m_s); i++) {
+    for (uint32_t i = m_s + 1; i <= (m_n + m_s); i++) {
         if (sigma.eval_by_exp(i) == 0)
             numbers.push_back(m_gf->inverse_by_exp(i));
     }

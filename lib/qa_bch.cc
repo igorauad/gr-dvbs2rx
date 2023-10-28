@@ -35,7 +35,7 @@ void fill_random_bytes(u8_vector_t& vec)
 }
 
 template <typename T>
-T flip_bits(const T& in_data, uint32_t valid_bits, uint32_t num_bits)
+T flip_random_bits(const T& in_data, uint32_t valid_bits, uint32_t num_bits)
 {
     std::set<uint32_t> flipped_bits;
     std::random_device rd;
@@ -51,7 +51,14 @@ T flip_bits(const T& in_data, uint32_t valid_bits, uint32_t num_bits)
     return out_data;
 }
 
-void flip_bits(u8_vector_t& vec, uint32_t num_bits)
+void flip_bit(u8_vector_t& vec, uint32_t bit_idx)
+{
+    uint32_t byte_idx = bit_idx / 8;
+    uint32_t bit_pos = bit_idx % 8;
+    vec[byte_idx] ^= (1 << bit_pos);
+}
+
+void flip_random_bits(u8_vector_t& vec, uint32_t num_bits)
 {
     std::set<uint32_t> flipped_bits;
     std::random_device rd;
@@ -61,9 +68,7 @@ void flip_bits(u8_vector_t& vec, uint32_t num_bits)
         uint32_t bit_idx = dis(gen);
         while (flipped_bits.find(bit_idx) != flipped_bits.end())
             bit_idx = dis(gen);
-        uint32_t byte_idx = bit_idx / 8;
-        uint32_t bit_pos = bit_idx % 8;
-        vec[byte_idx] ^= (1 << bit_pos);
+        flip_bit(vec, bit_idx);
         flipped_bits.insert(bit_idx);
     }
 }
@@ -298,7 +303,7 @@ BOOST_AUTO_TEST_CASE(test_bch_syndrome_u8_codeword)
     for (T msg = 0; msg <= max_msg; msg++) {
         T codeword = codec.encode(msg);
         for (uint8_t num_errors = 0; num_errors <= t; num_errors++) {
-            T rx_codeword = flip_bits(codeword, codec.get_n(), num_errors);
+            T rx_codeword = flip_random_bits(codeword, codec.get_n(), num_errors);
             auto syndrome = codec.syndrome(rx_codeword);
             u8_vector_t rx_codeword_u8 = to_u8_vector(rx_codeword, n_bytes);
             auto syndrome_u8 = codec.syndrome(rx_codeword_u8.data());
@@ -423,11 +428,10 @@ void check_decode(const bch_codec<T, P>& codec,
                   const galois_field<T>& gf,
                   uint8_t num_errors = 0)
 {
-    // The syndrome should be zero for error-free codewords
     T max_msg = (1 << codec.get_k()) - 1;
     for (T msg = 0; msg <= max_msg; msg++) {
         T tx_codeword = codec.encode(msg);
-        T rx_codeword = flip_bits(tx_codeword, codec.get_n(), num_errors);
+        T rx_codeword = flip_random_bits(tx_codeword, codec.get_n(), num_errors);
         T decoded_msg = codec.decode(rx_codeword);
         BOOST_CHECK_EQUAL(decoded_msg, msg);
     }
@@ -522,10 +526,42 @@ BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array)
     for (T msg = 0; msg <= max_msg; msg++) {
         T codeword = codec.encode(msg);
         for (uint8_t num_errors = 0; num_errors <= t; num_errors++) {
-            T rx_codeword = flip_bits(codeword, codec.get_n(), num_errors);
+            T rx_codeword = flip_random_bits(codeword, codec.get_n(), num_errors);
             u8_vector_t rx_codeword_u8 = to_u8_vector(rx_codeword, n_bytes);
             u8_vector_t decoded_msg(k_bytes);
             codec.decode(rx_codeword_u8.data(), decoded_msg.data());
+            BOOST_CHECK_EQUAL(msg, from_u8_vector<T>(decoded_msg));
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_correct_all_bit_positions)
+{
+    typedef uint64_t T;
+    typedef uint64_t P;
+
+    // Create a BCH codec with byte-aligned n and k
+    gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
+    galois_field gf(prim_poly);
+    uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
+    bch_codec<T, P> codec(&gf, t, /*n=*/56);
+    BOOST_CHECK_EQUAL(codec.get_n(), 56);
+    BOOST_CHECK_EQUAL(codec.get_k(), 32);
+    BOOST_CHECK(codec.get_n() % 8 == 0);
+    BOOST_CHECK(codec.get_k() % 8 == 0);
+    uint32_t n_bytes = codec.get_n() / 8;
+    uint32_t k_bytes = codec.get_k() / 8;
+
+    // Add single-bit errors in all bit positions and ensure they can be corrected
+    T max_msg = (1 << codec.get_k()) - 1;
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T codeword = codec.encode(msg);
+        for (uint32_t bit_pos = 0; bit_pos < codec.get_n(); bit_pos++) {
+            u8_vector_t rx_codeword_u8 = to_u8_vector(codeword, n_bytes);
+            flip_bit(rx_codeword_u8, bit_pos);
+            u8_vector_t decoded_msg(k_bytes);
+            int n_corrected = codec.decode(rx_codeword_u8.data(), decoded_msg.data());
+            BOOST_CHECK_EQUAL(n_corrected, 1);
             BOOST_CHECK_EQUAL(msg, from_u8_vector<T>(decoded_msg));
         }
     }
@@ -562,7 +598,7 @@ BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array_uncorrectable)
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(t + 1, d_min - 1);
     uint32_t num_errors = dis(gen);
-    flip_bits(rx_codeword, num_errors);
+    flip_random_bits(rx_codeword, num_errors);
     BOOST_CHECK_EQUAL(count_errors(tx_codeword, rx_codeword), num_errors);
 
     // Decode with error correction
@@ -608,7 +644,7 @@ void test_dvbs2(const std::string& fecframe_size, uint32_t n, uint8_t t)
     codec.encode(msg.data(), codeword.data());
 
     // Add up to t random errors
-    flip_bits(codeword, t);
+    flip_random_bits(codeword, t);
 
     // Decode it with error correction
     u8_vector_t decoded_msg(k_bytes);
