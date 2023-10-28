@@ -475,5 +475,36 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_eval, T, gf_elem_types)
     BOOST_CHECK(b.eval_by_exp(1) == b.eval(alpha));
 }
 
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_poly_root_search, T, gf_elem_types)
+{
+    gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
+    galois_field gf(prim_poly);
+
+    uint32_t m_two_to_m_minus_one = (1 << gf.get_m()) - 1;
+
+    // Search the roots of each minimal polynomial in GF(2^m)
+    for (uint32_t i = 1; i < m_two_to_m_minus_one; i++) {
+        // By definition, the minimal polynomial of alpha^i is the polynomial over GF(2)
+        // of smallest degree having alpha^i as a root. Also, the conjugates of alpha^i
+        // are the other roots of the minimal polynomial. Hence, the root search should
+        // obtain all conjugates of alpha^i.
+        T alpha_i = gf.get_alpha_i(i);
+        auto min_poly = gf.get_min_poly(alpha_i); // minimal polynomial is over GF(2)
+        auto poly = gf2m_poly(&gf, min_poly); // convert it to a polynomial over GF(2^m)
+        auto root_exps = poly.search_roots_in_exp_range(1, m_two_to_m_minus_one);
+        std::vector<T> roots; // convert the exponents to the actual elements (the roots)
+        std::transform(root_exps.cbegin(),
+                       root_exps.cend(),
+                       std::back_inserter(roots),
+                       [&gf](uint32_t root_exp) { return gf.get_alpha_i(root_exp); });
+        std::set<T> root_set(roots.cbegin(), roots.cend());
+        auto expected_roots = gf.get_conjugates(alpha_i);
+        BOOST_CHECK_EQUAL_COLLECTIONS(root_set.cbegin(),
+                                      root_set.cend(),
+                                      expected_roots.cbegin(),
+                                      expected_roots.cend());
+    }
+}
+
 } // namespace dvbs2rx
 } // namespace gr

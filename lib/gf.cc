@@ -362,6 +362,118 @@ T gf2m_poly<T>::eval_by_exp(uint32_t i) const
 }
 
 template <typename T>
+std::vector<uint32_t> gf2m_poly<T>::search_roots_in_exp_range(uint32_t i_start,
+                                                              uint32_t i_end) const
+{
+    // Based on eval_by_exp() but optimized for a contiguous range of exponents.
+    //
+    // The underlying polynomial has a set of non-zero coefficients. For instance, let's
+    // say the polynomial p(x) is over GF(2^4) and given by:
+    //
+    // p(x) = alpha^5 x^3 + alpha^4 x^2 + 1
+    //
+    // Then, the non-zero coefficients are {alpha^5, alpha^4, 1}, and their corresponding
+    // exponents are {5, 4, 0}. The exponents are the powers of the primitive element
+    // alpha that each coefficient is raised to. In this code, the vector with the
+    // exponents of the non-zero coefficients is called m_nonzero_coef_exp.
+    //
+    // The corresponding coefficient orders are {3, 2, 0} because they multiply x^3, x^2,
+    // and x^0, respectively. These orders are equivalent to the indexes where the
+    // non-zero coefficients are stored in the coefficients vector m_poly. In this code,
+    // the vector with the indexes (or orders) of the non-zero coefficients is called
+    // m_nonzero_coef_idx.
+    //
+    // In summary, the two vectors of interest are as follows:
+    //
+    // - m_nonzero_coef_exp = {5, 4, 0}
+    // - m_nonzero_coef_idx = {3, 2, 0}
+    //
+    // Next, let's say we are evaluating p(x) for x=alpha^i, then for alpha^(i+1), and so
+    // on. To start, we have:
+    //
+    // p(alpha^i) = alpha^5 (alpha^i)^3 + alpha^4 (alpha^i)^2 + 1
+    //            = alpha^(5 + i*3) + alpha^(4 + i*2) + 1
+    //
+    // We can break this computation into four steps:
+    //
+    //   1. Take the vector of coefficient indexes (or orders) {3, 2, 0} and multiply it
+    //      by the scalar i. The result is {3i, 2i, 0}.
+    //   2. Add the previous result to the vector of coefficient exponents {5, 4, 0}. The
+    //      result is {5 + 3i, 4 + 2i, 0}.
+    //   3. Take the primitive element alpha and raise it to the power of each element in
+    //      the previous result. The result is {alpha^(5 + 3i), alpha^(4 + 2i), 1}.
+    //   4. Add all GF(2^m) elements in the previous result. If the result is zero, then
+    //      alpha^i is a root of p(x).
+    //
+    // Next, we compute p(alpha^(i+1)), but note we can reuse some of the previous
+    // results. First, the addition in step 2 is the same because the vector of
+    // coefficient exponents does not change. Secondly, the multiplication in step 1 is
+    // now {3(i+1), 2(i+1), 0}, which is the same as {3i, 2i, 0} plus {3, 2, 0}. Hence, we
+    // can accumulate {3, 2, 0} to the result obtained previously in step 1 instead of
+    // computing multiplications again.
+    //
+    // With that, the updated algorithm becomes as follows:
+    //
+    //   1. On initialization, define an accumulator vector with the same dimensions as
+    //      m_nonzero_coef_exp and m_nonzero_coef_idx. Initialize it with the values of
+    //      m_nonzero_coef_exp so that the addition in step 2 (above) is only executed
+    //      once. In the given example, the accumulator would be started with {5, 4, 0}.
+    //
+    //   2. Add "(i_start-1) * m_nonzero_coef_idx" element-wise to the accumulator. In the
+    //      given example, the accumulator result would be {5 + 3*(i-1), 4 + 2*(i-1), 0}.
+    //
+    //      NOTE: The lowest possible i_start is zero since i is unsigned and alpha^0 is a
+    //      potential root. In this case, and only in this case, this step adds
+    //      -m_nonzero_coef_idx to the accumulator, i.e., subtracts m_nonzero_coef_idx
+    //      from the accumulator. Given the indexes are unsigned, such a subtraction could
+    //      underflow some or all values in the accumulator, and the resulting vector
+    //      could end up with large numbers. However, this is fine. In step 3.1 below, we
+    //      start by add +m_nonzero_coef_idx again, so an underflowed result would be
+    //      undone right in the first iteration.
+    //
+    //   3. For each i in the range from i_start to i_end (inclusive):
+    //
+    //      3.1. Add m_nonzero_coef_idx element-wise to the accumulator. In the given
+    //           example, the result in the first iteration after adding {3, 2, 0} would
+    //           be {5 + 3*i, 4 + 2*i, 0}. In the second iteration, the accumulator would
+    //           hold {5 + 3*(i+1), 4 + 2*(i+1), 0}, and so on.
+    //
+    //      3.2. Take the primitive element alpha and raise it to the power of each
+    //           element in the accumulator. In the first iteration, the result becomes
+    //           {alpha^(5 + 3i), alpha^(4 + 2i), 1}. In the next, it becomes {alpha^(5 +
+    //           3(i+1)), alpha^(4 + 2(i+1)), 1}, an so on.
+    //
+    //      3.3 Add all GF(2^m) elements in the previous result. If the result is zero,
+    //          then alpha^i is a root of p(x). Save the exponent i to return it later in
+    //          the vector of exponents of the roots of p(x).
+    //
+    if (i_start > i_end)
+        throw std::runtime_error("Start exponent is greater than end exponent");
+
+    // Step 1
+    std::vector<uint32_t> accum = m_nonzero_coef_exp;
+
+    // Step 2
+    for (size_t j = 0; j < m_n_nonzero_coef; j++) {
+        accum[j] += (i_start - 1) * m_nonzero_coef_idx[j];
+    }
+
+    // Step 3
+    std::vector<uint32_t> root_exps;
+    for (uint32_t i = i_start; i <= i_end; i++) {
+        T res = 0; // evaluation result
+        for (size_t j = 0; j < m_n_nonzero_coef; j++) {
+            accum[j] += m_nonzero_coef_idx[j];
+            res ^= m_gf->get_alpha_i(accum[j]);
+        }
+        if (res == 0)
+            root_exps.push_back(i);
+    }
+
+    return root_exps;
+}
+
+template <typename T>
 gf2_poly<T> gf2m_poly<T>::to_gf2_poly() const
 {
     if (m_degree > static_cast<int>(sizeof(T) * 8 - 1))

@@ -368,6 +368,28 @@ public:
     T eval_by_exp(uint32_t i) const;
 
     /**
+     * @brief Search roots by evaluating the polynomial for elements in a given range.
+     *
+     * Evaluates the polynomial for all alpha^i with i varying in [i_start, i_end] and
+     * returns the elements for which the polynomial evaluates to zero (the roots) given
+     * by their exponents. For instance, if alpha^2 and alpha^3 are roots of the
+     * polynomial, this function returns the vector [2, 3].
+     *
+     * The implementation does not simply rely on the eval() or eval_by_exp() functions.
+     * Instead, it is optimized by leveraging the fact that the evaluation is for a
+     * contiguous range of exponents. Hence, when searching for polynomial roots in
+     * GF(2^m), it is preferable to use this function instead of manually calling the
+     * eval() or eval_by_exp() functions.
+     *
+     * @param i_start Exponent of element alpha^i_start at the start of the range.
+     * @param i_end Exponent of element alpha^i_end at the end of the range.
+     * @return std::vector<uint32_t> Vector with the exponents associated with the GF(2^m)
+     * roots found in the range.
+     */
+    std::vector<uint32_t> search_roots_in_exp_range(uint32_t i_start,
+                                                    uint32_t i_end) const;
+
+    /**
      * @brief Get the polynomial coefficients.
      *
      * @return const std::vector<T>& Reference to vector of polynomial coefficients.
