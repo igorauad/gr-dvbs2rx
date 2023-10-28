@@ -348,6 +348,13 @@ gf2m_poly<T> bch_codec<T, P>::err_loc_polynomial(const std::vector<T>& syndrome)
 template <typename T, typename P>
 std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
 {
+    // If the error-location polynomial sigma has degree greater than t, that means there
+    // were more than t errors, and, in general, the errors cannot be located. Hence,
+    // there is no point in going through the expensive computation of the error-location
+    // numbers. Instead, the decoder should just skip the error correction step.
+    if (sigma.degree() > m_t)
+        return {};
+
     // Given the codeword has length n, the error location numbers can range from alpha^0
     // to alpha^n-1. Since alpha^(n+s) = alpha^(2^m - 1) = 1, the corresponding inverses
     // range from alpha^(n+s) to alpha^(s+1). See if any of these are the roots of sigma
