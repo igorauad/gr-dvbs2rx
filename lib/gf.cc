@@ -363,7 +363,8 @@ T gf2m_poly<T>::eval_by_exp(uint32_t i) const
 
 template <typename T>
 std::vector<uint32_t> gf2m_poly<T>::search_roots_in_exp_range(uint32_t i_start,
-                                                              uint32_t i_end) const
+                                                              uint32_t i_end,
+                                                              uint32_t max_roots) const
 {
     // Based on eval_by_exp() but optimized for a contiguous range of exponents.
     //
@@ -460,14 +461,18 @@ std::vector<uint32_t> gf2m_poly<T>::search_roots_in_exp_range(uint32_t i_start,
 
     // Step 3
     std::vector<uint32_t> root_exps;
+    uint32_t n_found = 0; // number of roots found so far
     for (uint32_t i = i_start; i <= i_end; i++) {
         T res = 0; // evaluation result
         for (size_t j = 0; j < m_n_nonzero_coef; j++) {
             accum[j] += m_nonzero_coef_idx[j];
             res ^= m_gf->get_alpha_i(accum[j]);
         }
-        if (res == 0)
+        if (res == 0) {
             root_exps.push_back(i);
+            if (++n_found == max_roots)
+                break;
+        }
     }
 
     return root_exps;

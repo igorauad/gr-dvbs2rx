@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <bitset>
 #include <cstdint>
+#include <limits>
 #include <set>
 #include <vector>
 
@@ -383,11 +384,15 @@ public:
      *
      * @param i_start Exponent of element alpha^i_start at the start of the range.
      * @param i_end Exponent of element alpha^i_end at the end of the range.
+     * @param max_roots Maximum number of roots to be returned. When defined, the search
+     * is stopped earlier as soon as this number of roots is found.
      * @return std::vector<uint32_t> Vector with the exponents associated with the GF(2^m)
      * roots found in the range.
      */
-    std::vector<uint32_t> search_roots_in_exp_range(uint32_t i_start,
-                                                    uint32_t i_end) const;
+    std::vector<uint32_t> search_roots_in_exp_range(
+        uint32_t i_start,
+        uint32_t i_end,
+        uint32_t max_roots = std::numeric_limits<uint32_t>::max()) const;
 
     /**
      * @brief Get the polynomial coefficients.

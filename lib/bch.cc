@@ -361,7 +361,11 @@ std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
     // and record the results.
     //
     // TODO: optimize this computation using a strategy like the one in Fig. 6.1.
-    std::vector<uint32_t> root_exps = sigma.search_roots_in_exp_range(m_s + 1, m_n + m_s);
+    std::vector<uint32_t> root_exps =
+        sigma.search_roots_in_exp_range(m_s + 1,       // starting exponent
+                                        m_n + m_s,     // ending exponent
+                                        sigma.degree() // max number of roots to find
+        );
     std::vector<T> numbers(root_exps.size());
     for (size_t i = 0; i < root_exps.size(); i++)
         numbers[i] = m_gf->inverse_by_exp(root_exps[i]);
