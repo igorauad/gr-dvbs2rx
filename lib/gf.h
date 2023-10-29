@@ -44,6 +44,7 @@ private:
     const uint8_t m_m;                   // dimension of the GF(2^m) field
     const uint32_t m_two_to_m_minus_one; // shortcut for (2^m - 1)
     std::vector<T> m_table;              // field elements
+    std::vector<T> m_table_nonzero;      // non-zero field elements
     std::unordered_map<T, uint32_t>
         m_inv_table; // LUT to map element alpha^i to its GF table index i+1
 

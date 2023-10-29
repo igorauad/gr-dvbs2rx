@@ -19,7 +19,10 @@ namespace dvbs2rx {
 
 template <typename T>
 galois_field<T>::galois_field(const gf2_poly<T>& prim_poly)
-    : m_m(prim_poly.degree()), m_two_to_m_minus_one((1 << m_m) - 1), m_table(1 << m_m)
+    : m_m(prim_poly.degree()),
+      m_two_to_m_minus_one((1 << m_m) - 1),
+      m_table(1 << m_m),              // GF(2^m) has 2^m elements
+      m_table_nonzero((1 << m_m) - 1) // among which 2^m - 1 are non-zero
 {
     // The field elements can be represented with m bits each. However, the minimal
     // polynomials can have degree up to m such that they need a storage of "m + 1" bits
@@ -49,6 +52,16 @@ galois_field<T>::galois_field(const gf2_poly<T>& prim_poly)
         m_table[i + 1] = ((m_table[i] << 1) & m_two_to_m_minus_one) ^
                          ((m_table[i] >> (m_m - 1)) * prim_poly_exc_high_bit);
 
+    // For performance, keep also a table of non-zero elements and use it when the lookup
+    // is by the exponent i of the element alpha^i (i.e., on method get_alpha_i()) instead
+    // of a lookup by index. While alpha^i is stored at position i + 1 in m_table, the
+    // same element is stored in position i in m_table_nonzero. Hence, the exponent i maps
+    // directly to the index at the m_table_nonzero vector, which makes the lookup
+    // slightly faster. This strategy can make a difference when many lookups are
+    // required, as in the polynomial root search (search_roots_in_exp_range() method).
+    for (uint32_t i = 0; i < m_two_to_m_minus_one; i++)
+        m_table_nonzero[i] = m_table[i + 1];
+
     // Inverse LUT: map each non-zero element alpha^i to its m_table index.
     //
     // Since m_table has element alpha^0 at index=1, alpha^1 at index=2, and so on, this
@@ -67,7 +80,7 @@ T galois_field<T>::operator[](uint32_t index) const
 template <typename T>
 T galois_field<T>::get_alpha_i(uint32_t i) const
 {
-    return m_table[(i % m_two_to_m_minus_one) + 1];
+    return m_table_nonzero[i % m_two_to_m_minus_one];
 }
 
 template <typename T>
