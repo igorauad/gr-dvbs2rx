@@ -62,36 +62,9 @@ galois_field<T>::galois_field(const gf2_poly<T>& prim_poly)
     for (uint32_t i = 0; i < m_two_to_m_minus_one; i++)
         m_table_nonzero[i] = m_table[i + 1];
 
-    // Inverse LUT: map each non-zero element alpha^i to its m_table index.
-    //
-    // Since m_table has element alpha^0 at index=1, alpha^1 at index=2, and so on, this
-    // function generates a map whose value for key "alpha^i" is the index "i+1".
-    for (uint32_t i = 1; i <= m_two_to_m_minus_one; i++)
-        m_inv_table.insert({ m_table[i], i });
-}
-
-template <typename T>
-T galois_field<T>::operator[](uint32_t index) const
-{
-    assert(index <= m_two_to_m_minus_one);
-    return m_table[index];
-}
-
-template <typename T>
-T galois_field<T>::get_alpha_i(uint32_t i) const
-{
-    return m_table_nonzero[i % m_two_to_m_minus_one];
-}
-
-template <typename T>
-uint32_t galois_field<T>::get_exponent(const T& beta) const
-{
-    if (beta == 0)
-        throw std::runtime_error("Zero element does not have an exponent");
-    if (m_inv_table.count(beta) == 0)
-        throw std::runtime_error("Element is not in the field");
-    // Recall alpha^i is stored at position i + 1.
-    return m_inv_table.at(beta) - 1;
+    // Inverse LUT (Exponent LUT): map each non-zero element alpha^i to its exponent i.
+    for (uint32_t i = 0; i < m_two_to_m_minus_one; i++)
+        m_exp_table.insert({ m_table_nonzero[i], i }); // m_table_nonzero[i] = alpha^i
 }
 
 template <typename T>
@@ -176,18 +149,6 @@ gf2_poly<T>::gf2_poly(const T& coefs) : m_poly(coefs)
     }
 }
 
-template <typename T>
-gf2_poly<T> gf2_poly<T>::operator+(const gf2_poly<T>& x) const
-{
-    return m_poly ^ x.get_poly();
-}
-
-template <typename T>
-gf2_poly<T> gf2_poly<T>::operator*(bool x) const
-{
-    return x ? m_poly : 0;
-}
-
 
 template <typename T>
 gf2_poly<T> gf2_poly<T>::operator*(const gf2_poly<T>& x) const
@@ -223,12 +184,6 @@ gf2_poly<T> gf2_poly<T>::operator%(const gf2_poly<T>& x) const
             remainder ^= x_coefs << (i - x_degree);
     }
     return remainder;
-}
-
-template <typename T>
-bool gf2_poly<T>::operator==(const gf2_poly<T>& x) const
-{
-    return m_poly == x.get_poly();
 }
 
 /********** Polynomial over GF(2^m) **********/
@@ -334,12 +289,6 @@ gf2m_poly<T> gf2m_poly<T>::operator*(const gf2m_poly& x) const
     }
 
     return gf2m_poly<T>(m_gf, std::move(res));
-}
-
-template <typename T>
-bool gf2m_poly<T>::operator==(const gf2m_poly& x) const
-{
-    return m_poly == x.get_poly();
 }
 
 template <typename T>

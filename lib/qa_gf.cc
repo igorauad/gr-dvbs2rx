@@ -79,7 +79,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_get_alpha_i_and_exponent, T, gf_elem_typ
 
     // The zero element cannot be represented by alpha^i (does not have an exponent i), so
     // this operation is forbidden:
-    BOOST_CHECK_THROW(gf.get_exponent(0), std::runtime_error);
+    BOOST_CHECK_THROW(gf.get_exponent(0), std::out_of_range);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2m_multiplication, T, gf_elem_types)

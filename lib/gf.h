@@ -41,12 +41,11 @@ template <typename T>
 class DVBS2RX_API galois_field
 {
 private:
-    const uint8_t m_m;                   // dimension of the GF(2^m) field
-    const uint32_t m_two_to_m_minus_one; // shortcut for (2^m - 1)
-    std::vector<T> m_table;              // field elements
-    std::vector<T> m_table_nonzero;      // non-zero field elements
-    std::unordered_map<T, uint32_t>
-        m_inv_table; // LUT to map element alpha^i to its GF table index i+1
+    const uint8_t m_m;                           // dimension of the GF(2^m) field
+    const uint32_t m_two_to_m_minus_one;         // shortcut for (2^m - 1)
+    std::vector<T> m_table;                      // field elements
+    std::vector<T> m_table_nonzero;              // non-zero field elements
+    std::unordered_map<T, uint32_t> m_exp_table; // map element alpha^i to its exponent i
 
 public:
     /**
@@ -62,7 +61,7 @@ public:
      * @param index Target index.
      * @return T GF(2^m) element.
      */
-    T operator[](uint32_t index) const;
+    T operator[](uint32_t index) const { return m_table[index]; }
 
     /**
      * @brief Get the i-th power of the primitive element (alpha^i).
@@ -73,7 +72,7 @@ public:
      * zero element cannot be expressed as a power of the primitive element. To access the
      * zero element, use the operator[] instead.
      */
-    T get_alpha_i(uint32_t i) const;
+    T get_alpha_i(uint32_t i) const { return m_table_nonzero[i % m_two_to_m_minus_one]; }
 
     /**
      * @brief Get the exponent i of a given element beta = alpha^i.
@@ -84,7 +83,7 @@ public:
      * element, given the zero element cannot be expressed as a power of the primitive
      * element alpha. A runtime error exception is raised if beta is the zero element.
      */
-    uint32_t get_exponent(const T& beta) const;
+    uint32_t get_exponent(const T& beta) const { return m_exp_table.at(beta); }
 
     /**
      * @brief Multiply two elements from GF(2^m).
@@ -202,7 +201,7 @@ public:
      * @param x Polynomial to add.
      * @return gf2_poly Addition result.
      */
-    gf2_poly<T> operator+(const gf2_poly<T>& x) const;
+    gf2_poly<T> operator+(const gf2_poly<T>& x) const { return m_poly ^ x.get_poly(); }
 
     /**
      * @brief Multiplication by a GF(2) scalar.
@@ -210,7 +209,7 @@ public:
      * @param x Binary scalar to multiply.
      * @return gf2_poly Multiplication result.
      */
-    gf2_poly<T> operator*(bool x) const;
+    gf2_poly<T> operator*(bool x) const { return x ? m_poly : 0; }
 
     /**
      * @brief Multiplication by another GF(2) polynomial.
@@ -234,7 +233,7 @@ public:
      * @param x The other GF(2^m) polynomial.
      * @return bool Whether they are equal.
      */
-    bool operator==(const gf2_poly<T>& x) const;
+    bool operator==(const gf2_poly<T>& x) const { return m_poly == x.get_poly(); }
 
     /**
      * @brief Get the polynomial coefficients.
@@ -340,7 +339,7 @@ public:
      * @param x The other GF(2^m) polynomial.
      * @return bool Whether they are equal.
      */
-    bool operator==(const gf2m_poly<T>& x) const;
+    bool operator==(const gf2m_poly<T>& x) const { return m_poly == x.get_poly(); }
 
     /**
      * @brief Evaluate the polynomial for a given GF(2^m) element.
