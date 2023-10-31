@@ -76,6 +76,37 @@ inline uint8_t get_byte(const bitset256_t& value, uint32_t byte_index)
 }
 
 /**
+ * @brief Get the most significant byte of a given value.
+ *
+ * @tparam T Value type.
+ * @param value Value.
+ * @param lsb_index Index of the least significant bit of the most significant byte,
+ * equivalent to the number of bits to be shifted to the right.
+ * @return uint8_t Extracted byte value.
+ * @note This function differs from get_byte in that it assumes the given value has zeros
+ * in the other byte positions (if any) within the container type T beyond the byte of
+ * interest. In other words, this function does not apply a mask (AND 0xFF) to the result.
+ */
+template <typename T>
+inline uint8_t get_msby(const T& value, uint32_t lsb_index)
+{
+    return value >> lsb_index;
+}
+
+/**
+ * @overload
+ * @note Template specialization for T = bitset256_t.
+ */
+template <>
+inline uint8_t get_msby(const bitset256_t& value, uint32_t lsb_index)
+{
+    uint8_t byte = 0;
+    for (uint32_t i = lsb_index; i < (lsb_index + 8); i++)
+        byte |= value[i] << (i - lsb_index);
+    return byte;
+}
+
+/**
  * @brief Test if bit is set
  *
  * @param x Bit register.
@@ -157,9 +188,9 @@ inline T from_u8_vector(const u8_vector_t& vec)
  *
  * The resulting LUT can be used to compute "y % x" more efficiently for any "y" and a
  * given "x". More specifically, it maps each possible input byte representative of a
- * dividend polynomial y to the bits that would leak in the succeeding bytes within the
+ * dividend polynomial y to the bits that would leak into the succeeding bytes within the
  * remainder computation. In the end, the LUT allows for computing the remainder with one
- * iteration per byte, instead of one interation per bit.
+ * iteration per byte instead of one interation per bit.
  *
  * @tparam T Type whose bits represent the binary polynomial coefficients.
  * @param x Divisor polynomial.
@@ -214,9 +245,9 @@ gf2_poly<T> gf2_poly_rem(u8_cptr_t y,
                          const gf2_poly<T>& x,
                          const std::array<T, 256>& x_lut)
 {
-    const int n_leak_bytes = sizeof(T) - 1; // see build_gf2_poly_rem_lut
-    const uint32_t bytes_after_msby = n_leak_bytes - 1;
-    const uint32_t bits_after_msby = bytes_after_msby * 8;
+    static constexpr int n_leak_bytes = sizeof(T) - 1; // see build_gf2_poly_rem_lut
+    static constexpr uint32_t bytes_after_msby = n_leak_bytes - 1;
+    static constexpr uint32_t bits_after_msby = bytes_after_msby * 8;
     const T leak_mask = bitmask<T>(n_leak_bytes * 8);
 
     // Over the first "y_size - n_leak_bytes" bytes, iteratively look up the leak that the
@@ -227,10 +258,9 @@ gf2_poly<T> gf2_poly_rem(u8_cptr_t y,
         // n_leak_bytes of the type-T word, and the resulting most significant byte (MSBy)
         // determines the next leak. The other bytes (other than the MSBy) from the
         // preceding leak continue to leak (are carried forward) over the next bytes.
-        T padded_in_byte = static_cast<T>(y[i]) << bits_after_msby;
-        uint8_t msby = get_byte((leak ^ padded_in_byte), bytes_after_msby);
+        uint8_t in_byte_plus_leak = y[i] ^ get_msby(leak, bits_after_msby);
         T leak_carried_forward = (leak_mask & (leak << 8));
-        leak = leak_carried_forward ^ x_lut[msby];
+        leak = leak_carried_forward ^ x_lut[in_byte_plus_leak];
     }
 
     // Convert the last n_leak_bytes of the input vector into a word of type T.
