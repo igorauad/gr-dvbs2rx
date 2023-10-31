@@ -13,6 +13,7 @@
 #include "bitset256.h"
 #include <gnuradio/dvbs2rx/api.h>
 #include <unordered_map>
+#include <bitset>
 #include <cstdint>
 #include <limits>
 #include <set>
@@ -20,6 +21,8 @@
 
 namespace gr {
 namespace dvbs2rx {
+
+typedef std::bitset<256> bitset256a_t;
 
 template <typename T>
 class DVBS2RX_API gf2_poly;

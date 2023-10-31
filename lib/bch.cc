@@ -10,6 +10,7 @@
 #include "bch.h"
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 #include <map>
 #include <stdexcept>
 
@@ -170,6 +171,18 @@ T _encode(const T& msg,
     return static_cast<T>((shifted_msg_poly + parity_poly).get_poly().to_ulong());
 }
 
+template <typename T>
+T _encode(const T& msg,
+          const gf2_poly<bitset256a_t>& g,
+          uint32_t msg_mask,
+          uint32_t n_parity_bits)
+{
+    const auto shifted_msg_poly =
+        gf2_poly<bitset256a_t>((msg & msg_mask) << n_parity_bits);
+    const auto parity_poly = shifted_msg_poly % g;
+    return static_cast<T>((shifted_msg_poly + parity_poly).get_poly().to_ulong());
+}
+
 template <typename T, typename P>
 T bch_codec<T, P>::encode(const T& msg) const
 {
@@ -196,6 +209,7 @@ void bch_codec<T, P>::encode(u8_cptr_t msg, u8_ptr_t codeword) const
     memset(codeword + m_k_bytes, 0,
            m_parity_bytes); // zero-initialize the parity bytes
     const auto parity_poly = gf2_poly_rem(codeword, m_n_bytes, m_g, m_gen_poly_rem_lut);
+    std::cout << parity_poly.get_poly() << std::endl;
     const auto parity_poly_u8_vec = to_u8_vector(parity_poly.get_poly(), m_parity_bytes);
     memcpy(codeword + m_k_bytes, parity_poly_u8_vec.data(), m_parity_bytes);
 }
@@ -498,6 +512,7 @@ template class bch_codec<uint32_t, uint32_t>;
 template class bch_codec<uint32_t, uint64_t>;
 template class bch_codec<uint64_t, uint64_t>;
 template class bch_codec<uint32_t, bitset256_t>;
+template class bch_codec<uint32_t, bitset256a_t>;
 
 } // namespace dvbs2rx
 } // namespace gr

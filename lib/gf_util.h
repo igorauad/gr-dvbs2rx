@@ -48,6 +48,15 @@ inline bitset256_t bitmask(int n_bits)
     return mask;
 }
 
+template <>
+inline bitset256a_t bitmask(int n_bits)
+{
+    bitset256a_t mask;
+    for (int i = 0; i < n_bits; i++)
+        mask.set(i);
+    return mask;
+}
+
 /**
  * @brief Get the byte at a given index of a type T value.
  *
@@ -75,6 +84,15 @@ inline uint8_t get_byte(const bitset256_t& value, uint32_t byte_index)
     return byte;
 }
 
+template <>
+inline uint8_t get_byte(const bitset256a_t& value, uint32_t byte_index)
+{
+    uint8_t byte = 0;
+    for (uint32_t i = byte_index * 8; i < (byte_index + 1) * 8; i++)
+        byte |= value[i] << (i - byte_index * 8);
+    return byte;
+}
+
 /**
  * @brief Test if bit is set
  *
@@ -94,6 +112,12 @@ inline bool is_bit_set(const T& x, int i_bit)
  */
 template <>
 inline bool is_bit_set(const bitset256_t& x, int i_bit)
+{
+    return x.test(i_bit);
+}
+
+template <>
+inline bool is_bit_set(const bitset256a_t& x, int i_bit)
 {
     return x.test(i_bit);
 }

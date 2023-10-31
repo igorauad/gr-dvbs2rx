@@ -13,6 +13,7 @@
 #include <boost/test/data/test_case.hpp>
 #include <boost/test/unit_test.hpp>
 #include <bitset>
+#include <iostream>
 
 namespace gr {
 namespace dvbs2rx {
@@ -627,6 +628,7 @@ void test_dvbs2(const std::string& fecframe_size, uint32_t n, uint8_t t)
     gf2_poly_u32 prim_poly(prim_poly_coefs);
     galois_field gf(prim_poly);
     bch_codec<uint32_t, bitset256_t> codec(&gf, t, n);
+    bch_codec<uint32_t, bitset256a_t> codec2(&gf, t, n);
     // NOTE: the generator polynomial can have degree up to 192, so use P=bitset256_t to
     // store it. Also, use T=uint32_t to store the GF(2^m) elements (with up to 16 bits)
     // and to represent the minimal polynomials (with up to 17 bits).
@@ -640,9 +642,21 @@ void test_dvbs2(const std::string& fecframe_size, uint32_t n, uint8_t t)
     uint32_t k_bytes = codec.get_k() / 8;
     uint32_t n_bytes = codec.get_n() / 8;
     u8_vector_t msg(k_bytes);
-    u8_vector_t codeword(n_bytes);
     fill_random_bytes(msg);
+
+    std::cout << "Encoding with codec 1" << std::endl;
+    u8_vector_t codeword(n_bytes);
     codec.encode(msg.data(), codeword.data());
+
+    std::cout << "Encoding with codec 2" << std::endl;
+    u8_vector_t codeword2(n_bytes);
+    codec2.encode(msg.data(), codeword2.data());
+
+    for (uint32_t i = 0; i < n_bytes; i++) {
+        if (codeword[i] != codeword2[i])
+            std::cout << "Mismatch at byte " << i << "/" << n_bytes << std::endl;
+        BOOST_CHECK_EQUAL(codeword[i], codeword2[i]);
+    }
 
     // Add up to t random errors
     flip_random_bits(codeword, t);
