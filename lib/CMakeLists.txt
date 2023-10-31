@@ -86,6 +86,7 @@ include(GrTest)
 # List all files that contain Boost.UTF unit tests here
 list(APPEND test_dvbs2rx_sources
   qa_bch.cc
+  qa_bitset256.cc
   qa_cdeque.cc
   qa_crc.cc
   qa_delay_line.cc

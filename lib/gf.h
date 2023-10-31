@@ -10,9 +10,9 @@
 #ifndef INCLUDED_DVBS2RX_GF_H
 #define INCLUDED_DVBS2RX_GF_H
 
+#include "bitset256.h"
 #include <gnuradio/dvbs2rx/api.h>
 #include <unordered_map>
-#include <bitset>
 #include <cstdint>
 #include <limits>
 #include <set>
@@ -20,9 +20,6 @@
 
 namespace gr {
 namespace dvbs2rx {
-
-// Non-int types for storing GF(2) coefficients or GF(2^m) elements:
-typedef std::bitset<256> bitset256_t;
 
 template <typename T>
 class DVBS2RX_API gf2_poly;
@@ -164,7 +161,7 @@ inline constexpr size_t get_max_gf2_poly_degree()
 template <>
 inline constexpr size_t get_max_gf2_poly_degree<bitset256_t>()
 {
-    return bitset256_t().size() - 1;
+    return 255;
 }
 
 /**

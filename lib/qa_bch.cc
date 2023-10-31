@@ -12,6 +12,7 @@
 #include <boost/mpl/pair.hpp>
 #include <boost/test/data/test_case.hpp>
 #include <boost/test/unit_test.hpp>
+#include <bitset>
 
 namespace gr {
 namespace dvbs2rx {

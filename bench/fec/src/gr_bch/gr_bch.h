@@ -11,6 +11,7 @@
 
 #include "api.h"
 #include "bch.h"
+#include "bitset256.h"
 #include "bose_chaudhuri_hocquenghem_decoder.hh"
 #include "galois_field.hh"
 #include <bitset>
