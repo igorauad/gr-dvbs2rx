@@ -26,6 +26,33 @@ jobs:
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
       - name: Test
         run: cd ${{github.workspace}}/build && ctest -C ${{env.BUILD_TYPE}} -VV
+  arm:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["3.10.7.0-ubuntu-jammy"]
+        platform: ["linux/arm64", "linux/arm/v7"]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: "recursive"
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64,arm
+      - name: Build and test inside Docker container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: igorfreire/gnuradio-oot-dev:${{ matrix.container }}
+          options: |
+            --platform ${{ matrix.platform }}
+            --volume ${{ github.workspace }}:/build
+            --workdir /build
+          run: |
+            apt update && apt install -y libsndfile1-dev
+            cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+            cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+            cd ${{github.workspace}}/build && ctest -C ${{env.BUILD_TYPE}} -VV
   macos:
     runs-on: macos-latest
     steps:
