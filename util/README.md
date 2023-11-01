@@ -20,8 +20,16 @@ Next, you can select one of the recordings and test the receiver on it. The CLI 
 
 Note `REC_NAME` is the name of the recording as displayed in the first column returned by the list (`ls`) command.
 
-Finally, the CLI can execute a benchmark of implementation performances using a selected recording. In this case, it compares the performance of `dvbs2-rx` to the one achieved with the `leandvb` application, which must be installed separately. The benchmark can be launched as follows:
+The above command can also measure the CPU utilization of each thread spawned by the receiver application. To do so, run it with the `--cpu` option. Also, if you would like to plot the per-thread CPU utilization over time, use the `--plot-cpu` switch, as follows:
+
+```bash
+./iq-rec-cli rx REC_NAME --cpu --plot-cpu
+```
+
+Finally, the CLI can benchmark implementation performances using a selected recording. In this case, it compares the performance of `dvbs2-rx` to the one achieved with the `leandvb` application, which must be installed separately. The benchmark can be launched as follows:
 
 ```bash
 ./iq-rec-cli bench REC_NAME
 ```
+
+Like the `rx` command, the `bench` command supports the `--cpu` and `--plot-cpu` options to measure and plot the CPU utilization of the receiver threads.
