@@ -239,9 +239,9 @@ BOOST_AUTO_TEST_CASE(test_bch_encoder_u8_vector_out)
     gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
     galois_field gf(prim_poly);
     uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
-    bch_codec<T, P> codec(&gf, t, /*n=*/56);
-    BOOST_CHECK_EQUAL(codec.get_n(), 56);
-    BOOST_CHECK_EQUAL(codec.get_k(), 32);
+    bch_codec<T, P> codec(&gf, t, /*n=*/32);
+    BOOST_CHECK_EQUAL(codec.get_n(), 32);
+    BOOST_CHECK_EQUAL(codec.get_k(), 8);
     BOOST_CHECK(codec.get_n() % 8 == 0);
     BOOST_CHECK(codec.get_k() % 8 == 0);
     uint32_t n_bytes = codec.get_n() / 8;
@@ -290,9 +290,9 @@ BOOST_AUTO_TEST_CASE(test_bch_syndrome_u8_codeword)
     gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
     galois_field gf(prim_poly);
     uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
-    bch_codec<T, P> codec(&gf, t, /*n=*/56);
-    BOOST_CHECK_EQUAL(codec.get_n(), 56);
-    BOOST_CHECK_EQUAL(codec.get_k(), 32);
+    bch_codec<T, P> codec(&gf, t, /*n=*/32);
+    BOOST_CHECK_EQUAL(codec.get_n(), 32);
+    BOOST_CHECK_EQUAL(codec.get_k(), 8);
     BOOST_CHECK(codec.get_n() % 8 == 0);
     BOOST_CHECK(codec.get_k() % 8 == 0);
     uint32_t n_bytes = codec.get_n() / 8;
@@ -513,9 +513,9 @@ BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array)
     gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
     galois_field gf(prim_poly);
     uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
-    bch_codec<T, P> codec(&gf, t, /*n=*/56);
-    BOOST_CHECK_EQUAL(codec.get_n(), 56);
-    BOOST_CHECK_EQUAL(codec.get_k(), 32);
+    bch_codec<T, P> codec(&gf, t, /*n=*/32);
+    BOOST_CHECK_EQUAL(codec.get_n(), 32);
+    BOOST_CHECK_EQUAL(codec.get_k(), 8);
     BOOST_CHECK(codec.get_n() % 8 == 0);
     BOOST_CHECK(codec.get_k() % 8 == 0);
     uint32_t n_bytes = codec.get_n() / 8;
@@ -544,9 +544,9 @@ BOOST_AUTO_TEST_CASE(test_bch_correct_all_bit_positions)
     gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
     galois_field gf(prim_poly);
     uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
-    bch_codec<T, P> codec(&gf, t, /*n=*/56);
-    BOOST_CHECK_EQUAL(codec.get_n(), 56);
-    BOOST_CHECK_EQUAL(codec.get_k(), 32);
+    bch_codec<T, P> codec(&gf, t, /*n=*/32);
+    BOOST_CHECK_EQUAL(codec.get_n(), 32);
+    BOOST_CHECK_EQUAL(codec.get_k(), 8);
     BOOST_CHECK(codec.get_n() % 8 == 0);
     BOOST_CHECK(codec.get_k() % 8 == 0);
     uint32_t n_bytes = codec.get_n() / 8;
