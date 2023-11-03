@@ -30,12 +30,12 @@ Package: gr-dvbs2rx-dev
 Section: libdevel
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, gnuradio
-Description: Blockstream Satellite Receiver GR Module - Development
+Description: DVB-S2 Receiver GNU Radio Module - Development
  Development files of the gr-dvbs2rx GNU Radio out-of-tree module.
 
 Package: gr-dvbs2rx-doc
 Section: doc
 Architecture: all
 Depends: ${misc:Depends}
-Description: Blockstream Satellite Receiver GR Module Documentation
+Description: DVB-S2 Receiver GNU Radio Module - Documentation
  gr-dvbs2rx GNU Radio out-of-tree module documentation.

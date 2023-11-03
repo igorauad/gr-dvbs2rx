@@ -28,7 +28,7 @@ A GNU Radio out-of-tree module containing signal processing blocks and full
 transmitter/receiver applications for DVB-S2 over software-defined radio.
 
 %package devel
-Summary: DVB-S2 Receiver GNU Radio Module
+Summary: DVB-S2 Receiver GNU Radio Module - Development
 Requires:	%{name}% = %{version}-%{release}
 Requires:	cmake
 
@@ -36,7 +36,7 @@ Requires:	cmake
 gr-dvbs2rx GNU Radio out-of-tree module headers.
 
 %package doc
-Summary: DVB-S2 Receiver GNU Radio Module
+Summary: DVB-S2 Receiver GNU Radio Module - Documentation
 Requires:	%{name} = %{version}-%{release}
 
 %description doc
