@@ -25,8 +25,8 @@ namespace dvbs2rx {
  * @brief Build the CRC computation look-up table (LUT)
  *
  * @tparam T CRC data type.
- * @param gen_poly Generator polynomial in normal representation and excluding the MSB.
- * For instance, x^4 + x + 1 would be given as 0b11.
+ * @param gen_poly_no_msb Generator polynomial in normal representation but excluding the
+ * MSB. For instance, x^4 + x + 1 would be given as 0b11.
  * @return std::array<T, 256> Byte-by-byte CRC look-up table.
  * @note This implementation only works for generator polynomials with degrees multiple of
  * 8, e.g., for CRC8, CRC16, CRC32, etc.
