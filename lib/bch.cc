@@ -74,12 +74,6 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t, uint32_t 
       m_k_bytes(m_k / 8),
       m_parity_bytes(m_n_bytes - m_k_bytes),
       m_msg_mask(bitmask<T>(m_k)), // k-bit mask
-      // The tables below need 2t elements (the number of minimal polynomials in g(x)),
-      // but the index i goes from 1 to 2*t in the computations that follow, skipping i=0.
-      // For convenience, it is helpful to allocate 2t+1 elements and leave the first
-      // empty so that the for loop and array indexes coincide.
-      m_conjugate_map(2 * t + 1),
-      m_min_poly_rem_lut(2 * t + 1),
       m_gen_poly_lut_generated(false)
 {
     if (n > ((static_cast<uint32_t>(1) << gf->get_m()) - 1))
@@ -92,18 +86,11 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t, uint32_t 
     if (gf->get_m() > (sizeof(uint32_t) * 8) - 1) // ensure m_n does not overflow
         throw std::runtime_error("GF(2^m) dimension m not supported (too large)");
 
-    // Build the LUTs to assist in computing the remainder of "r(x) % phi_i(x)", for
-    // arbitrary r(x), and for the 2t minimal polynomials phi_1(x) to phi_2t(x).
-    m_min_poly.push_back(gf2_poly<T>(0)); // i=0 is empty for convenience
-    for (int i = 1; i <= (2 * t); i++) {
-        m_min_poly.push_back(gf->get_min_poly(gf->get_alpha_i(i)));
-        m_min_poly_rem_lut[i] = build_gf2_poly_rem_lut(m_min_poly[i]);
-    }
-
     // When k and n are multiples of 8, the message and parity bits are byte-aligned, so
-    // encoding into bytes array becomes supported. For that, generate the LUT to help
-    // computing the remainder of "r(x) % g(x)", where r(x) is an arbitrary GF(2)
-    // polynomial and g(x) is the generator polynomial.
+    // encoding and decoding into/from a bytes array becomes supported. For that, generate
+    // a LUT to help in computing the remainder of "r(x) % g(x)", where r(x) is an
+    // arbitrary GF(2) polynomial and g(x) is the generator polynomial. On encoding, r(x)
+    // is the padded message polynomial, and on decoding, r(x) is the received codeword.
     //
     // NOTE: This LUT imposes an additional limitation on the maximum degree of g(x) based
     // on the size of type P. Since g(x) can have degree up to m*t, the P-typed remainder
@@ -113,30 +100,6 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t, uint32_t 
     if (m_k % 8 == 0 || m_n % 8 == 0) {
         m_gen_poly_rem_lut = build_gf2_poly_rem_lut(m_g);
         m_gen_poly_lut_generated = true;
-    }
-
-    // To speed up the syndrome computation, it is useful to keep a map of the elements
-    // associated with the same minimal polynomial (conjugates). For the i-th index, a
-    // value m_conjugate_map[i] equal to j (with j > 0) indicates that alpha^i has a
-    // conjugate alpha^j with j lower than i, in which case the remainder "r % phi_j"
-    // would already have been computed, so the computation of "r % phi_i" is unnecessary
-    // (given phi_i and phi_j are the same minimal polynomial). If m_conjugate_map[i] is
-    // zero, it means index i is the first to process the conjugate set of alpha^i, so the
-    // associated "r % phi_i" polynomial needs to be computed for the first time.
-    for (int i = 1; i <= (2 * t); i++) {
-        T beta = gf->get_alpha_i(i);
-        auto conjugates = gf->get_conjugates(beta);
-        std::vector<T> conjugate_exponents;
-        std::transform(conjugates.cbegin(),
-                       conjugates.cend(),
-                       std::back_inserter(conjugate_exponents),
-                       [gf](const T& conjugate) {
-                           return gf->get_exponent(conjugate);
-                       }); // map conjugates to their exponents
-        // After sorting, the first exponent in the vector is the lowest exponent.
-        std::sort(conjugate_exponents.begin(), conjugate_exponents.end());
-        if (conjugate_exponents[0] < static_cast<T>(i))
-            m_conjugate_map[i] = conjugate_exponents[0];
     }
 }
 
@@ -203,41 +166,29 @@ void bch_codec<T, P>::encode(u8_cptr_t msg, u8_ptr_t codeword) const
 template <typename T, typename P>
 std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
 {
-    std::vector<T> syndrome_vec;
+    // Due to how the generator polynomial is constructed as the LCM of 2t minimal
+    // polynomials, every valid codeword c(x) must have alpha^i for i from 1 to 2t as its
+    // roots, i.e., c(alpha^i) = 0, for i = 1, ..., 2t. Then, by denoting the noisy
+    // incoming codeword as "r(x) = c(x) + e(x)", where e(x) is the error polynomial, it
+    // follows that "r(alpha^i) = e(alpha^i)", given that c(alpha^i) is zero. Furthermore,
+    // note r(x) can be expressed as:
+    //
+    // r(x) = a(x) * g(x) + s(x),
+    //
+    // where g(x) is the generator polynomial, and a(x) and s(x) are the quotient and
+    // remainder resulting from the division of r(x) by g(x), respectively. Since
+    // "g(alpha^i) = 0" (by definition), it follows that:
+    //
+    // r(alpha^i) = s(alpha^i) = e(alpha^i),
+    //
+    // which is the i-th syndrome component. Hence, compute the syndrome components by
+    // evaluating the remainder s(x) of "r(x) % g(x)" for alpha^i for i from 1 to 2t.
     const auto codeword_poly = gf2_poly(codeword);
-    std::map<int, gf2_poly<T>> bi_map;
-    for (int i = 1; i <= (2 * m_t); i++) {
-        // Due to how the generator polynomial is constructed (as the LCM of 2t minimal
-        // polynomials), every valid codeword c(x) must have alpha^i as one of its roots.
-        // In other words, c(alpha^i) = 0, for i varying from 1 to 2t. Then, by denoting
-        // the noisy incoming codeword as "r(x) = c(x) + e(x)", where e(x) is the error
-        // polynomial, it follows that "r(alpha^i) = e(alpha^i)", given that c(alpha^i) is
-        // zero. Furthermore, note r(x) can be expressed as:
-        //
-        // r(x) = q(x) * phi_i(x) + b_i(x),
-        //
-        // where phi_i(x) is the i-th minimal polynomial, and q(x) and b_i(x) are the
-        // quotient and remainder in the division of r(x) by phi_i(x), respectively. Then,
-        // since "phi_i(alpha^i) = 0" (by definition), it follows that:
-        //
-        // r(alpha^i) = b_i(alpha^i) = e(alpha^i),
-        //
-        // which is the i-th syndrome component.
-        //
-        // Besides, since alpha^i has conjugates with the same associated minimal
-        // polynomial, the remainder polynomial b_i(x) is the same for all conjugates of
-        // alpha^i, so it only needs to be computed once. In other words, b_i(x) coincides
-        // for the conjugates, but b_i(alpha^i) needs to be evaluated separately.
-        if (m_conjugate_map[i] == 0) // new b_i(x)
-            bi_map.emplace(i, codeword_poly % m_min_poly[i]);
-        const int bi_idx = (m_conjugate_map[i] == 0) ? i : m_conjugate_map[i];
-        const auto& bi = bi_map.at(bi_idx);
-        // b_i(x) is a polynomial over GF(2), so it must be converted to a polynomial
-        // over GF(2^m) to allow for the evaluation b_i(alpha^i) for alpha^i in
-        // GF(2^m).
-        const auto bi_gf2m = gf2m_poly(m_gf, bi);
-        syndrome_vec.push_back(bi_gf2m.eval_by_exp(i));
-    }
+    const auto parity_poly = codeword_poly % m_g;
+    const auto parity_poly_gf2m = gf2m_poly(m_gf, parity_poly);
+    std::vector<T> syndrome_vec;
+    for (int i = 1; i <= (2 * m_t); i++)
+        syndrome_vec.push_back(parity_poly_gf2m.eval_by_exp(i));
     return syndrome_vec;
 }
 
@@ -245,21 +196,11 @@ template <typename T, typename P>
 std::vector<T> bch_codec<T, P>::syndrome(u8_cptr_t codeword) const
 {
     assert_byte_aligned_n_k(m_n, m_k);
+    const auto parity_poly = gf2_poly_rem(codeword, m_n_bytes, m_g, m_gen_poly_rem_lut);
+    const auto parity_poly_gf2m = gf2m_poly(m_gf, parity_poly);
     std::vector<T> syndrome_vec;
-    std::map<int, gf2_poly<T>> bi_map;
-    for (int i = 1; i <= (2 * m_t); i++) {
-        // See the notes in the above (alternative) syndrome implementation. The
-        // difference here is that the remainder computation to obtain b_i(x) is based on
-        // LUTs instead of manual bit shifts and XORs for each input bit.
-        if (m_conjugate_map[i] == 0) // new b_i(x)
-            bi_map.emplace(
-                i,
-                gf2_poly_rem(codeword, m_n_bytes, m_min_poly[i], m_min_poly_rem_lut[i]));
-        const int bi_idx = (m_conjugate_map[i] == 0) ? i : m_conjugate_map[i];
-        const auto& bi = bi_map.at(bi_idx);
-        const auto bi_gf2m = gf2m_poly(m_gf, bi);
-        syndrome_vec.push_back(bi_gf2m.eval_by_exp(i));
-    }
+    for (int i = 1; i <= (2 * m_t); i++)
+        syndrome_vec.push_back(parity_poly_gf2m.eval_by_exp(i));
     return syndrome_vec;
 }
 

@@ -28,22 +28,17 @@ template <typename T, typename P>
 class DVBS2RX_API bch_codec
 {
 private:
-    const galois_field<T>* m_gf;         // Galois field
-    uint8_t m_t;                         // error correction capability
-    gf2_poly<P> m_g;                     // generator polynomial
-    uint32_t m_n;                        // codeword length
-    uint32_t m_s;                        // code shortening
-    uint32_t m_k;                        // message length
-    uint32_t m_parity;                   // number of parity bits
-    uint32_t m_n_bytes;                  // codeword length in bytes
-    uint32_t m_k_bytes;                  // message length in bytes
-    uint32_t m_parity_bytes;             // number of parity bytes
-    T m_msg_mask;                        // mask used to enforce k bits per message
-    std::vector<gf2_poly<T>> m_min_poly; // minimal polynomials in g(x)
-    std::vector<int> m_conjugate_map; // LUT mapping each GF(2^m) element to a conjugate
-                                      // of lower exponent (if existing)
-    std::vector<std::array<T, 256>>
-        m_min_poly_rem_lut; // Remainder LUT for each minimal polynomial in g(x)
+    const galois_field<T>* m_gf;           // Galois field
+    uint8_t m_t;                           // error correction capability
+    gf2_poly<P> m_g;                       // generator polynomial
+    uint32_t m_n;                          // codeword length
+    uint32_t m_s;                          // code shortening
+    uint32_t m_k;                          // message length
+    uint32_t m_parity;                     // number of parity bits
+    uint32_t m_n_bytes;                    // codeword length in bytes
+    uint32_t m_k_bytes;                    // message length in bytes
+    uint32_t m_parity_bytes;               // number of parity bytes
+    T m_msg_mask;                          // mask used to enforce k bits per message
     std::array<P, 256> m_gen_poly_rem_lut; // Remainder LUT for the generator polynomial
     bool m_gen_poly_lut_generated; // Whether the generator polynomial remainder LUT has
                                    // been generated already
