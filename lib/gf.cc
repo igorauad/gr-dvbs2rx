@@ -197,22 +197,6 @@ gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, std::vector<T>&& coefs)
 }
 
 template <typename T>
-gf2m_poly<T>::gf2m_poly(const galois_field<T>* const gf, const gf2_poly<T>& gf2_poly)
-    : m_gf(gf)
-{
-    const T& coefs = gf2_poly.get_poly();
-    for (int i = 0; i <= gf2_poly.degree(); i++) {
-        if (is_bit_set(coefs, i)) {
-            m_poly.push_back((*gf)[1]);
-        } else {
-            m_poly.push_back((*gf)[0]);
-        }
-    }
-    set_degree();
-    set_coef_exponents();
-}
-
-template <typename T>
 void gf2m_poly<T>::set_degree()
 {
     // Remove any leading zeros and set the polynomial degree

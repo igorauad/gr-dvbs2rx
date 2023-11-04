@@ -31,6 +31,29 @@ template <typename T>
 class DVBS2RX_API gf2m_poly;
 
 /**
+ * @brief Test if bit is set
+ *
+ * @param x Bit register.
+ * @param i_bit Target bit index.
+ * @return true if bit is 1 and false otherwise.
+ */
+template <typename T>
+inline bool is_bit_set(const T& x, int i_bit)
+{
+    return x & (static_cast<T>(1) << i_bit);
+}
+
+/**
+ * @overload
+ * @note Template specialization for T = bitset256_t.
+ */
+template <>
+inline bool is_bit_set(const bitset256_t& x, int i_bit)
+{
+    return x.test(i_bit);
+}
+
+/**
  * @brief Galois Field GF(2^m).
  *
  * @tparam T Base type for the field elements.
@@ -307,7 +330,20 @@ public:
      * @param gf Reference Galois field.
      * @param gf2_poly Reference polynomial over GF(2).
      */
-    gf2m_poly(const galois_field<T>* const gf, const gf2_poly<T>& gf2_poly);
+    template <typename Y>
+    gf2m_poly(const galois_field<T>* const gf, const gf2_poly<Y>& gf2_poly) : m_gf(gf)
+    {
+        const Y& coefs = gf2_poly.get_poly();
+        for (int i = 0; i <= gf2_poly.degree(); i++) {
+            if (is_bit_set(coefs, i)) {
+                m_poly.push_back((*gf)[1]);
+            } else {
+                m_poly.push_back((*gf)[0]);
+            }
+        }
+        set_degree();
+        set_coef_exponents();
+    };
 
     /**
      * @brief GF(2^m) polynomial addition.

@@ -107,29 +107,6 @@ inline uint8_t get_msby(const bitset256_t& value, uint32_t lsb_index)
 }
 
 /**
- * @brief Test if bit is set
- *
- * @param x Bit register.
- * @param i_bit Target bit index.
- * @return true if bit is 1 and false otherwise.
- */
-template <typename T>
-inline bool is_bit_set(const T& x, int i_bit)
-{
-    return x & (static_cast<T>(1) << i_bit);
-}
-
-/**
- * @overload
- * @note Template specialization for T = bitset256_t.
- */
-template <>
-inline bool is_bit_set(const bitset256_t& x, int i_bit)
-{
-    return x.test(i_bit);
-}
-
-/**
  * @brief Convert type to u8 vector in network byte order (big-endian)
  *
  * @tparam T Bit storage type.
