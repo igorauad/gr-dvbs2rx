@@ -164,6 +164,22 @@ void bch_codec<T, P>::encode(u8_cptr_t msg, u8_ptr_t codeword) const
 }
 
 template <typename T, typename P>
+std::vector<T>
+_eval_syndrome(const gf2_poly<P>& parity_poly, const galois_field<T>* const gf, uint8_t t)
+{
+    // A zero parity polynomial means there are no errors in the codeword. In this case,
+    // don't bother computing the syndrome to avoid 2t unnecessary calls to "eval_by_exp".
+    if (parity_poly.is_zero())
+        return {};
+
+    const auto parity_poly_gf2m = gf2m_poly(gf, parity_poly);
+    std::vector<T> syndrome_vec;
+    for (int i = 1; i <= (2 * t); i++)
+        syndrome_vec.push_back(parity_poly_gf2m.eval_by_exp(i));
+    return syndrome_vec;
+}
+
+template <typename T, typename P>
 std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
 {
     // Due to how the generator polynomial is constructed as the LCM of 2t minimal
@@ -183,13 +199,9 @@ std::vector<T> bch_codec<T, P>::syndrome(const T& codeword) const
     //
     // which is the i-th syndrome component. Hence, compute the syndrome components by
     // evaluating the remainder s(x) of "r(x) % g(x)" for alpha^i for i from 1 to 2t.
-    const auto codeword_poly = gf2_poly(codeword);
+    const auto codeword_poly = gf2_poly<T>(codeword);
     const auto parity_poly = codeword_poly % m_g;
-    const auto parity_poly_gf2m = gf2m_poly(m_gf, parity_poly);
-    std::vector<T> syndrome_vec;
-    for (int i = 1; i <= (2 * m_t); i++)
-        syndrome_vec.push_back(parity_poly_gf2m.eval_by_exp(i));
-    return syndrome_vec;
+    return _eval_syndrome(parity_poly, m_gf, m_t);
 }
 
 template <typename T, typename P>
@@ -197,11 +209,7 @@ std::vector<T> bch_codec<T, P>::syndrome(u8_cptr_t codeword) const
 {
     assert_byte_aligned_n_k(m_n, m_k);
     const auto parity_poly = gf2_poly_rem(codeword, m_n_bytes, m_g, m_gen_poly_rem_lut);
-    const auto parity_poly_gf2m = gf2m_poly(m_gf, parity_poly);
-    std::vector<T> syndrome_vec;
-    for (int i = 1; i <= (2 * m_t); i++)
-        syndrome_vec.push_back(parity_poly_gf2m.eval_by_exp(i));
-    return syndrome_vec;
+    return _eval_syndrome(parity_poly, m_gf, m_t);
 }
 
 template <typename T, typename P>
@@ -314,23 +322,6 @@ std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
 }
 
 /**
- * @brief Check if the codeword has errors according to the syndrome vector.
- *
- * @tparam T GF(2^m) element type.
- * @param syndrome Syndrome vector.
- * @return true if there are errors in the codeword, false otherwise.
- */
-template <typename T>
-bool syndrome_has_errors(const std::vector<T>& syndrome)
-{
-    for (const T& element : syndrome) {
-        if (element != 0)
-            return true;
-    }
-    return false;
-}
-
-/**
  * @brief Correct errors in the given codeword.
  *
  * @tparam T Codeword type and GF(2^m) element type.
@@ -401,7 +392,7 @@ template <typename T, typename P>
 T bch_codec<T, P>::decode(T codeword) const
 {
     const auto s = syndrome(codeword);
-    if (syndrome_has_errors(s)) {
+    if (s.size() > 0) { // an empty syndrome means no errors
         const auto poly = err_loc_polynomial(s);
         const auto numbers = err_loc_numbers(poly);
         correct_errors(codeword, m_n, m_gf, numbers);
@@ -416,7 +407,7 @@ int bch_codec<T, P>::decode(u8_cptr_t codeword, u8_ptr_t decoded_msg) const
     assert_byte_aligned_n_k(m_n, m_k);
     memcpy(decoded_msg, codeword, m_k_bytes); // systematic bytes
     const auto s = syndrome(codeword);
-    if (syndrome_has_errors(s)) {
+    if (s.size() > 0) { // an empty syndrome means no errors
         const auto poly = err_loc_polynomial(s);
         const auto numbers = err_loc_numbers(poly);
         correct_errors(decoded_msg, m_n, m_k, m_gf, numbers);

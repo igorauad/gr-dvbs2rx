@@ -265,6 +265,13 @@ public:
      * @note By convention, the zero polynomial has degree -1.
      */
     int degree() const { return m_degree; }
+
+    /**
+     * @brief Test if the polynomial is the zero polynomial.
+     *
+     * @return true if the polynomial is zero and false otherwise.
+     */
+    bool is_zero() const { return m_degree == -1; }
 };
 
 /**

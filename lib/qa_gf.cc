@@ -296,6 +296,16 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2_poly_degrees, T, gf2_poly_base_types)
     BOOST_CHECK_EQUAL(e.degree(), -1);
 }
 
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2_poly_is_zero, T, gf2_poly_base_types)
+{
+    auto a = gf2_poly<T>(0b101); // x^2 + 1
+    auto b = gf2_poly<T>(1);     // unit polynomial
+    auto c = gf2_poly<T>(0);     // zero polynomial
+    BOOST_CHECK(!a.is_zero());
+    BOOST_CHECK(!b.is_zero());
+    BOOST_CHECK(c.is_zero());
+}
+
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_gf2_poly_addition, T, gf2_poly_base_types)
 {
     auto a = gf2_poly<T>(0b101);               // x^2 + 1

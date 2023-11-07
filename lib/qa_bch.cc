@@ -316,13 +316,12 @@ BOOST_AUTO_TEST_CASE(test_bch_syndrome_u8_codeword)
 template <typename T, typename P>
 void check_err_free_syndrome(const bch_codec<T, P>& codec, const galois_field<T>& gf)
 {
-    // The syndrome should be zero for error-free codewords
+    // The syndrome should be empty for error-free codewords
     T max_msg = (1 << codec.get_k()) - 1;
     for (T msg = 0; msg <= max_msg; msg++) {
         T rx_codeword = codec.encode(msg);
         auto syndrome = codec.syndrome(rx_codeword);
-        for (const auto& element : syndrome)
-            BOOST_CHECK_EQUAL(element, gf[0]);
+        BOOST_CHECK_EQUAL(syndrome.size(), 0);
     }
 }
 
@@ -389,23 +388,25 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_loc_poly_error_free, type_pair, bch_b
     // BCH code over GF(2 ^ 4)
     gf2_poly<T> prim_poly(0b10011); // x^4 + x + 1
     galois_field gf(prim_poly);
-    bch_codec<T, P> codec(&gf, 3); // Triple-error-correcting code
+    uint8_t t = 3; // Triple-error-correcting code
+    bch_codec<T, P> codec(&gf, t);
 
-    // Test with error-free codewords. The syndrome should be zero, and the
-    // error-location polynomial should be sigma(x)=1, a polynomial of zero degree
-    // (i.e., with no roots).
-    T max_msg = (1 << codec.get_k()) - 1;
+    // Simulate an all-zeros syndrome vector indicating no error has occurred. In this
+    // case, the resulting error-location polynomial should be sigma(x)=1, a polynomial of
+    // zero degree (i.e., with no roots).
+    //
+    // NOTE: The syndrome calculation functions return an empty vector for error-free
+    // codewords. However, an all-zeros syndrome vector is equally valid for error-free
+    // codewords. The difference is the latter requires unnecessary computations to
+    // evaluate the syndrome components.
+    auto syndrome = std::vector<T>(2 * t, 0); // all-zeros syndrome vector
+    auto err_loc_poly = codec.err_loc_polynomial(syndrome);
     T unit = gf.get_alpha_i(0);
-    for (T msg = 0; msg <= max_msg; msg++) {
-        T rx_codeword = codec.encode(msg);
-        auto syndrome = codec.syndrome(rx_codeword);
-        auto err_loc_poly = codec.err_loc_polynomial(syndrome);
-        BOOST_CHECK(err_loc_poly.get_poly() == std::vector<T>({ unit }));
-        BOOST_CHECK_EQUAL(err_loc_poly.degree(), 0);
-        // The list of error-location numbers should be empty.
-        auto err_loc_numbers = codec.err_loc_numbers(err_loc_poly);
-        BOOST_CHECK_EQUAL(err_loc_numbers.size(), 0);
-    }
+    BOOST_CHECK(err_loc_poly.get_poly() == std::vector<T>({ unit }));
+    BOOST_CHECK_EQUAL(err_loc_poly.degree(), 0);
+    // The list of error-location numbers should be empty.
+    auto err_loc_numbers = codec.err_loc_numbers(err_loc_poly);
+    BOOST_CHECK_EQUAL(err_loc_numbers.size(), 0);
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(test_bch_err_correction, type_pair, bch_base_types)

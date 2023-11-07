@@ -87,10 +87,14 @@ public:
     void encode(u8_cptr_t msg, u8_ptr_t codeword) const;
 
     /**
-     * @brief Compute syndrome of a receiver codeword.
+     * @brief Compute the syndrome of a received codeword.
      *
      * @param codeword Received codeword.
-     * @return std::vector<T> Syndrome as a vector with 2t GF(2^m) elements.
+     * @return std::vector<T> Syndrome as a vector with 2t GF(2^m) elements or an empty
+     * vector when the codeword is error-free.
+     * @note An empty vector is returned for an error-free codeword for CPU efficiency.
+     * The caller should check the size of the returned vector to determine whether the
+     * codeword is error-free or not.
      */
     std::vector<T> syndrome(const T& codeword) const;
 
