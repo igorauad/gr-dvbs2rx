@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <limits>
 #include <set>
+#include <stdexcept>
 #include <vector>
 
 namespace gr {
@@ -243,14 +244,6 @@ public:
     gf2_poly<T> operator*(const gf2_poly<T>& x) const;
 
     /**
-     * @brief Remainder of division by another GF(2) polynomial.
-     *
-     * @param x Divisor polynomial.
-     * @return gf2_poly Remainder result.
-     */
-    gf2_poly<T> operator%(const gf2_poly<T>& x) const;
-
-    /**
      * @brief Equal comparator.
      *
      * @param x The other GF(2^m) polynomial.
@@ -273,6 +266,69 @@ public:
      */
     int degree() const { return m_degree; }
 };
+
+/**
+ * @brief Compute the remainder of the division between two GF(2) polynomials.
+ *
+ * Computes the remainder of polynomial over GF(2) a(x) divided by another polynomial over
+ * GF(2) b(x), i.e., computes a(x) % b(x). The result has degree up to the degree of b(x)
+ * minus one. Hence, the result necessarily fits within the type used to store b(x).
+ *
+ * @tparam Ta Type of the dividend polynomial.
+ * @tparam Tb Type of the divisor polynomial.
+ * @param a Dividend polynomial.
+ * @param b Divisor polynomial.
+ * @return gf2_poly<Tb> Remainder result.
+ * @throws std::runtime_error if b(x) is a zero polynomial.
+ * @note The implementation requires the divisor type Tb to be larger than or equal to the
+ * dividend type Ta. Otherwise, a static assertion is raised.
+ */
+template <typename Ta, typename Tb>
+inline gf2_poly<Tb> operator%(const gf2_poly<Ta> a, const gf2_poly<Tb> b)
+{
+    check_rem_types(a, b); // ensure the types are
+    if (b.degree() == -1)  // zero divisor
+        throw std::runtime_error("Remainder of division by a zero polynomial");
+    if (a.degree() == -1) // zero dividend
+        return gf2_poly<Tb>(0);
+    if (a.degree() < b.degree()) // remainder is the dividend polynomial a(x) itself
+        return gf2_poly<Tb>(a.get_poly());
+
+    int b_degree = b.degree();
+    const Tb b_coefs = b.get_poly();
+    Tb remainder = a.get_poly(); // here type Tb must be large enough to store a(x)
+    for (int i = a.degree(); i >= b_degree; i--) {
+        if (is_bit_set(remainder, i))
+            remainder ^= b_coefs << (i - b_degree);
+    }
+    return remainder;
+}
+
+template <typename Ta, typename Tb>
+inline void check_rem_types(const gf2_poly<Ta> a, const gf2_poly<Tb> b)
+{
+    static_assert(sizeof(Tb) >= sizeof(Ta),
+                  "Divisor type must be larger or equal than dividend type");
+}
+
+template <typename Tb>
+inline void check_rem_types(const gf2_poly<bitset256_t> a, const gf2_poly<Tb> b)
+{
+    static_assert(sizeof(Tb) * 8 >= bitset256_t().size(),
+                  "Divisor type must be larger or equal than dividend type");
+}
+
+template <typename Ta>
+inline void check_rem_types(const gf2_poly<Ta> a, const gf2_poly<bitset256_t> b)
+{
+    static_assert(bitset256_t().size() >= sizeof(Ta) * 8,
+                  "Divisor type must be larger or equal than dividend type");
+}
+
+inline void check_rem_types(const gf2_poly<bitset256_t> a, const gf2_poly<bitset256_t> b)
+{
+    static_assert(true); // the two types are the same
+}
 
 /**
  * @brief Polynomial over GF(2^m).
