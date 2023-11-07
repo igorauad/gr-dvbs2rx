@@ -304,6 +304,14 @@ std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
     if (sigma.degree() > m_t)
         return {};
 
+    if (sigma.degree() == 1) {
+        // An unitary-degree error-location polynomial has a single root that can be
+        // solved immediately with no need for a brute-force search. The polynomial can be
+        // expressed as "ax + b", whose root is "b/a". Correspondingly, the error-location
+        // number (reciprocal of the root) is "a/b".
+        return { m_gf->divide(sigma[1], sigma[0]) };
+    }
+
     // Given the codeword has length n, the error location numbers can range from alpha^0
     // to alpha^n-1. Since alpha^(n+s) = alpha^(2^m - 1) = 1, the corresponding inverses
     // range from alpha^(n+s) to alpha^(s+1). See if any of these are the roots of sigma

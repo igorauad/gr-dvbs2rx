@@ -441,6 +441,14 @@ public:
     bool operator==(const gf2m_poly<T>& x) const { return m_poly == x.get_poly(); }
 
     /**
+     * @brief Access a polynomial coefficient.
+     *
+     * @param index Index of the target coefficient.
+     * @return T Polynomial coefficient.
+     */
+    T operator[](uint32_t index) const { return m_poly[index]; }
+
+    /**
      * @brief Evaluate the polynomial for a given GF(2^m) element.
      *
      * Assuming the underlying polynomial is p(x), this function evaluates p(x) for a
