@@ -18,6 +18,7 @@ list(APPEND dvbs2rx_sources
     bbdescrambler_bb_impl.cc
     bch_decoder_bb_impl.cc
     bch.cc
+    fec_params.cc
     gf.cc
     ldpc_decoder_cb_impl.cc
     pi2_bpsk.cc

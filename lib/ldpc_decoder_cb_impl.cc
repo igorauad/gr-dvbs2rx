@@ -13,6 +13,7 @@
 
 #include "cpu_features_macros.h"
 #include "debug_level.h"
+#include "fec_params.h"
 #include "ldpc_decoder_cb_impl.h"
 #include <gnuradio/io_signature.h>
 #include <gnuradio/logger.h>
@@ -322,34 +323,33 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
                 gr::io_signature::make(1, 1, sizeof(unsigned char))),
       d_debug_level(debug_level)
 {
-    unsigned int rows;
+    fec_info_t fec_info;
+    get_fec_info(standard, framesize, rate, fec_info);
+    kldpc = fec_info.ldpc.k;
+    nldpc = fec_info.ldpc.n;
+    kldpc_bytes = kldpc / 8;
+    nldpc_bytes = nldpc / 8;
+
     if (framesize == FECFRAME_NORMAL) {
-        frame_size = FRAME_SIZE_NORMAL;
         switch (rate) {
         case C1_4:
-            nbch = 16200;
             ldpc = new LDPC<DVB_S2_TABLE_B1>();
             break;
         case C1_3:
-            nbch = 21600;
             ldpc = new LDPC<DVB_S2_TABLE_B2>();
             break;
         case C2_5:
-            nbch = 25920;
             ldpc = new LDPC<DVB_S2_TABLE_B3>();
             break;
         case C1_2:
-            nbch = 32400;
             q_val = 90;
             ldpc = new LDPC<DVB_S2_TABLE_B4>();
             break;
         case C3_5:
-            nbch = 38880;
             q_val = 72;
             ldpc = new LDPC<DVB_S2_TABLE_B5>();
             break;
         case C2_3:
-            nbch = 43200;
             q_val = 60;
             if (standard == STANDARD_DVBS2) {
                 ldpc = new LDPC<DVB_S2_TABLE_B6>();
@@ -358,151 +358,116 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
             }
             break;
         case C3_4:
-            nbch = 48600;
             q_val = 45;
             ldpc = new LDPC<DVB_S2_TABLE_B7>();
             break;
         case C4_5:
-            nbch = 51840;
             q_val = 36;
             ldpc = new LDPC<DVB_S2_TABLE_B8>();
             break;
         case C5_6:
-            nbch = 54000;
             q_val = 30;
             ldpc = new LDPC<DVB_S2_TABLE_B9>();
             break;
         case C8_9:
-            nbch = 57600;
             ldpc = new LDPC<DVB_S2_TABLE_B10>();
             break;
         case C9_10:
-            nbch = 58320;
             ldpc = new LDPC<DVB_S2_TABLE_B11>();
             break;
         case C2_9_VLSNR:
-            nbch = 14400;
             ldpc = new LDPC<DVB_S2X_TABLE_B1>();
             break;
         case C13_45:
-            nbch = 18720;
             ldpc = new LDPC<DVB_S2X_TABLE_B2>();
             break;
         case C9_20:
-            nbch = 29160;
             ldpc = new LDPC<DVB_S2X_TABLE_B3>();
             break;
         case C90_180:
-            nbch = 32400;
             ldpc = new LDPC<DVB_S2X_TABLE_B11>();
             break;
         case C96_180:
-            nbch = 34560;
             ldpc = new LDPC<DVB_S2X_TABLE_B12>();
             break;
         case C11_20:
-            nbch = 35640;
             ldpc = new LDPC<DVB_S2X_TABLE_B4>();
             break;
         case C100_180:
-            nbch = 36000;
             ldpc = new LDPC<DVB_S2X_TABLE_B13>();
             break;
         case C104_180:
-            nbch = 37440;
             ldpc = new LDPC<DVB_S2X_TABLE_B14>();
             break;
         case C26_45:
-            nbch = 37440;
             ldpc = new LDPC<DVB_S2X_TABLE_B5>();
             break;
         case C18_30:
-            nbch = 38880;
             ldpc = new LDPC<DVB_S2X_TABLE_B22>();
             break;
         case C28_45:
-            nbch = 40320;
             ldpc = new LDPC<DVB_S2X_TABLE_B6>();
             break;
         case C23_36:
-            nbch = 41400;
             ldpc = new LDPC<DVB_S2X_TABLE_B7>();
             break;
         case C116_180:
-            nbch = 41760;
             ldpc = new LDPC<DVB_S2X_TABLE_B15>();
             break;
         case C20_30:
-            nbch = 43200;
             ldpc = new LDPC<DVB_S2X_TABLE_B23>();
             break;
         case C124_180:
-            nbch = 44640;
             ldpc = new LDPC<DVB_S2X_TABLE_B16>();
             break;
         case C25_36:
-            nbch = 45000;
             ldpc = new LDPC<DVB_S2X_TABLE_B8>();
             break;
         case C128_180:
-            nbch = 46080;
             ldpc = new LDPC<DVB_S2X_TABLE_B17>();
             break;
         case C13_18:
-            nbch = 46800;
             ldpc = new LDPC<DVB_S2X_TABLE_B9>();
             break;
         case C132_180:
-            nbch = 47520;
             ldpc = new LDPC<DVB_S2X_TABLE_B18>();
             break;
         case C22_30:
-            nbch = 47520;
             ldpc = new LDPC<DVB_S2X_TABLE_B24>();
             break;
         case C135_180:
-            nbch = 48600;
             ldpc = new LDPC<DVB_S2X_TABLE_B19>();
             break;
         case C140_180:
-            nbch = 50400;
             ldpc = new LDPC<DVB_S2X_TABLE_B20>();
             break;
         case C7_9:
-            nbch = 50400;
             ldpc = new LDPC<DVB_S2X_TABLE_B10>();
             break;
         case C154_180:
-            nbch = 55440;
             ldpc = new LDPC<DVB_S2X_TABLE_B21>();
             break;
         default:
             break;
         }
     } else if (framesize == FECFRAME_SHORT) {
-        frame_size = FRAME_SIZE_SHORT;
         switch (rate) {
         case C1_4:
-            nbch = 3240;
             ldpc = new LDPC<DVB_S2_TABLE_C1>();
             break;
         case C1_3:
-            nbch = 5400;
             q_val = 30;
             ldpc = new LDPC<DVB_S2_TABLE_C2>();
             break;
         case C2_5:
-            nbch = 6480;
             q_val = 27;
             ldpc = new LDPC<DVB_S2_TABLE_C3>();
             break;
         case C1_2:
-            nbch = 7200;
             q_val = 25;
             ldpc = new LDPC<DVB_S2_TABLE_C4>();
             break;
         case C3_5:
-            nbch = 9720;
             q_val = 18;
             if (standard == STANDARD_DVBS2) {
                 ldpc = new LDPC<DVB_S2_TABLE_C5>();
@@ -511,101 +476,80 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
             }
             break;
         case C2_3:
-            nbch = 10800;
             q_val = 15;
             ldpc = new LDPC<DVB_S2_TABLE_C6>();
             break;
         case C3_4:
-            nbch = 11880;
             q_val = 12;
             ldpc = new LDPC<DVB_S2_TABLE_C7>();
             break;
         case C4_5:
-            nbch = 12600;
             q_val = 10;
             ldpc = new LDPC<DVB_S2_TABLE_C8>();
             break;
         case C5_6:
-            nbch = 13320;
             q_val = 8;
             ldpc = new LDPC<DVB_S2_TABLE_C9>();
             break;
         case C8_9:
-            nbch = 14400;
             ldpc = new LDPC<DVB_S2_TABLE_C10>();
             break;
         case C11_45:
-            nbch = 3960;
             ldpc = new LDPC<DVB_S2X_TABLE_C1>();
             break;
         case C4_15:
-            nbch = 4320;
             ldpc = new LDPC<DVB_S2X_TABLE_C2>();
             break;
         case C14_45:
-            nbch = 5040;
             ldpc = new LDPC<DVB_S2X_TABLE_C3>();
             break;
         case C7_15:
-            nbch = 7560;
             ldpc = new LDPC<DVB_S2X_TABLE_C4>();
             break;
         case C8_15:
-            nbch = 8640;
             ldpc = new LDPC<DVB_S2X_TABLE_C5>();
             break;
         case C26_45:
-            nbch = 9360;
             ldpc = new LDPC<DVB_S2X_TABLE_C6>();
             break;
         case C32_45:
-            nbch = 11520;
             ldpc = new LDPC<DVB_S2X_TABLE_C7>();
             break;
         case C1_5_VLSNR_SF2:
-            nbch = 2680;
             ldpc = new LDPC<DVB_S2_TABLE_C1>();
             break;
         case C11_45_VLSNR_SF2:
-            nbch = 3960;
             ldpc = new LDPC<DVB_S2X_TABLE_C1>();
             break;
         case C1_5_VLSNR:
-            nbch = 3240;
             ldpc = new LDPC<DVB_S2_TABLE_C1>();
             break;
         case C4_15_VLSNR:
-            nbch = 4320;
             ldpc = new LDPC<DVB_S2X_TABLE_C2>();
             break;
         case C1_3_VLSNR:
-            nbch = 5400;
             ldpc = new LDPC<DVB_S2_TABLE_C2>();
             break;
         default:
-            nbch = 0;
             break;
         }
     } else {
-        frame_size = FRAME_SIZE_MEDIUM;
         switch (rate) {
         case C1_5_MEDIUM:
-            nbch = 5840;
             ldpc = new LDPC<DVB_S2X_TABLE_C8>();
             break;
         case C11_45_MEDIUM:
-            nbch = 7920;
             ldpc = new LDPC<DVB_S2X_TABLE_C9>();
             break;
         case C1_3_MEDIUM:
-            nbch = 10800;
             ldpc = new LDPC<DVB_S2X_TABLE_C10>();
             break;
         default:
-            nbch = 0;
             break;
         }
     }
+
+    unsigned int rows;
     switch (constellation) {
     case MOD_QPSK:
         mod = new PhaseShiftKeying<4, gr_complex, int8_t>();
@@ -645,6 +589,7 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     default:
         break;
     }
+
     frame = 0;
     chunk = 0;
     d_max_trials = max_trials;
@@ -700,24 +645,22 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     aligned_buffer = aligned_alloc(d_simd_size, d_simd_size * ldpc->code_len());
     generate_interleave_lookup();
     generate_deinterleave_lookup();
-    nbch_bytes = nbch / 8;
-    frame_size_bytes = frame_size / 8;
     if (outputmode == OM_MESSAGE) {
-        set_output_multiple(nbch_bytes * d_simd_size);
-        set_relative_rate((double)nbch_bytes / frame_size);
+        set_output_multiple(kldpc_bytes * d_simd_size);
+        set_relative_rate((double)kldpc_bytes / nldpc);
     } else {
-        set_output_multiple(frame_size_bytes * d_simd_size);
+        set_output_multiple(nldpc_bytes * d_simd_size);
     }
 }
 
 inline void ldpc_decoder_cb_impl::interleave_parity_bits(int* tempu, const int*& in)
 {
-    for (unsigned int k = 0; k < nbch; k++) {
+    for (unsigned int k = 0; k < kldpc; k++) {
         tempu[k] = *in++;
     }
     for (unsigned int t = 0; t < q_val; t++) {
         for (int s = 0; s < 360; s++) {
-            tempu[nbch + (360 * t) + s] = in[(q_val * s) + t];
+            tempu[kldpc + (360 * t) + s] = in[(q_val * s) + t];
         }
     }
     in = in + (q_val * 360);
@@ -775,8 +718,8 @@ void ldpc_decoder_cb_impl::generate_interleave_lookup()
     case MOD_QPSK:
         break;
     case MOD_16QAM:
-        rows = frame_size / (MOD_BITS * 2);
-        if (frame_size == FRAME_SIZE_NORMAL) {
+        rows = nldpc / (MOD_BITS * 2);
+        if (nldpc == FRAME_SIZE_NORMAL) {
             twist = &twist16n[0];
         } else {
             twist = &twist16s[0];
@@ -803,8 +746,8 @@ void ldpc_decoder_cb_impl::generate_interleave_lookup()
         }
         break;
     case MOD_64QAM:
-        rows = frame_size / (MOD_BITS * 2);
-        if (frame_size == FRAME_SIZE_NORMAL) {
+        rows = nldpc / (MOD_BITS * 2);
+        if (nldpc == FRAME_SIZE_NORMAL) {
             twist = twist64n;
         } else {
             twist = twist64s;
@@ -839,8 +782,8 @@ void ldpc_decoder_cb_impl::generate_interleave_lookup()
         }
         break;
     case MOD_256QAM:
-        if (frame_size == FRAME_SIZE_NORMAL) {
-            rows = frame_size / (MOD_BITS * 2);
+        if (nldpc == FRAME_SIZE_NORMAL) {
+            rows = nldpc / (MOD_BITS * 2);
             interleave_parity_bits(tempu, in);
             c1 = &tempv[0];
             c2 = &tempv[rows];
@@ -878,7 +821,7 @@ void ldpc_decoder_cb_impl::generate_interleave_lookup()
                 tempu[index++] = c16[j];
             }
         } else {
-            rows = frame_size / MOD_BITS;
+            rows = nldpc / MOD_BITS;
             interleave_parity_bits(tempu, in);
             c1 = &tempv[0];
             c2 = &tempv[rows];
@@ -902,7 +845,7 @@ void ldpc_decoder_cb_impl::generate_interleave_lookup()
         }
         break;
     }
-    memcpy(interleave_lookup_table, tempu, frame_size * sizeof(int));
+    memcpy(interleave_lookup_table, tempu, nldpc * sizeof(int));
 }
 
 void ldpc_decoder_cb_impl::generate_deinterleave_lookup()
@@ -923,8 +866,8 @@ void ldpc_decoder_cb_impl::generate_deinterleave_lookup()
     case MOD_QPSK:
         break;
     case MOD_16QAM:
-        rows = frame_size / (MOD_BITS * 2);
-        if (frame_size == FRAME_SIZE_NORMAL) {
+        rows = nldpc / (MOD_BITS * 2);
+        if (nldpc == FRAME_SIZE_NORMAL) {
             twist = &twist16n[0];
         } else {
             twist = &twist16s[0];
@@ -950,8 +893,8 @@ void ldpc_decoder_cb_impl::generate_deinterleave_lookup()
         twist_deinterleave_columns(tempv, tempu, rows, (MOD_BITS * 2), twist);
         break;
     case MOD_64QAM:
-        rows = frame_size / (MOD_BITS * 2);
-        if (frame_size == FRAME_SIZE_NORMAL) {
+        rows = nldpc / (MOD_BITS * 2);
+        if (nldpc == FRAME_SIZE_NORMAL) {
             twist = twist64n;
         } else {
             twist = twist64s;
@@ -985,8 +928,8 @@ void ldpc_decoder_cb_impl::generate_deinterleave_lookup()
         twist_deinterleave_columns(tempv, tempu, rows, (MOD_BITS * 2), twist);
         break;
     case MOD_256QAM:
-        if (frame_size == FRAME_SIZE_NORMAL) {
-            rows = frame_size / (MOD_BITS * 2);
+        if (nldpc == FRAME_SIZE_NORMAL) {
+            rows = nldpc / (MOD_BITS * 2);
             c1 = &tempu[0];
             c2 = &tempu[rows];
             c3 = &tempu[rows * 2];
@@ -1023,7 +966,7 @@ void ldpc_decoder_cb_impl::generate_deinterleave_lookup()
             }
             twist_deinterleave_columns(tempv, tempu, rows, (MOD_BITS * 2), twist256n);
         } else {
-            rows = frame_size / MOD_BITS;
+            rows = nldpc / MOD_BITS;
             c1 = &tempu[0];
             c2 = &tempu[rows];
             c3 = &tempu[rows * 2];
@@ -1046,7 +989,7 @@ void ldpc_decoder_cb_impl::generate_deinterleave_lookup()
         }
         break;
     }
-    memcpy(deinterleave_lookup_table, tempv, frame_size * sizeof(int));
+    memcpy(deinterleave_lookup_table, tempv, nldpc * sizeof(int));
 }
 
 /*
@@ -1067,8 +1010,8 @@ void ldpc_decoder_cb_impl::forecast(int noutput_items,
                                     gr_vector_int& ninput_items_required)
 {
     if (output_mode == OM_MESSAGE) {
-        unsigned int n_frames = noutput_items / nbch_bytes;
-        ninput_items_required[0] = n_frames * (frame_size / mod->bits());
+        unsigned int n_frames = noutput_items / kldpc_bytes;
+        ninput_items_required[0] = n_frames * (nldpc / mod->bits());
     } else {
         ninput_items_required[0] = 8 * noutput_items / mod->bits();
     }
@@ -1097,7 +1040,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
     int rows, offset, indexin, indexout;
     const int* mux;
     int8_t *c1, *c2, *c3;
-    int output_size = output_mode ? nbch_bytes : frame_size_bytes;
+    int output_size = output_mode ? kldpc_bytes : nldpc_bytes;
 
     for (int i = 0; i < noutput_items; i += output_size * d_simd_size) {
         for (int blk = 0; blk < d_simd_size; blk++) {
@@ -1127,11 +1070,11 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                     if (code_rate == C1_3 || code_rate == C2_5) {
                         for (unsigned int t = 0; t < q_val; t++) {
                             for (int s = 0; s < 360; s++) {
-                                dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
-                                    soft[(nbch + (360 * t) + s) + (blk * CODE_LEN)];
+                                dint[(kldpc + (q_val * s) + t) + (blk * CODE_LEN)] =
+                                    soft[(kldpc + (360 * t) + s) + (blk * CODE_LEN)];
                             }
                         }
-                        for (unsigned int k = 0; k < nbch; k++) {
+                        for (unsigned int k = 0; k < kldpc; k++) {
                             dint[k + (blk * CODE_LEN)] = soft[k + (blk * CODE_LEN)];
                         }
                         code = dint;
@@ -1143,7 +1086,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 }
                 break;
             case MOD_8PSK:
-                rows = frame_size / MOD_BITS;
+                rows = nldpc / MOD_BITS;
                 c1 = &dint[rowaddr0 + (blk * CODE_LEN)];
                 c2 = &dint[rowaddr1 + (blk * CODE_LEN)];
                 c3 = &dint[rowaddr2 + (blk * CODE_LEN)];
@@ -1156,18 +1099,18 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 code = dint;
                 break;
             case MOD_16QAM:
-                if (code_rate == C3_5 && frame_size == FRAME_SIZE_NORMAL) {
+                if (code_rate == C3_5 && nldpc == FRAME_SIZE_NORMAL) {
                     mux = &mux16_35[0];
-                } else if (code_rate == C1_3 && frame_size == FRAME_SIZE_SHORT) {
+                } else if (code_rate == C1_3 && nldpc == FRAME_SIZE_SHORT) {
                     mux = &mux16_13[0];
-                } else if (code_rate == C2_5 && frame_size == FRAME_SIZE_SHORT) {
+                } else if (code_rate == C2_5 && nldpc == FRAME_SIZE_SHORT) {
                     mux = &mux16_25[0];
                 } else {
                     mux = &mux16[0];
                 }
                 indexin = 0;
                 indexout = 0;
-                for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                for (unsigned int d = 0; d < nldpc / (MOD_BITS * 2); d++) {
                     for (int e = 0; e < (MOD_BITS * 2); e++) {
                         offset = mux[e];
                         tempu[indexout++] = soft[(offset + indexin) + (blk * CODE_LEN)];
@@ -1176,33 +1119,33 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 }
                 indexin = 0;
                 indexout = 0;
-                for (unsigned int j = 0; j < frame_size; j++) {
+                for (unsigned int j = 0; j < nldpc; j++) {
                     tempv[indexout++] = tempu[deinterleave_lookup_table[indexin++]];
                 }
                 for (unsigned int t = 0; t < q_val; t++) {
                     for (int s = 0; s < 360; s++) {
-                        dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
-                            tempv[(nbch + (360 * t) + s)];
+                        dint[(kldpc + (q_val * s) + t) + (blk * CODE_LEN)] =
+                            tempv[(kldpc + (360 * t) + s)];
                     }
                 }
-                for (unsigned int k = 0; k < nbch; k++) {
+                for (unsigned int k = 0; k < kldpc; k++) {
                     dint[k + (blk * CODE_LEN)] = tempv[k];
                 }
                 code = dint;
                 break;
             case MOD_64QAM:
-                if (code_rate == C3_5 && frame_size == FRAME_SIZE_NORMAL) {
+                if (code_rate == C3_5 && nldpc == FRAME_SIZE_NORMAL) {
                     mux = &mux64_35[0];
-                } else if (code_rate == C1_3 && frame_size == FRAME_SIZE_SHORT) {
+                } else if (code_rate == C1_3 && nldpc == FRAME_SIZE_SHORT) {
                     mux = &mux64_13[0];
-                } else if (code_rate == C2_5 && frame_size == FRAME_SIZE_SHORT) {
+                } else if (code_rate == C2_5 && nldpc == FRAME_SIZE_SHORT) {
                     mux = &mux64_25[0];
                 } else {
                     mux = &mux64[0];
                 }
                 indexin = 0;
                 indexout = 0;
-                for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                for (unsigned int d = 0; d < nldpc / (MOD_BITS * 2); d++) {
                     for (int e = 0; e < (MOD_BITS * 2); e++) {
                         offset = mux[e];
                         tempu[indexout++] = soft[(offset + indexin) + (blk * CODE_LEN)];
@@ -1211,22 +1154,22 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 }
                 indexin = 0;
                 indexout = 0;
-                for (unsigned int j = 0; j < frame_size; j++) {
+                for (unsigned int j = 0; j < nldpc; j++) {
                     tempv[indexout++] = tempu[deinterleave_lookup_table[indexin++]];
                 }
                 for (unsigned int t = 0; t < q_val; t++) {
                     for (int s = 0; s < 360; s++) {
-                        dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
-                            tempv[(nbch + (360 * t) + s)];
+                        dint[(kldpc + (q_val * s) + t) + (blk * CODE_LEN)] =
+                            tempv[(kldpc + (360 * t) + s)];
                     }
                 }
-                for (unsigned int k = 0; k < nbch; k++) {
+                for (unsigned int k = 0; k < kldpc; k++) {
                     dint[k + (blk * CODE_LEN)] = tempv[k];
                 }
                 code = dint;
                 break;
             case MOD_256QAM:
-                if (frame_size == FRAME_SIZE_NORMAL) {
+                if (nldpc == FRAME_SIZE_NORMAL) {
                     if (code_rate == C3_5) {
                         mux = &mux256_35[0];
                     } else if (code_rate == C2_3) {
@@ -1236,7 +1179,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                     }
                     indexin = 0;
                     indexout = 0;
-                    for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                    for (unsigned int d = 0; d < nldpc / (MOD_BITS * 2); d++) {
                         for (int e = 0; e < (MOD_BITS * 2); e++) {
                             offset = mux[e];
                             tempu[indexout++] =
@@ -1246,16 +1189,16 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                     }
                     indexin = 0;
                     indexout = 0;
-                    for (unsigned int j = 0; j < frame_size; j++) {
+                    for (unsigned int j = 0; j < nldpc; j++) {
                         tempv[indexout++] = tempu[deinterleave_lookup_table[indexin++]];
                     }
                     for (unsigned int t = 0; t < q_val; t++) {
                         for (int s = 0; s < 360; s++) {
-                            dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
-                                tempv[(nbch + (360 * t) + s)];
+                            dint[(kldpc + (q_val * s) + t) + (blk * CODE_LEN)] =
+                                tempv[(kldpc + (360 * t) + s)];
                         }
                     }
-                    for (unsigned int k = 0; k < nbch; k++) {
+                    for (unsigned int k = 0; k < kldpc; k++) {
                         dint[k + (blk * CODE_LEN)] = tempv[k];
                     }
                     code = dint;
@@ -1269,7 +1212,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                     }
                     indexin = 0;
                     indexout = 0;
-                    for (unsigned int d = 0; d < frame_size / MOD_BITS; d++) {
+                    for (unsigned int d = 0; d < nldpc / MOD_BITS; d++) {
                         for (int e = 0; e < MOD_BITS; e++) {
                             offset = mux[e];
                             tempu[indexout++] =
@@ -1279,16 +1222,16 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                     }
                     indexin = 0;
                     indexout = 0;
-                    for (unsigned int j = 0; j < frame_size; j++) {
+                    for (unsigned int j = 0; j < nldpc; j++) {
                         tempv[indexout++] = tempu[deinterleave_lookup_table[indexin++]];
                     }
                     for (unsigned int t = 0; t < q_val; t++) {
                         for (int s = 0; s < 360; s++) {
-                            dint[(nbch + (q_val * s) + t) + (blk * CODE_LEN)] =
-                                tempv[(nbch + (360 * t) + s)];
+                            dint[(kldpc + (q_val * s) + t) + (blk * CODE_LEN)] =
+                                tempv[(kldpc + (360 * t) + s)];
                         }
                     }
-                    for (unsigned int k = 0; k < nbch; k++) {
+                    for (unsigned int k = 0; k < kldpc; k++) {
                         dint[k + (blk * CODE_LEN)] = tempv[k];
                     }
                     code = dint;
@@ -1298,8 +1241,8 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 code = soft;
                 break;
             }
-            in += frame_size / MOD_BITS;
-            consumed += frame_size / MOD_BITS;
+            in += nldpc / MOD_BITS;
+            consumed += nldpc / MOD_BITS;
         }
         int count = decode(aligned_buffer, code, trials);
         if (count < 0) {
@@ -1330,7 +1273,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 for (int j = 0; j < CODE_LEN; j++) {
                     tempu[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
                 }
-                rows = frame_size / MOD_BITS;
+                rows = nldpc / MOD_BITS;
                 c1 = &tempu[rowaddr0];
                 c2 = &tempu[rowaddr1];
                 c3 = &tempu[rowaddr2];
@@ -1342,11 +1285,11 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 }
                 break;
             case MOD_16QAM:
-                if (code_rate == C3_5 && frame_size == FRAME_SIZE_NORMAL) {
+                if (code_rate == C3_5 && nldpc == FRAME_SIZE_NORMAL) {
                     mux = &mux16_35[0];
-                } else if (code_rate == C1_3 && frame_size == FRAME_SIZE_SHORT) {
+                } else if (code_rate == C1_3 && nldpc == FRAME_SIZE_SHORT) {
                     mux = &mux16_13[0];
-                } else if (code_rate == C2_5 && frame_size == FRAME_SIZE_SHORT) {
+                } else if (code_rate == C2_5 && nldpc == FRAME_SIZE_SHORT) {
                     mux = &mux16_25[0];
                 } else {
                     mux = &mux16[0];
@@ -1356,7 +1299,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 }
                 indexin = 0;
                 indexout = 0;
-                for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                for (unsigned int d = 0; d < nldpc / (MOD_BITS * 2); d++) {
                     for (int e = 0; e < (MOD_BITS * 2); e++) {
                         offset = mux[e];
                         tempv[offset + indexout] =
@@ -1366,11 +1309,11 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 }
                 break;
             case MOD_64QAM:
-                if (code_rate == C3_5 && frame_size == FRAME_SIZE_NORMAL) {
+                if (code_rate == C3_5 && nldpc == FRAME_SIZE_NORMAL) {
                     mux = &mux64_35[0];
-                } else if (code_rate == C1_3 && frame_size == FRAME_SIZE_SHORT) {
+                } else if (code_rate == C1_3 && nldpc == FRAME_SIZE_SHORT) {
                     mux = &mux64_13[0];
-                } else if (code_rate == C2_5 && frame_size == FRAME_SIZE_SHORT) {
+                } else if (code_rate == C2_5 && nldpc == FRAME_SIZE_SHORT) {
                     mux = &mux64_25[0];
                 } else {
                     mux = &mux64[0];
@@ -1380,7 +1323,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 }
                 indexin = 0;
                 indexout = 0;
-                for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                for (unsigned int d = 0; d < nldpc / (MOD_BITS * 2); d++) {
                     for (int e = 0; e < (MOD_BITS * 2); e++) {
                         offset = mux[e];
                         tempv[offset + indexout] =
@@ -1390,7 +1333,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                 }
                 break;
             case MOD_256QAM:
-                if (frame_size == FRAME_SIZE_NORMAL) {
+                if (nldpc == FRAME_SIZE_NORMAL) {
                     if (code_rate == C3_5) {
                         mux = &mux256_35[0];
                     } else if (code_rate == C2_3) {
@@ -1403,7 +1346,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                     }
                     indexin = 0;
                     indexout = 0;
-                    for (unsigned int d = 0; d < frame_size / (MOD_BITS * 2); d++) {
+                    for (unsigned int d = 0; d < nldpc / (MOD_BITS * 2); d++) {
                         for (int e = 0; e < (MOD_BITS * 2); e++) {
                             offset = mux[e];
                             tempv[offset + indexout] =
@@ -1424,7 +1367,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                     }
                     indexin = 0;
                     indexout = 0;
-                    for (unsigned int d = 0; d < frame_size / MOD_BITS; d++) {
+                    for (unsigned int d = 0; d < nldpc / MOD_BITS; d++) {
                         for (int e = 0; e < MOD_BITS; e++) {
                             offset = mux[e];
                             tempv[offset + indexout] =
@@ -1461,7 +1404,7 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                                    (total_trials / chunk),
                                    (total_snr / (frame + 1)));
             }
-            insnr += frame_size / MOD_BITS;
+            insnr += nldpc / MOD_BITS;
             frame++;
         }
         precision = precision_sum / d_simd_size;
