@@ -877,15 +877,9 @@ def main():
     tb = DVBS2RecTopBlock(options, rec_metadata)
     tb.start()
 
-    if (gui_mode):
-        if (options.gui_dark):
-            if not tb.setStyleSheetFromFile("dvbs2_dark.qss"):
-                tb.setStyleSheetFromFile("dark.qss")
-        tb.show()
-    else:
-        tb.wait()
-
     def sig_handler(sig=None, frame=None):
+        gr.log.info("Caught {}. Stopping DVB-S2 Rec...".format(
+            signal.Signals(sig).name))
         tb.stop()
         tb.wait()
         tb.save_rec_meta()
@@ -898,10 +892,16 @@ def main():
     signal.signal(signal.SIGTERM, sig_handler)
 
     if (gui_mode):
+        if (options.gui_dark):
+            if not tb.setStyleSheetFromFile("dvbs2_dark.qss"):
+                tb.setStyleSheetFromFile("dark.qss")
+        tb.show()
         timer = Qt.QTimer()
         timer.start(500)
         timer.timeout.connect(lambda: None)
         qapp.exec_()
+    else:
+        tb.wait()
 
     tb.save_rec_meta()
     gr.log.info("Stopping DVB-S2 Rec")
