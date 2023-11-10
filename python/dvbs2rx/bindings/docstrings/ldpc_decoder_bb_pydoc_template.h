@@ -15,16 +15,13 @@
  */
 
 
-static const char* __doc_gr_dvbs2rx_ldpc_decoder_cb = R"doc()doc";
+static const char* __doc_gr_dvbs2rx_ldpc_decoder_bb = R"doc()doc";
 
 
-static const char* __doc_gr_dvbs2rx_ldpc_decoder_cb_ldpc_decoder_cb = R"doc()doc";
+static const char* __doc_gr_dvbs2rx_ldpc_decoder_bb_ldpc_decoder_bb = R"doc()doc";
 
 
-static const char* __doc_gr_dvbs2rx_ldpc_decoder_cb_make = R"doc()doc";
+static const char* __doc_gr_dvbs2rx_ldpc_decoder_bb_make = R"doc()doc";
 
 
-static const char* __doc_gr_dvbs2rx_ldpc_decoder_cb_get_snr = R"doc()doc";
-
-
-static const char* __doc_gr_dvbs2rx_ldpc_decoder_cb_get_average_trials = R"doc()doc";
+static const char* __doc_gr_dvbs2rx_ldpc_decoder_bb_get_average_trials = R"doc()doc";

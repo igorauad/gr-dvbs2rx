@@ -10,9 +10,10 @@ install(FILES
     dvbs2rx_bbdeheader_bb.block.yml
     dvbs2rx_bbdescrambler_bb.block.yml
     dvbs2rx_bch_decoder_bb.block.yml
-    dvbs2rx_ldpc_decoder_cb.block.yml
+    dvbs2rx_ldpc_decoder_bb.block.yml
     dvbs2rx_plsync_cc.block.yml
     dvbs2rx_rotator_cc.block.yml
     dvbs2rx_symbol_sync_cc.block.yml
+    dvbs2rx_xfecframe_demapper_cb.block.yml
     DESTINATION share/gnuradio/grc/blocks
 )

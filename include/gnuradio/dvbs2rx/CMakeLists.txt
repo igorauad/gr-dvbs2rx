@@ -14,9 +14,10 @@ install(FILES
     bbdeheader_bb.h
     bbdescrambler_bb.h
     bch_decoder_bb.h
-    ldpc_decoder_cb.h
+    ldpc_decoder_bb.h
     plsync_cc.h
     rotator_cc.h
     symbol_sync_cc.h
+    xfecframe_demapper_cb.h
     DESTINATION include/gnuradio/dvbs2rx
 )

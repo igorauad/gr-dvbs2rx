@@ -27,10 +27,11 @@ void bind_bch_decoder_bb(py::module& m);
 void bind_dvb_config(py::module& m);
 void bind_dvbs2_config(py::module& m);
 void bind_dvbt2_config(py::module& m);
-void bind_ldpc_decoder_cb(py::module& m);
+void bind_ldpc_decoder_bb(py::module& m);
 void bind_plsync_cc(py::module& m);
 void bind_rotator_cc(py::module& m);
 void bind_symbol_sync_cc(py::module& m);
+void bind_xfecframe_demapper_cb(py::module& m);
 // ) END BINDING_FUNCTION_PROTOTYPES
 
 
@@ -65,9 +66,10 @@ PYBIND11_MODULE(dvbs2rx_python, m)
     bind_dvb_config(m);
     bind_dvbs2_config(m);
     bind_dvbt2_config(m);
-    bind_ldpc_decoder_cb(m);
+    bind_ldpc_decoder_bb(m);
     bind_plsync_cc(m);
     bind_rotator_cc(m);
     bind_symbol_sync_cc(m);
+    bind_xfecframe_demapper_cb(m);
     // ) END BINDING_FUNCTION_CALLS
 }

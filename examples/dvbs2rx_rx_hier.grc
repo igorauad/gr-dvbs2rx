@@ -23,6 +23,7 @@ options:
     sizing_mode: fixed
     thread_safe_setters: ''
     title: DVB-S2 Rx Hierarchical Block
+    window_size: (1000,1000)
   states:
     bus_sink: false
     bus_source: false
@@ -139,23 +140,6 @@ blocks:
     coordinate: [72, 500.0]
     rotation: 0
     state: true
-- name: dvbs2rx_rotator_cc_0
-  id: dvbs2rx_rotator_cc
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: Frequency Correction Block
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    phase_inc: '0'
-    tag_inc_update: 'True'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [280, 504.0]
-    rotation: 0
-    state: true
 - name: debug
   id: parameter
   parameters:
@@ -179,6 +163,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
+    debug_level: '0'
     framesize: frame_size
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -215,6 +200,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
+    debug_level: '0'
     framesize: frame_size
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -228,13 +214,14 @@ blocks:
     coordinate: [672, 660.0]
     rotation: 180
     state: enabled
-- name: dvbs2rx_ldpc_decoder_cb_0
-  id: dvbs2rx_ldpc_decoder_cb
+- name: dvbs2rx_ldpc_decoder_bb_0
+  id: dvbs2rx_ldpc_decoder_bb
   parameters:
     affinity: ''
     alias: ''
     comment: ''
     constellation: constellation
+    debug_level: '0'
     framesize: frame_size
     infomode: INFO_OFF
     max_trials: '25'
@@ -273,6 +260,23 @@ blocks:
     coordinate: [792, 452.0]
     rotation: 0
     state: true
+- name: dvbs2rx_rotator_cc_0
+  id: dvbs2rx_rotator_cc
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: Frequency Correction Block
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    phase_inc: '0'
+    tag_inc_update: 'True'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [280, 504.0]
+    rotation: 0
+    state: true
 - name: dvbs2rx_symbol_sync_cc_0
   id: dvbs2rx_symbol_sync_cc
   parameters:
@@ -295,6 +299,24 @@ blocks:
     coordinate: [520, 476.0]
     rotation: 0
     state: enabled
+- name: dvbs2rx_xfecframe_demapper_cb_0
+  id: dvbs2rx_xfecframe_demapper_cb
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    constellation: constellation
+    framesize: frame_size
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    rate: code_rate
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1096, 676.0]
+    rotation: 180
+    state: true
 - name: frame_size
   id: parameter
   parameters:
@@ -596,18 +618,21 @@ blocks:
 connections:
 - [analog_agc_xx_0, '0', dvbs2rx_rotator_cc_0, '0']
 - [analog_agc_xx_0, '0', pad_sink_2_0, '0']
-- [dvbs2rx_rotator_cc_0, '0', dvbs2rx_symbol_sync_cc_0, '0']
-- [dvbs2rx_rotator_cc_0, '0', pad_sink_2, '0']
 - [dvbs2rx_bbdeheader_bb_0, '0', pad_sink_0, '0']
 - [dvbs2rx_bbdescrambler_bb_0, '0', dvbs2rx_bbdeheader_bb_0, '0']
 - [dvbs2rx_bch_decoder_bb_0, '0', dvbs2rx_bbdescrambler_bb_0, '0']
-- [dvbs2rx_ldpc_decoder_cb_0, '0', dvbs2rx_bch_decoder_bb_0, '0']
-- [dvbs2rx_plsync_cc_0, '0', dvbs2rx_ldpc_decoder_cb_0, '0']
+- [dvbs2rx_ldpc_decoder_bb_0, '0', dvbs2rx_bch_decoder_bb_0, '0']
+- [dvbs2rx_ldpc_decoder_bb_0, llr_pdu, dvbs2rx_xfecframe_demapper_cb_0, llr_pdu]
+- [dvbs2rx_plsync_cc_0, '0', dvbs2rx_xfecframe_demapper_cb_0, '0']
 - [dvbs2rx_plsync_cc_0, '0', pad_sink_1_0, '0']
 - [dvbs2rx_plsync_cc_0, rotator_phase_inc, dvbs2rx_rotator_cc_0, cmd]
+- [dvbs2rx_rotator_cc_0, '0', dvbs2rx_symbol_sync_cc_0, '0']
+- [dvbs2rx_rotator_cc_0, '0', pad_sink_2, '0']
 - [dvbs2rx_symbol_sync_cc_0, '0', dvbs2rx_plsync_cc_0, '0']
 - [dvbs2rx_symbol_sync_cc_0, '0', pad_sink_1, '0']
+- [dvbs2rx_xfecframe_demapper_cb_0, '0', dvbs2rx_ldpc_decoder_bb_0, '0']
 - [pad_source_0, '0', analog_agc_xx_0, '0']
 
 metadata:
   file_format: 1
+  grc_version: 3.10.5.1

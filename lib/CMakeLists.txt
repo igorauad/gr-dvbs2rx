@@ -20,7 +20,7 @@ list(APPEND dvbs2rx_sources
     bch.cc
     fec_params.cc
     gf.cc
-    ldpc_decoder_cb_impl.cc
+    ldpc_decoder_bb_impl.cc
     pi2_bpsk.cc
     pl_descrambler.cc
     pl_frame_sync.cc
@@ -31,6 +31,7 @@ list(APPEND dvbs2rx_sources
     rotator_cc_impl.cc
     symbol_sync_cc_impl.cc
     util.cc
+    xfecframe_demapper_cb_impl.cc
 )
 
 set(dvbs2rx_sources "${dvbs2rx_sources}" PARENT_SCOPE)

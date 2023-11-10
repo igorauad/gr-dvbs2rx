@@ -8,8 +8,8 @@
  */
 
 
-#ifndef INCLUDED_DVBS2RX_LDPC_DECODER_CB_H
-#define INCLUDED_DVBS2RX_LDPC_DECODER_CB_H
+#ifndef INCLUDED_DVBS2RX_LDPC_DECODER_BB_H
+#define INCLUDED_DVBS2RX_LDPC_DECODER_BB_H
 
 #include <gnuradio/block.h>
 #include <gnuradio/dvbs2rx/api.h>
@@ -23,18 +23,17 @@ namespace dvbs2rx {
  * \ingroup dvbs2rx
  *
  */
-class DVBS2RX_API ldpc_decoder_cb : virtual public gr::block
+class DVBS2RX_API ldpc_decoder_bb : virtual public gr::block
 {
 public:
-    typedef std::shared_ptr<ldpc_decoder_cb> sptr;
+    typedef std::shared_ptr<ldpc_decoder_bb> sptr;
 
     /*!
-     * \brief Return a shared_ptr to a new instance of dvbs2rx::ldpc_decoder_cb.
+     * \brief Return a shared_ptr to a new instance of dvbs2rx::ldpc_decoder_bb.
      *
-     * To avoid accidental use of raw pointers, dvbs2rx::ldpc_decoder_cb's
-     * constructor is in a private implementation
-     * class. dvbs2rx::ldpc_decoder_cb::make is the public interface for
-     * creating new instances.
+     * To avoid accidental use of raw pointers, dvbs2rx::ldpc_decoder_bb's constructor is
+     * in a private implementation class. dvbs2rx::ldpc_decoder_bb::make is the public
+     * interface for creating new instances.
      */
     static sptr make(dvb_standard_t standard,
                      dvb_framesize_t framesize,
@@ -46,12 +45,6 @@ public:
                      int debug_level = 0);
 
     /*!
-     * \brief Get the measured SNR.
-     * \return float Measured SNR.
-     */
-    virtual float get_snr() = 0;
-
-    /*!
      * \brief Get the average number of LDPC decoding iterations per frame.
      * \return unsigned int Average decoding interations.
      */
@@ -61,4 +54,4 @@ public:
 } // namespace dvbs2rx
 } // namespace gr
 
-#endif /* INCLUDED_DVBS2RX_LDPC_DECODER_CB_H */
+#endif /* INCLUDED_DVBS2RX_LDPC_DECODER_BB_H */

@@ -858,7 +858,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         standard, frame_size, code_rate, constellation = translated_params
 
         # Upper layer (FEC + BB Processing)
-        ldpc_decoder = dvbs2rx.ldpc_decoder_cb(
+        ldpc_decoder = dvbs2rx.ldpc_decoder_bb(
             standard, frame_size, code_rate, constellation, dvbs2rx.OM_MESSAGE,
             dvbs2rx.INFO_OFF, self.ldpc_iterations, self.debug)
         bch_decoder = dvbs2rx.bch_decoder_bb(standard, frame_size, code_rate,
@@ -924,11 +924,20 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                                                  interp_method)
         self.connect((rotator, 0), (symbol_sync, 0))
 
-        # PL Sync - after the symbol synchronizer and before the LDPC decoder
+        # PL Sync
         plsync = dvbs2rx.plsync_cc(*self._plsync_params())
         self.msg_connect((plsync, 'rotator_phase_inc'), (rotator, 'cmd'))
-        self.connect((plsync, 0), (ldpc_decoder, 0))
-        self.connect((symbol_sync, 0), (plsync, 0))
+
+        # XFECFRAME demapper
+        xfecframe_demapper = dvbs2rx.xfecframe_demapper_cb(
+            frame_size, code_rate, constellation)
+        self.connect((symbol_sync, 0), (plsync, 0), (xfecframe_demapper, 0),
+                     (ldpc_decoder, 0))
+
+        # The LDPC decoder block sends decoded LLRs back to the XFECFRAME
+        # demapper so that the latter can estimate the post-decoder SNR.
+        self.msg_connect((ldpc_decoder, 'llr_pdu'),
+                         (xfecframe_demapper, 'llr_pdu'))
 
         # Connect the source to the first block
         self.connect((source_block, 0), (first_block, 0))
@@ -959,6 +968,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.bbdeheader = bbdeheader
         self.bch_decoder = bch_decoder
         self.ldpc_decoder = ldpc_decoder
+        self.xfecframe_demapper = xfecframe_demapper
         self.plsync = plsync
 
         # Connection state
@@ -1000,7 +1010,8 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         has_fec_frames = fec_frames > 0
         fec_fer = (fec_errors / fec_frames) if has_fec_frames else None
 
-        ldpc_snr = self.ldpc_decoder.get_snr() if has_fec_frames else None
+        post_decoder_snr = self.xfecframe_demapper.get_snr() \
+            if has_fec_frames else None
         ldpc_avg_trials = self.ldpc_decoder.get_average_trials() \
             if has_fec_frames else None
 
@@ -1022,7 +1033,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
 
         return {
             "lock": self.plsync.get_locked(),
-            "snr": ldpc_snr,
+            "snr": post_decoder_snr,
             "plsync": {
                 "coarse_freq_corr": self.plsync.get_coarse_freq_corr_state(),
                 "freq_offset_hz": freq_offset_hz,

@@ -24,10 +24,11 @@ list(APPEND dvbs2rx_python_files
     dvb_config_python.cc
     dvbs2_config_python.cc
     dvbt2_config_python.cc
-    ldpc_decoder_cb_python.cc
+    ldpc_decoder_bb_python.cc
     plsync_cc_python.cc
     rotator_cc_python.cc
     symbol_sync_cc_python.cc
+    xfecframe_demapper_cb_python.cc
     python_bindings.cc)
 
 GR_PYBIND_MAKE_OOT(dvbs2rx
