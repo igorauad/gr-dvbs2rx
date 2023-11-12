@@ -1026,6 +1026,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             "plsync": {
                 "coarse_freq_corr": self.plsync.get_coarse_freq_corr_state(),
                 "freq_offset_hz": freq_offset_hz,
+                "sof_count": self.plsync.get_sof_count(),
                 "frame_count": {
                     'processed': self.plsync.get_frame_count(),
                     'rejected': self.plsync.get_rejected_count(),

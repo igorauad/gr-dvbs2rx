@@ -100,7 +100,25 @@ public:
     virtual bool get_locked() = 0;
 
     /*!
-     * \brief Get the current count of processed PLFRAMEs.
+     * \brief Get the current count of detected start-of-frame (SOF) instants.
+     *
+     * This count includes all detected SOFs, including false positives. Note that
+     * detecting a SOF does not mean that instant will lead to a processed frame. Frames
+     * are only processed after frame timing lock, which requires two consecutive SOFs
+     * detected with the correct interval between them. Hence, the SOF count is always
+     * greater than or equal to the processed frame count.
+     *
+     * \return (uint64_t) Detected SOF count.
+     */
+    virtual uint64_t get_sof_count() = 0;
+
+    /*!
+     * \brief Get the current count of processed (accepted) PLFRAMEs.
+     *
+     * A PLFRAME is processed after frame timing lock and after being accepted by the PLS
+     * filter, in which case its XFECFRAME is output to the next block. Frames rejected by
+     * the PLS filter and dummy frames are not included in this count.
+     *
      * \return (uint64_t) Processed frame count.
      */
     virtual uint64_t get_frame_count() = 0;

@@ -13,8 +13,8 @@
 /* If manual edits are made, the following tags should be modified accordingly.    */
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
-/* BINDTOOL_HEADER_FILE(plsync_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(62c873b492855358cd028bc849bb069d)                     */
+/* BINDTOOL_HEADER_FILE(plsync_cc.h)                                               */
+/* BINDTOOL_HEADER_FILE_HASH(0a8ef05229dca8050b4fe45a146e00b1)                     */
 /***********************************************************************************/
 
 #include <pybind11/chrono.h>
@@ -56,6 +56,8 @@ void bind_plsync_cc(py::module& m)
              D(plsync_cc, get_coarse_freq_corr_state))
 
         .def("get_locked", &plsync_cc::get_locked, D(plsync_cc, get_locked))
+
+        .def("get_sof_count", &plsync_cc::get_sof_count, D(plsync_cc, get_sof_count))
 
         .def(
             "get_frame_count", &plsync_cc::get_frame_count, D(plsync_cc, get_frame_count))

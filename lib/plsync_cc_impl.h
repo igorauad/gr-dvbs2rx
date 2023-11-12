@@ -292,6 +292,7 @@ public:
     /* Other externally readable stats */
     bool get_coarse_freq_corr_state() { return d_freq_sync->is_coarse_corrected(); }
     bool get_locked() { return d_locked; }
+    uint64_t get_sof_count() { return d_sof_cnt; }
     uint64_t get_frame_count() { return d_frame_cnt; }
     uint64_t get_rejected_count() { return d_rejected_cnt; }
     uint64_t get_dummy_count() { return d_dummy_cnt; }

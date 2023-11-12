@@ -33,6 +33,9 @@ static const char* __doc_gr_dvbs2rx_plsync_cc_get_coarse_freq_corr_state = R"doc
 static const char* __doc_gr_dvbs2rx_plsync_cc_get_locked = R"doc()doc";
 
 
+static const char* __doc_gr_dvbs2rx_plsync_cc_get_sof_count = R"doc()doc";
+
+
 static const char* __doc_gr_dvbs2rx_plsync_cc_get_frame_count = R"doc()doc";
 
 
