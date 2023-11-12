@@ -48,6 +48,8 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
       d_partial_ts_bytes(0),
       d_packet_cnt(0),
       d_error_cnt(0),
+      d_bbframe_cnt(0),
+      d_bbframe_drop_cnt(0),
       d_crc_poly(0b111010101), // x^8 + x^7 + x^6 + x^4 + x^2 + 1
       d_crc8_table(build_gf2_poly_rem_lut(d_crc_poly))
 {
@@ -158,9 +160,11 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
     for (unsigned int i = 0; i < n_bbframes; i++) {
         // Parse and validate the BBHEADER
         const bool bbheader_valid = parse_bbheader(in, &d_bbheader);
+        d_bbframe_cnt++;
         if (!bbheader_valid) {
             d_synched = false;
             in += d_kbch_bytes; // jump to the next BBFRAME
+            d_bbframe_drop_cnt++;
             continue;
         }
 

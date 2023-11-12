@@ -13,8 +13,8 @@
 /* If manual edits are made, the following tags should be modified accordingly.    */
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
-/* BINDTOOL_HEADER_FILE(bbdeheader_bb.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(0cd9b8a0a6f32ac47efe1d496e649197)                     */
+/* BINDTOOL_HEADER_FILE(bbdeheader_bb.h)                                           */
+/* BINDTOOL_HEADER_FILE_HASH(578413664762f19a0cacbaaec4388df9)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -50,6 +50,14 @@ void bind_bbdeheader_bb(py::module& m)
         .def("get_error_count",
              &bbdeheader_bb::get_error_count,
              D(bbdeheader_bb, get_error_count))
+
+        .def("get_bbframe_count",
+             &bbdeheader_bb::get_bbframe_count,
+             D(bbdeheader_bb, get_bbframe_count))
+
+        .def("get_bbframe_drop_count",
+             &bbdeheader_bb::get_bbframe_drop_count,
+             D(bbdeheader_bb, get_bbframe_drop_count))
 
         ;
 }

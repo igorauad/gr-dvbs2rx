@@ -53,6 +53,18 @@ public:
      * \return uint64_t Corrupt packet count.
      */
     virtual uint64_t get_error_count() = 0;
+
+    /*!
+     * \brief Get count of processed BBFRAMEs.
+     * \return uint64_t Number of BBFRAMEs processed so far.
+     */
+    virtual uint64_t get_bbframe_count() = 0;
+
+    /*!
+     * \brief Get count of BBFRAMEs dropped due to invalid BBHEADER.
+     * \return uint64_t Number of BBFRAMEs dropped so far.
+     */
+    virtual uint64_t get_bbframe_drop_count() = 0;
 };
 
 } // namespace dvbs2rx

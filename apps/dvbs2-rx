@@ -1004,6 +1004,10 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         ldpc_avg_trials = self.ldpc_decoder.get_average_trials() \
             if has_fec_frames else None
 
+        # BBFRAME stats
+        processed_bbframes = self.bbdeheader.get_bbframe_count()
+        dropped_bbframes = self.bbdeheader.get_bbframe_drop_count()
+
         # MPEG TS stats
         mpeg_ts_packets = self.bbdeheader.get_packet_count()
         mpeg_ts_errors = self.bbdeheader.get_error_count()
@@ -1035,8 +1039,13 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
                 "fer": fec_fer,
                 "avg_ldpc_trials": ldpc_avg_trials
             },
+            "bbframes": {
+                "processed": processed_bbframes,
+                "dropped": dropped_bbframes
+            },
             "mpeg-ts": {
                 "packets": mpeg_ts_packets,
+                "errors": mpeg_ts_errors,
                 "per": mpeg_ts_per
             }
         }

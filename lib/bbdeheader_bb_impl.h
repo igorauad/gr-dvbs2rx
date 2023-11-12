@@ -46,6 +46,8 @@ private:
     BBHeader d_bbheader;                           /**< Parsed BBHEADER */
     uint64_t d_packet_cnt;         /**< All-time count of received packets  */
     uint64_t d_error_cnt;          /**< All-time count of packets with bit errors */
+    uint64_t d_bbframe_cnt;        /**< All-time count of processed BBFRAMEs */
+    uint64_t d_bbframe_drop_cnt;   /**< All-time count of dropped BBFRAMEs */
     gf2_poly<uint16_t> d_crc_poly; /**< CRC-8 generator polynomial */
     std::array<uint16_t, 256> d_crc8_table; /**< CRC-8 remainder look-up table */
 
@@ -85,6 +87,8 @@ public:
 
     uint64_t get_packet_count() { return d_packet_cnt; }
     uint64_t get_error_count() { return d_error_cnt; }
+    uint64_t get_bbframe_count() { return d_bbframe_cnt; }
+    uint64_t get_bbframe_drop_count() { return d_bbframe_drop_cnt; }
 };
 
 } // namespace dvbs2rx
