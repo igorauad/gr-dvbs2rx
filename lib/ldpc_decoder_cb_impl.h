@@ -17,6 +17,7 @@
 #include "ldpc_decoder/ldpc.hh"
 #include "psk.hh"
 #include "qam.hh"
+#include "qpsk.h"
 #include <gnuradio/dvbs2rx/ldpc_decoder_cb.h>
 
 namespace gr {
@@ -40,7 +41,9 @@ private:
     unsigned int chunk;
     unsigned int total_trials;
     int d_max_trials;
-    float snr;
+    float snr;       /**< Estimated SNR in dB */
+    float d_snr_lin; /**< Estimated linear SNR */
+    float d_N0;      /**< Estimated noise energy per complex dimension */
     float precision;
     float total_snr;
     unsigned int rowaddr0;
@@ -48,6 +51,7 @@ private:
     unsigned int rowaddr2;
     LDPCInterface* ldpc;
     Modulation<gr_complex, int8_t>* mod;
+    QpskConstellation* d_qpsk;
     int d_simd_size;
     int8_t* soft;
     int8_t* dint;

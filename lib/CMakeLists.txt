@@ -96,6 +96,7 @@ list(APPEND test_dvbs2rx_sources
   qa_pl_frame_sync.cc
   qa_pl_freq_sync.cc
   qa_pl_signaling.cc
+  qa_qpsk.cc
   qa_reed_muller.cc
   qa_symbol_sync_cc.cc
 )

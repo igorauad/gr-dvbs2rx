@@ -553,6 +553,7 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     switch (constellation) {
     case MOD_QPSK:
         mod = new PhaseShiftKeying<4, gr_complex, int8_t>();
+        d_qpsk = new QpskConstellation();
         break;
     case MOD_8PSK:
         mod = new PhaseShiftKeying<8, gr_complex, int8_t>();
@@ -1005,6 +1006,7 @@ ldpc_decoder_cb_impl::~ldpc_decoder_cb_impl()
     delete[] dint;
     delete[] soft;
     delete mod;
+    delete d_qpsk;
     delete ldpc;
 }
 
@@ -1034,7 +1036,6 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
     const int MOD_BITS = mod->bits();
     int8_t tmp[MOD_BITS];
     int8_t* code = nullptr;
-    float sp, np, sigma, precision_sum;
     gr_complex s, e;
     const int SYMBOLS = CODE_LEN / MOD_BITS;
     const int trials = (d_max_trials == 0) ? DEFAULT_TRIALS : d_max_trials;
@@ -1043,29 +1044,45 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
     const int* mux;
     int8_t *c1, *c2, *c3;
     int output_size = output_mode ? kldpc_bytes : nldpc_bytes;
+    static constexpr float Es = 1.0; // assume unitary symbol energy
 
     for (int i = 0; i < noutput_items; i += output_size * d_simd_size) {
         for (int blk = 0; blk < d_simd_size; blk++) {
-            if (frame == 0) {
-                sp = 0;
-                np = 0;
+            // Compute an initial SNR estimate if this is the first batch of frames ever.
+            if (chunk == 0) {
+                if (signal_constellation == MOD_QPSK) {
+                    d_snr_lin = d_qpsk->estimate_snr(in, SYMBOLS);
+                } else {
+                    float sp = 0;
+                    float np = 0;
+                    for (int j = 0; j < SYMBOLS; j++) {
+                        mod->hard(tmp, in[j]);
+                        s = mod->map(tmp);
+                        e = in[j] - s;
+                        sp += std::norm(s);
+                        np += std::norm(e);
+                    }
+
+                    if (!(np > 0)) {
+                        np = 1e-12;
+                    }
+                    d_snr_lin = sp / np;
+                }
+                snr = 10 * std::log10(d_snr_lin);
+                d_N0 = Es / d_snr_lin;
+                precision = FACTOR / (d_N0 / 2);
+            }
+
+            // Soft constellation demapping
+            if (signal_constellation == MOD_QPSK) {
+                d_qpsk->demap_soft(soft + (blk * CODE_LEN), in, SYMBOLS, d_N0);
+            } else {
                 for (int j = 0; j < SYMBOLS; j++) {
-                    mod->hard(tmp, in[j]);
-                    s = mod->map(tmp);
-                    e = in[j] - s;
-                    sp += std::norm(s);
-                    np += std::norm(e);
+                    mod->soft(soft + (j * MOD_BITS + (blk * CODE_LEN)), in[j], precision);
                 }
-                if (!(np > 0)) {
-                    np = 1e-12;
-                }
-                snr = 10 * std::log10(sp / np);
-                sigma = std::sqrt(np / (2 * sp));
-                precision = FACTOR / (sigma * sigma);
             }
-            for (int j = 0; j < SYMBOLS; j++) {
-                mod->soft(soft + (j * MOD_BITS + (blk * CODE_LEN)), in[j], precision);
-            }
+
+            // Deinterleave
             switch (signal_constellation) {
             case MOD_QPSK:
                 if (dvb_standard == STANDARD_DVBT2) {
@@ -1246,6 +1263,8 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             in += nldpc / MOD_BITS;
             consumed += nldpc / MOD_BITS;
         }
+
+        // LDPC Decoding
         int count = decode(aligned_buffer, code, trials);
         if (count < 0) {
             total_trials += trials;
@@ -1263,13 +1282,15 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                                (trials - count));
         }
         chunk++;
-        precision_sum = 0;
+
+        // Map the soft LDPC-decoded output to +-1 and use those to remap into the
+        // corresponding constellation symbols. Then, refine the SNR estimate.
+        float N0_accum = 0;
         for (int blk = 0; blk < d_simd_size; blk++) {
             switch (signal_constellation) {
             case MOD_QPSK:
-                for (int j = 0; j < CODE_LEN; j++) {
-                    tempv[j] = code[j + (blk * CODE_LEN)] < 0 ? -1 : 1;
-                }
+                // The QPSK case has an optimization using the QpskConstellation's
+                // estimate_snr_llr_ref() method. No need to map to +-1 here.
                 break;
             case MOD_8PSK:
                 for (int j = 0; j < CODE_LEN; j++) {
@@ -1382,21 +1403,29 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
             default:
                 break;
             }
-            sp = 0;
-            np = 0;
-            for (int j = 0; j < SYMBOLS; j++) {
-                s = mod->map(&tempv[(j * MOD_BITS)]);
-                e = insnr[j] - s;
-                sp += std::norm(s);
-                np += std::norm(e);
+
+            // Refine the SNR estimate using the LDPC-decoded output
+            if (signal_constellation == MOD_QPSK) {
+                d_snr_lin = d_qpsk->estimate_snr(insnr, &code[blk * CODE_LEN], SYMBOLS);
+            } else {
+                float sp = 0;
+                float np = 0;
+                for (int j = 0; j < SYMBOLS; j++) {
+                    s = mod->map(&tempv[(j * MOD_BITS)]);
+                    e = insnr[j] - s;
+                    sp += std::norm(s);
+                    np += std::norm(e);
+                }
+                if (!(np > 0)) {
+                    np = 1e-12;
+                }
+                d_snr_lin = sp / np;
             }
-            if (!(np > 0)) {
-                np = 1e-12;
-            }
-            snr = 10 * std::log10(sp / np);
-            sigma = std::sqrt(np / (2 * sp));
-            precision_sum += FACTOR / (sigma * sigma);
+            snr = 10 * std::log10(d_snr_lin);
             total_snr += snr;
+            N0_accum += Es / d_snr_lin;
+            insnr += nldpc / MOD_BITS;
+            frame++;
             if (info_mode) {
                 GR_LOG_DEBUG_LEVEL(1,
                                    "frame = {:d}, snr = {:.2f}, average trials = {:d}, "
@@ -1404,12 +1433,11 @@ int ldpc_decoder_cb_impl::general_work(int noutput_items,
                                    frame,
                                    snr,
                                    (total_trials / chunk),
-                                   (total_snr / (frame + 1)));
+                                   (total_snr / frame));
             }
-            insnr += nldpc / MOD_BITS;
-            frame++;
         }
-        precision = precision_sum / d_simd_size;
+        d_N0 = N0_accum / d_simd_size;
+        precision = FACTOR / (d_N0 / 2);
 
         // Output bit-packed bytes with the hard decisions and with the MSB first
         for (int blk = 0; blk < d_simd_size; blk++) {
