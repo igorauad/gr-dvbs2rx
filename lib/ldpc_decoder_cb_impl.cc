@@ -645,11 +645,13 @@ ldpc_decoder_cb_impl::ldpc_decoder_cb_impl(dvb_standard_t standard,
     aligned_buffer = aligned_alloc(d_simd_size, d_simd_size * ldpc->code_len());
     generate_interleave_lookup();
     generate_deinterleave_lookup();
+    unsigned int xfecframe_len = nldpc / mod->bits();
     if (outputmode == OM_MESSAGE) {
         set_output_multiple(kldpc_bytes * d_simd_size);
-        set_relative_rate((double)kldpc_bytes / nldpc);
+        set_relative_rate((double)kldpc_bytes / xfecframe_len);
     } else {
         set_output_multiple(nldpc_bytes * d_simd_size);
+        set_relative_rate((double)nldpc_bytes / xfecframe_len);
     }
 }
 
