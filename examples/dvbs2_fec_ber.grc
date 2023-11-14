@@ -23,6 +23,7 @@ options:
     sizing_mode: fixed
     thread_safe_setters: ''
     title: DVB-S2 FEC BER
+    window_size: (1000,1000)
   states:
     bus_sink: false
     bus_source: false
@@ -142,7 +143,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [952, 436.0]
+    coordinate: [856, 436.0]
     rotation: 180
     state: true
 - name: analog_random_uniform_source_x_0
@@ -196,7 +197,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [816, 368.0]
+    coordinate: [728, 368.0]
     rotation: 180
     state: true
 - name: blocks_char_to_float_0
@@ -233,22 +234,6 @@ blocks:
     coordinate: [288, 708.0]
     rotation: 0
     state: enabled
-- name: blocks_pack_k_bits_bb_0
-  id: blocks_pack_k_bits_bb
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    k: '8'
-    maxoutbuf: '0'
-    minoutbuf: '0'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [248, 380.0]
-    rotation: 180
-    state: true
 - name: blocks_throttle_0
   id: blocks_throttle
   parameters:
@@ -369,7 +354,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [952, 340.0]
+    coordinate: [856, 340.0]
     rotation: 180
     state: enabled
 - name: dvbs2rx_bch_decoder_bb_0
@@ -378,6 +363,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
+    debug_level: '0'
     framesize: frame_size
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -388,7 +374,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [384, 356.0]
+    coordinate: [264, 348.0]
     rotation: 180
     state: enabled
 - name: dvbs2rx_ldpc_decoder_cb_0
@@ -398,6 +384,7 @@ blocks:
     alias: ''
     comment: ''
     constellation: constellation
+    debug_level: '0'
     framesize: frame_size
     infomode: INFO_OFF
     max_trials: '25'
@@ -410,7 +397,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [592, 332.0]
+    coordinate: [488, 324.0]
     rotation: 180
     state: enabled
 - name: fec_ber_bf_0
@@ -567,7 +554,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [576, 476.0]
+    coordinate: [472, 484.0]
     rotation: 180
     state: true
 - name: qtgui_number_sink_0
@@ -808,14 +795,13 @@ connections:
 - [blocks_add_xx_0, '0', qtgui_const_sink_x_0, '0']
 - [blocks_char_to_float_0, '0', qtgui_time_sink_x_0, '0']
 - [blocks_char_to_float_0_0, '0', qtgui_time_sink_x_0, '1']
-- [blocks_pack_k_bits_bb_0, '0', virtual_sink_0_0, '0']
 - [blocks_throttle_0, '0', dtv_dvb_bch_bb_0, '0']
 - [blocks_unpack_k_bits_bb_0, '0', blocks_throttle_0, '0']
 - [dtv_dvb_bch_bb_0, '0', dtv_dvb_ldpc_bb_0, '0']
 - [dtv_dvb_ldpc_bb_0, '0', dtv_dvbs2_interleaver_bb_0, '0']
 - [dtv_dvbs2_interleaver_bb_0, '0', dtv_dvbs2_modulator_bc_0, '0']
 - [dtv_dvbs2_modulator_bc_0, '0', blocks_add_xx_0, '0']
-- [dvbs2rx_bch_decoder_bb_0, '0', blocks_pack_k_bits_bb_0, '0']
+- [dvbs2rx_bch_decoder_bb_0, '0', virtual_sink_0_0, '0']
 - [dvbs2rx_ldpc_decoder_cb_0, '0', dvbs2rx_bch_decoder_bb_0, '0']
 - [fec_ber_bf_0, '0', qtgui_number_sink_0, '0']
 - [virtual_source_0, '0', blocks_char_to_float_0_0, '0']
@@ -825,3 +811,4 @@ connections:
 
 metadata:
   file_format: 1
+  grc_version: 3.10.7.0
