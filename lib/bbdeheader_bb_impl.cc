@@ -168,16 +168,21 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
             continue;
         }
 
-        GR_LOG_DEBUG_LEVEL(3,
-                           "MATYPE: TS/GS={:b}; SIS/MIS={}; CCM/ACM={}; ISSYI={}; "
-                           "NPD={}; RO={:b}; ISI={}",
-                           d_bbheader.ts_gs,
-                           d_bbheader.sis_mis,
-                           d_bbheader.ccm_acm,
-                           d_bbheader.issyi,
-                           d_bbheader.npd,
-                           d_bbheader.ro,
-                           d_bbheader.isi);
+        GR_LOG_DEBUG_LEVEL(
+            3,
+            "MATYPE: TS/GS={:b}; SIS/MIS={}; CCM/ACM={}; ISSYI={}; "
+            "NPD={}; RO={:b}; ISI={}; UPL={:d}; DFL={:d}; SYNC=0x{:x}; SYNCD={:d}",
+            d_bbheader.ts_gs,
+            d_bbheader.sis_mis,
+            d_bbheader.ccm_acm,
+            d_bbheader.issyi,
+            d_bbheader.npd,
+            d_bbheader.ro,
+            d_bbheader.isi,
+            d_bbheader.upl,
+            d_bbheader.dfl,
+            d_bbheader.sync,
+            d_bbheader.syncd);
 
         // Skip the BBHEADER
         in += BB_HEADER_LENGTH_BYTES;
