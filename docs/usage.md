@@ -185,12 +185,13 @@ A recommended application to handle the MPEG TS layer is the `tsp` tool from the
 The `craft` plugin used earlier is handy for generating a test TS stream. The example below uses it on the Tx side, while the `bitrate_monitor` plugin is used on the Rx side to measure the bitrate of the decoded MPEG TS stream:
 
 ```
-tsp -I craft --pid 100 | dvbs2-tx | \
+tsp -I craft --pid 100 | \
+dvbs2-tx --out-fd 3 3>&1 1>&2 | \
 dvbs2-rx --out-fd 3 3>&1 1>&2 | \
 tsp --realtime --buffer-size-mb 1 -P bitrate_monitor -p 1 -O drop
 ```
 
-This example uses noteworthy descriptor redirection options on `dvbs2-rx` to ensure it only feeds the MPEG TS output into `tsp`, not its logs. At first, the `dvbs2-rx` application outputs the decoded TS stream into descriptor 3 through option `-out-fd 3`. At the same time, descriptor three is redirected to stdout through option `3>&1`, while the original stdout (containing the receiver logs) goes to stderr due to `1>&2`. In the end, only the TS output is piped into `tsp`, and the logs are preserved on the console via stderr. The same trick is adopted in the other `tsp` examples that follow.
+This example uses noteworthy descriptor redirection options on `dvbs2-tx` and `dvbs2-rx` to ensure they only feed their IQ or MPEG TS outputs into the next app, and not their logs. For instance, the `dvbs2-rx` application outputs the decoded TS stream into descriptor 3 through option `--out-fd 3`. At the same time, descriptor three is redirected to stdout using `3>&1`, while the original stdout (containing the receiver logs) goes to stderr due to `1>&2`. In the end, only the TS output is piped into `tsp`, and the logs are preserved on the console via stderr. The same idea applies to `dvbs2-tx`, and the same trick is adopted in the other `tsp` examples that follow.
 
 ### Example 12
 
@@ -217,7 +218,7 @@ Then, connecting everything, the following command implements the entire chain f
 
 ```
 tsp -I null -P regulate --bitrate 500000 -P mpeinject --pid 32 9005 | \
-dvbs2-tx | \
+dvbs2-tx --out-fd 3 3>&1 1>&2 | \
 dvbs2-rx --out-fd 3 3>&1 1>&2 | \
 tsp --realtime --buffer-size-mb 1 --max-flushed-packets 10 \
     -P mpe --pid 32 --udp-forward --local-address 127.0.0.1 --local-port 9006 -O drop
@@ -240,7 +241,7 @@ echo "Test message" > /dev/udp/127.0.0.1/9005
 The `tsp` tool can also help with real-time video streaming. For example, the following command uses the `play` output plugin from `tsp` to play the decoded MPEG TS video stream in real time on VLC (provided that VLC is installed):
 
 ```
-cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsp --realtime --buffer-size-mb 1 -O play
+cat example.ts | dvbs2-tx --out-fd 3 3>&1 1>&2 | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsp --realtime --buffer-size-mb 1 -O play
 ```
 
 ### Example 14
@@ -248,7 +249,7 @@ cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsp --realtime --buf
 Lastly, another useful application from the TSDuck toolkit is the `tsdump` tool, which dumps all the incoming TS packets into the console in real time. You can use it as follows:
 
 ```
-cat example.ts | dvbs2-tx | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsdump --no-pager --headers-only
+cat example.ts | dvbs2-tx --out-fd 3 3>&1 1>&2 | dvbs2-rx --out-fd 3 3>&1 1>&2 | tsdump --no-pager --headers-only
 ```
 
 Please refer to TSDuck's [user guide](https://tsduck.io/download/docs/tsduck.pdf) for further information.
