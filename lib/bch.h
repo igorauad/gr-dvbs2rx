@@ -42,6 +42,7 @@ private:
     std::array<P, 256> m_gen_poly_rem_lut; // Remainder LUT for the generator polynomial
     bool m_gen_poly_lut_generated; // Whether the generator polynomial remainder LUT has
                                    // been generated already
+    std::vector<T> m_quadratic_poly_lut; // LUT to solve quadratic error-loc polynomials
 
 public:
     /**

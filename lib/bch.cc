@@ -101,6 +101,15 @@ bch_codec<T, P>::bch_codec(const galois_field<T>* const gf, uint8_t t, uint32_t 
         m_gen_poly_rem_lut = build_gf2_poly_rem_lut(m_g);
         m_gen_poly_lut_generated = true;
     }
+
+    // Generate a LUT to solve quadratic error-location polynomials faster than with
+    // brute-force root search. See err_loc_numbers() for details.
+    const uint32_t two_to_m = static_cast<uint32_t>(1) << gf->get_m();
+    m_quadratic_poly_lut.resize(two_to_m);
+    for (T r = 0; r < two_to_m; r++) {
+        T idx = m_gf->multiply(r, r) ^ r; // R*(R+1)
+        m_quadratic_poly_lut[idx] = r;
+    }
 }
 
 
@@ -310,6 +319,52 @@ std::vector<T> bch_codec<T, P>::err_loc_numbers(const gf2m_poly<T>& sigma) const
         // expressed as "ax + b", whose root is "b/a". Correspondingly, the error-location
         // number (reciprocal of the root) is "a/b".
         return { m_gf->divide(sigma[1], sigma[0]) };
+    }
+
+    if (sigma.degree() == 2) {
+        // A quadratic error-location polynomial has two roots that can be solved
+        // immediately using a LUT. The polynomial can be expressed as "ax^2 + bx + c",
+        // whose roots x0 and x1 in GF(2^m) are related by the sum and product below:
+        //
+        // x0 + x1 = b/a,                                 (1)
+        // x0 * x1 = c/a.                                 (2)
+        //
+        // Now, define "R = a*x_0/b", or, equivalently:
+        //
+        // x_0 = R*b/a.                                   (3)
+        //
+        // Then, by substituting (3) in (1), it follows that:
+        //
+        // R*b/a + x1 = b/a
+        // x1 = (b/a)*(R + 1)                             (4)
+        //
+        // Next, substituting (3) and (4) in (2), we obtain:
+        //
+        // R*(R + 1) = (c/a)*(a/b)^2 = c*a/b^2            (5)
+        //
+        // So, to solve the polynomial, compute c*a/b^2 and look up the corresponding R in
+        // the pre-computed LUT. The LUT stores the value R on each index R*(R+1) for all
+        // possible R in GF(2^m). Thus, by using c*a/b^2 as the index, we can find the
+        // corresponding R and use it to solve for x0 and x1.
+        //
+        // For further reference, see the discussion in igorauad/gr-dvbs2rx#31.
+        //
+        // Also, note the coefficients b and c of the quadratic polynomial must be
+        // non-zero. Otherwise, we would not have two distinct and invertible roots. For
+        // instance, with "sigma(x) = ax^2 + bx" (i.e., c=0), we would have "x0 = 0",
+        // which is not invertible. Also, with "sigma(x) = ax^2 + c" (i.e., b=0), we would
+        // not have distinct roots, and with "sigma(x) = ax^2" (i.e., b=c=0), the equal
+        // roots would both be zero (non-invertible). In any of these cases, return early
+        // with an empty vector of error-location numbers (meaning decoding failure).
+        if (sigma[1] == 0 || sigma[0] == 0) // b=0 or c=0
+            return {};
+        T b_over_a = m_gf->divide(sigma[1], sigma[2]);
+        T r_sq_plus_r = m_gf->divide(m_gf->multiply(sigma[0], sigma[2]),
+                                     m_gf->multiply(sigma[1], sigma[1]));
+        T r = m_quadratic_poly_lut[r_sq_plus_r];
+        T x0 = m_gf->multiply(r, b_over_a);
+        T x1 = m_gf->multiply(b_over_a, (r ^ 1));
+        return { m_gf->inverse(x0), m_gf->inverse(x1) };
     }
 
     // Given the codeword has length n, the error location numbers can range from alpha^0

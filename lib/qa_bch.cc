@@ -536,7 +536,7 @@ BOOST_AUTO_TEST_CASE(test_bch_encode_decode_u8_array)
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_bch_correct_all_bit_positions)
+BOOST_AUTO_TEST_CASE(test_bch_correct_single_bit_errors)
 {
     typedef uint64_t T;
     typedef uint64_t P;
@@ -553,7 +553,7 @@ BOOST_AUTO_TEST_CASE(test_bch_correct_all_bit_positions)
     uint32_t n_bytes = codec.get_n() / 8;
     uint32_t k_bytes = codec.get_k() / 8;
 
-    // Add single-bit errors in all bit positions and ensure they can be corrected
+    // Add all possible single-bit errors and ensure they can be corrected
     T max_msg = (1 << codec.get_k()) - 1;
     for (T msg = 0; msg <= max_msg; msg++) {
         T codeword = codec.encode(msg);
@@ -564,6 +564,41 @@ BOOST_AUTO_TEST_CASE(test_bch_correct_all_bit_positions)
             int n_corrected = codec.decode(rx_codeword_u8.data(), decoded_msg.data());
             BOOST_CHECK_EQUAL(n_corrected, 1);
             BOOST_CHECK_EQUAL(msg, from_u8_vector<T>(decoded_msg));
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_bch_correct_two_bit_errors)
+{
+    typedef uint64_t T;
+    typedef uint64_t P;
+
+    // Create a BCH codec with byte-aligned n and k
+    gf2_poly<T> prim_poly(0b1000011); // x^6 + x + 1
+    galois_field gf(prim_poly);
+    uint8_t t = 4; // For t = 4, m*t = 24, so the parity bits are byte-aligned
+    bch_codec<T, P> codec(&gf, t, /*n=*/32);
+    BOOST_CHECK_EQUAL(codec.get_n(), 32);
+    BOOST_CHECK_EQUAL(codec.get_k(), 8);
+    BOOST_CHECK(codec.get_n() % 8 == 0);
+    BOOST_CHECK(codec.get_k() % 8 == 0);
+    uint32_t n_bytes = codec.get_n() / 8;
+    uint32_t k_bytes = codec.get_k() / 8;
+
+    // Add all possible two-bit errors and ensure they can be corrected
+    T max_msg = (1 << codec.get_k()) - 1;
+    for (T msg = 0; msg <= max_msg; msg++) {
+        T codeword = codec.encode(msg);
+        for (uint32_t bit1_pos = 0; bit1_pos < codec.get_n(); bit1_pos++) {
+            for (uint32_t bit2_pos = bit1_pos + 1; bit2_pos < codec.get_n(); bit2_pos++) {
+                u8_vector_t rx_codeword_u8 = to_u8_vector(codeword, n_bytes);
+                flip_bit(rx_codeword_u8, bit1_pos);
+                flip_bit(rx_codeword_u8, bit2_pos);
+                u8_vector_t decoded_msg(k_bytes);
+                int n_corrected = codec.decode(rx_codeword_u8.data(), decoded_msg.data());
+                BOOST_CHECK_EQUAL(n_corrected, 2);
+                BOOST_CHECK_EQUAL(msg, from_u8_vector<T>(decoded_msg));
+            }
         }
     }
 }
