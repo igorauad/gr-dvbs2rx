@@ -1,7 +1,30 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [1.4.0](#131)
   - [1.3.0](#130)
+
+## 1.4.0
+
+Release Date: 2023-11-29
+
+### Added
+
+- Standalone block for XFECFRAME demapping.
+- Vectorized implementation of QPSK demapping and deinterleaving operations.
+- Count of detected SOFs and BBFRAMEs (processed and dropped) monitored by dvbs2-rx.
+- Optional debug logging of the BBHEADER's UPL, DFL, SYNC, and SYNCD fields.
+- Optimized computation of BCH error-location numbers for first-order and second-order error-location polynomials.
+
+### Changed
+
+- BCH syndrome computation using the remainder of a single division by the generator polynomial instead of t divisions by minimal polynomials.
+- Bias used on IQ format conversion from cf32 to cu8 and vice versa.
+
+### Fixed
+
+- LDPC decoder's relative input/output rate.
+- SIGINT/SIGTERM handlers of the dvbs2-tx, dvbs2-rx, and dvbs2-rec applications.
 
 ## 1.3.0
 

@@ -1,4 +1,4 @@
-cff-version: 1.3.0
+cff-version: 1.4.0
 message: "If you use this software, please cite it as below."
 authors:
   - family-names: "Freire"
@@ -7,6 +7,6 @@ authors:
   - family-names: "Economos"
     given-names: "Ron"
 title: "gr-dvbs2rx: a Software-Defined DVB-S2 Receiver based on GNU Radio"
-version: 1.3.0
+version: 1.4.0
 date-released: 2023-03-01
 url: "https://github.com/igorauad/gr-dvbs2rx"
