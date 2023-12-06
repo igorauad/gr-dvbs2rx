@@ -8,8 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["fedora:38", "fedora:39"]
     container:
-      image: fedora:38
+      image: ${{ matrix.container }}
     steps:
       - name: Install git
         run: |
