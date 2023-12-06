@@ -7,6 +7,7 @@ override_dh_auto_configure:
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=/usr \
 		-DCMAKE_LIBRARY_ARCHITECTURE="$(DEB_TARGET_MULTIARCH)" \
+		-DGR_PYTHON_DIR=/usr/lib/python3/dist-packages \
 		-DNATIVE_OPTIMIZATIONS=OFF
 
 # FIXME: Override the home so that Python QA tests don't fail due to not being
