@@ -17,6 +17,13 @@
 namespace gr {
 namespace dvbs2rx {
 
+enum class interp_method_t : int {
+    POLYPHASE = 0,
+    LINEAR = 1,
+    QUADRATIC = 2,
+    CUBIC = 3,
+};
+
 template <typename T>
 struct base_interpolator {
     base_interpolator(unsigned history) : d_history(history){};
@@ -104,7 +111,7 @@ private:
     // approach allows the compiler to know exactly which interpolator functor is used for
     // each templated loop instantiation. Consequently, the compiler can inline the
     // interpolation calls, which is so much more important than saving memory here.
-    int d_interp_method;
+    interp_method_t d_interp_method;
     linear_interpolator d_lin_interp;
     quadratic_interpolator d_qua_interp;
     cubic_interpolator d_cub_interp;
@@ -121,7 +128,7 @@ public:
                         float rolloff,
                         int rrc_delay,
                         int n_subfilt,
-                        int interp_method);
+                        interp_method_t interp_method);
     ~symbol_sync_cc_impl();
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required);

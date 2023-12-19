@@ -11,17 +11,6 @@
 #include <gnuradio/filter/firdes.h>
 #include <gnuradio/io_signature.h>
 
-// Static interpolator choice:
-//   1 - linear
-//   2 - quadratic
-//   3 - cubic
-//   4 - polyphase
-//
-// Note the synchronizer block must be preceded by a dedicated matched filter block if
-// using interpolators 1 to 3. In contrast, with interpolator 4, the polyphase filter used
-// for interpolation is also a matched filter, so an external filter block is unnecessary.
-#define INTERPOLATOR 4
-
 namespace gr {
 namespace dvbs2rx {
 
@@ -152,7 +141,13 @@ symbol_sync_cc::sptr symbol_sync_cc::make(float sps,
                                           int interp_method)
 {
     return gnuradio::make_block_sptr<symbol_sync_cc_impl>(
-        sps, loop_bw, damping_factor, rolloff, rrc_delay, n_subfilt, interp_method);
+        sps,
+        loop_bw,
+        damping_factor,
+        rolloff,
+        rrc_delay,
+        n_subfilt,
+        static_cast<interp_method_t>(interp_method));
 }
 
 // NOTE: All equations references that follow refer to the book "Digital Communications: A
@@ -212,7 +207,7 @@ symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
                                          float rolloff,
                                          int rrc_delay,
                                          int n_subfilt,
-                                         int interp_method)
+                                         interp_method_t interp_method)
     : gr::block("symbol_sync_cc",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(1, 1, sizeof(gr_complex))),
@@ -247,16 +242,16 @@ symbol_sync_cc_impl::symbol_sync_cc_impl(float sps,
     // sure the zero-crossing sample located "d_midpoint" indexes before the basepoint
     // index is also within the input buffer's history.
     switch (interp_method) {
-    case 0:
+    case interp_method_t::POLYPHASE:
         d_history = d_poly_interp.history() + d_midpoint;
         break;
-    case 1:
+    case interp_method_t::LINEAR:
         d_history = d_lin_interp.history() + d_midpoint;
         break;
-    case 2:
+    case interp_method_t::QUADRATIC:
         d_history = d_qua_interp.history() + d_midpoint;
         break;
-    case 3:
+    case interp_method_t::CUBIC:
         d_history = d_cub_interp.history() + d_midpoint;
         break;
     default:
@@ -411,16 +406,16 @@ std::pair<int, int> symbol_sync_cc_impl::loop(const gr_complex* in,
                                               int noutput_items)
 {
     switch (d_interp_method) {
-    case 0:
+    case interp_method_t::POLYPHASE:
         return loop(in, out, ninput_items, noutput_items, d_poly_interp);
         break;
-    case 1:
+    case interp_method_t::LINEAR:
         return loop(in, out, ninput_items, noutput_items, d_lin_interp);
         break;
-    case 2:
+    case interp_method_t::QUADRATIC:
         return loop(in, out, ninput_items, noutput_items, d_qua_interp);
         break;
-    case 3:
+    case interp_method_t::CUBIC:
         return loop(in, out, ninput_items, noutput_items, d_cub_interp);
         break;
     default:
@@ -473,7 +468,7 @@ int symbol_sync_cc_impl::general_work(int noutput_items,
     // of the basepoint index, the interpolant is more strongly influenced by the sample
     // at "m_k + 1 - D" for mu < 0.5, and "m_k + 2 - D" for mu > 0.5. Again, as for the
     // other interpolation methods, assume the case of mu < 0.5 for simplicity.
-    unsigned int strobe_offset = (d_interp_method == 0)
+    unsigned int strobe_offset = (d_interp_method == interp_method_t::POLYPHASE)
                                      ? (d_history + d_poly_interp.get_subfilt_delay() - 1)
                                      : d_history;
     for (auto& tag : tags) {

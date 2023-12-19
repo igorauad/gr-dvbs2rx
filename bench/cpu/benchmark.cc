@@ -186,7 +186,8 @@ static void BM_symbol_sync(benchmark::State& state)
     float rolloff = 0.2;
     int rrc_delay = 5;
     int n_subfilt = 128;
-    int interp_method = state.range(0);
+    gr::dvbs2rx::interp_method_t interp_method =
+        static_cast<gr::dvbs2rx::interp_method_t>(state.range(0));
 
     int ninput_items = 1025;
     int noutput_items = 512;
