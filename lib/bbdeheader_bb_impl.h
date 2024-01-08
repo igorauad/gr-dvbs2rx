@@ -44,6 +44,7 @@ private:
     unsigned int d_partial_ts_bytes; /**< Byte count of the partial TS packet
                                         extracted at the end of the previous BBFRAME */
     unsigned char d_partial_pkt[TS_PACKET_LENGTH+3]; /**< Partial TS packet storage */
+    const int d_multistream_isi;  /**< ISI to process in MIS mode */
     BBHeader d_bbheader;                           /**< Parsed BBHEADER */
     uint64_t d_packet_cnt;         /**< All-time count of received packets  */
     uint64_t d_error_cnt;          /**< All-time count of packets with bit errors */
@@ -76,6 +77,7 @@ public:
     bbdeheader_bb_impl(dvb_standard_t standard,
                        dvb_framesize_t framesize,
                        dvb_code_rate_t rate,
+                       int multistream_isi,
                        int debug_level);
     ~bbdeheader_bb_impl();
 

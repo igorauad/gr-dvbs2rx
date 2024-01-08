@@ -27,10 +27,11 @@ namespace dvbs2rx {
 bbdeheader_bb::sptr bbdeheader_bb::make(dvb_standard_t standard,
                                         dvb_framesize_t framesize,
                                         dvb_code_rate_t rate,
+                                        int multistream_isi,
                                         int debug_level)
 {
     return gnuradio::get_initial_sptr(
-        new bbdeheader_bb_impl(standard, framesize, rate, debug_level));
+        new bbdeheader_bb_impl(standard, framesize, rate, multistream_isi, debug_level));
 }
 
 /*
@@ -39,6 +40,7 @@ bbdeheader_bb::sptr bbdeheader_bb::make(dvb_standard_t standard,
 bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
                                        dvb_framesize_t framesize,
                                        dvb_code_rate_t rate,
+                                       int multistream_isi,
                                        int debug_level)
     : gr::block("bbdeheader_bb",
                 gr::io_signature::make(1, 1, sizeof(unsigned char)),
@@ -46,6 +48,7 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
       d_debug_level(debug_level),
       d_synched(false),
       d_partial_ts_bytes(0),
+      d_multistream_isi(multistream_isi),
       d_packet_cnt(0),
       d_error_cnt(0),
       d_bbframe_cnt(0),
@@ -198,6 +201,12 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
             d_bbheader.dfl,
             d_bbheader.sync,
             d_bbheader.syncd);
+
+        // Limit processing to user-specified ISI BBFRAMEs only
+        if ((d_bbheader.sis_mis == 0) && (d_bbheader.isi != d_multistream_isi)) {
+            in += d_kbch_bytes;
+            continue;
+        }
 
         // Skip the BBHEADER
         in += BB_HEADER_LENGTH_BYTES;

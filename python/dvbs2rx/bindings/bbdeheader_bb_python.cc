@@ -40,6 +40,7 @@ void bind_bbdeheader_bb(py::module& m)
              py::arg("standard"),
              py::arg("framesize"),
              py::arg("rate"),
+             py::arg("multistream_isi") = 0,
              py::arg("debug_level") = 0,
              D(bbdeheader_bb, make))
 
