@@ -39,10 +39,11 @@ private:
     const int d_debug_level;         /**< Debug level*/
     unsigned int d_kbch_bytes;       /**< BBFRAME length in bytes */
     unsigned int d_max_dfl;          /**< Maximum DATAFIELD length in bits */
+    unsigned int d_up_length;        /**< User-packet length in bytes */
     bool d_synched;                  /**< Synchronized to the start of TS packets */
     unsigned int d_partial_ts_bytes; /**< Byte count of the partial TS packet
                                         extracted at the end of the previous BBFRAME */
-    unsigned char d_partial_pkt[TS_PACKET_LENGTH]; /**< Partial TS packet storage */
+    unsigned char d_partial_pkt[TS_PACKET_LENGTH+3]; /**< Partial TS packet storage */
     BBHeader d_bbheader;                           /**< Parsed BBHEADER */
     uint64_t d_packet_cnt;         /**< All-time count of received packets  */
     uint64_t d_error_cnt;          /**< All-time count of packets with bit errors */
