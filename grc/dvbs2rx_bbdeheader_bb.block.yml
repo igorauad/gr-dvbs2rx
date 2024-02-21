@@ -7,13 +7,13 @@ category: '[Core]/Digital Television/DVB'
 parameters:
 -   id: standard
     label: Standard
-    dtype: string
+    dtype: raw
 -   id: framesize
     label: FECFRAME size
-    dtype: string
+    dtype: raw
 -   id: rate
     label: Code rate
-    dtype: string
+    dtype: raw
 -   id: debug_level
     label: Debug Level
     dtype: int
@@ -29,13 +29,6 @@ outputs:
 
 templates:
     imports: from gnuradio import dvbs2rx
-    make: |-
-        dvbs2rx.bbdeheader_bb(
-            *dvbs2rx.params.translate(${standard},
-                ${framesize},
-                ${rate}
-            ),
-            ${debug_level}
-        )
+    make: dvbs2rx.bbdeheader_bb(${standard}, ${framesize}, ${rate}, ${debug_level})
 
 file_format: 1

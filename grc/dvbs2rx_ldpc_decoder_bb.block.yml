@@ -7,16 +7,16 @@ category: "[Core]/Digital Television/DVB"
 parameters:
 -   id: standard
     label: Standard
-    dtype: string
+    dtype: raw
 -   id: framesize
     label: FECFRAME size
-    dtype: string
+    dtype: raw
 -   id: rate
     label: Code rate
-    dtype: string
+    dtype: raw
 -   id: constellation
     label: Constellation
-    dtype: string
+    dtype: raw
 -   id: outputmode
     label: Output mode
     dtype: enum
@@ -50,15 +50,7 @@ outputs:
 templates:
   imports: from gnuradio import dvbs2rx
   make: |-
-    dvbs2rx.ldpc_decoder_bb(
-        *dvbs2rx.params.translate(${standard},
-            ${framesize},
-            ${rate},
-            ${constellation}
-        ),
-        dvbs2rx.${outputmode},
-        dvbs2rx.${infomode},
-        ${max_trials},
-        ${debug_level})
+    dvbs2rx.ldpc_decoder_bb(${standard}, ${framesize}, ${rate}, ${constellation},
+                            dvbs2rx.${outputmode}, dvbs2rx.${infomode}, ${max_trials}, ${debug_level})
 
 file_format: 1

@@ -7,13 +7,13 @@ category: '[Core]/Digital Television/DVB'
 parameters:
 -   id: standard
     label: Standard
-    dtype: string
+    dtype: raw
 -   id: framesize
     label: FECFRAME size
-    dtype: string
+    dtype: raw
 -   id: rate
     label: Code rate
-    dtype: string
+    dtype: raw
 -   id: outputmode
     label: Output mode
     dtype: enum
@@ -34,13 +34,6 @@ outputs:
 
 templates:
     imports: from gnuradio import dvbs2rx
-    make: |-
-        dvbs2rx.bch_decoder_bb(
-            *dvbs2rx.params.translate(${standard},
-                ${framesize},
-                ${rate}
-            ),
-            dvbs2rx.${outputmode},
-            ${debug_level})
+    make: dvbs2rx.bch_decoder_bb(${standard}, ${framesize}, ${rate}, dvbs2rx.${outputmode}, ${debug_level})
 
 file_format: 1

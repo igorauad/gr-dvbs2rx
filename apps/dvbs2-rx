@@ -852,10 +852,18 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             sink_block : The block consuming the MPEG TS output stream.
 
         """
-        translated_params = dvbs2rx.params.translate('DVB-S2', self.frame_size,
-                                                     self.code_rate,
-                                                     self.constellation)
-        standard, frame_size, code_rate, constellation = translated_params
+        translated_params = dvbs2rx.dvb_params(
+            'DVB-S2',
+            self.frame_size,
+            self.code_rate,
+            self.constellation,
+            self.rolloff,
+            self.pilots
+        )
+        standard = translated_params.standard
+        frame_size = translated_params.framesize
+        code_rate = translated_params.rate
+        constellation = translated_params.constellation
 
         # Upper layer (FEC + BB Processing)
         ldpc_decoder = dvbs2rx.ldpc_decoder_bb(

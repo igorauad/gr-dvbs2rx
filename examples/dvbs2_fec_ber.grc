@@ -126,6 +126,25 @@ blocks:
     coordinate: [712, 4.0]
     rotation: 0
     state: true
+- name: params
+  id: dvbs2rx_dvb_params
+  parameters:
+    alias: ''
+    code_rate: code_rate
+    comment: ''
+    constellation: constellation
+    frame_size: frame_size
+    pilots: 'True'
+    rolloff: '0.2'
+    standard: DVB-S2
+    vl_snr: 'False'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [824, 4.0]
+    rotation: 0
+    state: true
 - name: analog_fastnoise_source_x_0
   id: analog_fastnoise_source_x
   parameters:
@@ -364,12 +383,12 @@ blocks:
     alias: ''
     comment: ''
     debug_level: '0'
-    framesize: frame_size
+    framesize: params.framesize
     maxoutbuf: '0'
     minoutbuf: '0'
     outputmode: OM_MESSAGE
-    rate: code_rate
-    standard: DVB-S2
+    rate: params.rate
+    standard: params.standard
   states:
     bus_sink: false
     bus_source: false
@@ -383,16 +402,16 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    constellation: constellation
+    constellation: params.constellation
     debug_level: '0'
-    framesize: frame_size
+    framesize: params.framesize
     infomode: INFO_OFF
     max_trials: '25'
     maxoutbuf: '0'
     minoutbuf: '0'
     outputmode: OM_MESSAGE
-    rate: code_rate
-    standard: DVB-S2
+    rate: params.rate
+    standard: params.standard
   states:
     bus_sink: false
     bus_source: false
@@ -406,11 +425,11 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    constellation: constellation
-    framesize: frame_size
+    constellation: params.constellation
+    framesize: params.framesize
     maxoutbuf: '0'
     minoutbuf: '0'
-    rate: code_rate
+    rate: params.rate
   states:
     bus_sink: false
     bus_source: false
