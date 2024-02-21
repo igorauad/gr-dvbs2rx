@@ -46,7 +46,7 @@ templates:
 cpp_templates:
   includes: ['#include <gnuradio/dvbs2rx/dvb_params.h>']
   declarations: 'dvbs2rx::dvb_params ${id};'
-  var_make: this->${id} = dvbs2rx::dvb_params::make(${standard}, ${frame_size}, ${code_rate}, ${constellation}, ${rolloff}, ${pilots}, ${vl_snr});
+  var_make: ${id} = dvbs2rx::dvb_params::make(${standard}, ${frame_size}, ${code_rate}, ${constellation}, ${rolloff}, ${pilots}, ${vl_snr});
   link: ['gnuradio::gnuradio-dvbs2rx']
   translations:
     "'": '"'

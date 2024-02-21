@@ -1,10 +1,7 @@
 id: dvbs2rx_xfecframe_demapper_cb
 label: XFECFRAME Demapper
 category: "[Core]/Digital Television/DVB-S2"
-
-templates:
-  imports: from gnuradio import dvbs2rx
-  make: dvbs2rx.xfecframe_demapper_cb(${framesize}, ${rate}, ${constellation})
+flags: [python, cpp]
 
 parameters:
   - id: framesize
@@ -29,5 +26,15 @@ outputs:
   - label: out
     domain: stream
     dtype: byte
+
+templates:
+  imports: from gnuradio import dvbs2rx
+  make: dvbs2rx.xfecframe_demapper_cb(${framesize}, ${rate}, ${constellation})
+
+cpp_templates:
+  includes: ["#include <gnuradio/dvbs2rx/xfecframe_demapper_cb.h>"]
+  declarations: "dvbs2rx::xfecframe_demapper_cb::sptr ${id};"
+  make: this->${id} = dvbs2rx::xfecframe_demapper_cb::make(${framesize}, ${rate}, ${constellation});
+  link: ["gnuradio::gnuradio-dvbs2rx"]
 
 file_format: 1
