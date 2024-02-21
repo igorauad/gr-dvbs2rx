@@ -1,0 +1,56 @@
+id: dvbs2rx_dvb_params
+label: DVB Parameters
+category: '[Core]/Digital Television/DVB'
+flags: [ show_id, python, cpp ]
+
+parameters:
+  - id: standard
+    label: Standard
+    dtype: string
+    options: [ DVB-S2, DVB-T2 ]
+    default: DVB-S2
+  - id: frame_size
+    label: FECFRAME size
+    dtype: string
+    options: [ normal, short, medium ]
+    default: normal
+  - id: code_rate
+    label: Code rate
+    dtype: string
+  - id: constellation
+    label: Constellation
+    dtype: string
+    options: [ QPSK, 16QAM, 64QAM, 256QAM, 8PSK ]
+    default: QPSK
+  - id: rolloff
+    label: RRC Rolloff Factor
+    dtype: float
+    default: 0.2
+  - id: pilots
+    label: Pilot symbols
+    dtype: bool
+    options: [False, True]
+    default: True
+  - id: vl_snr
+    label: VL-SNR
+    dtype: bool
+    options: [False, True]
+    default: False
+
+value: ${ dvbs2rx.dvb_params(standard, frame_size, code_rate, constellation, rolloff, pilots, vl_snr) }
+
+templates:
+  imports: from gnuradio import dvbs2rx
+  var_make: self.${id} = ${id} = dvbs2rx.dvb_params(${standard}, ${frame_size}, ${code_rate}, ${constellation}, ${rolloff}, ${pilots}, ${vl_snr})
+
+cpp_templates:
+  includes: ['#include <gnuradio/dvbs2rx/dvb_params.h>']
+  declarations: 'dvbs2rx::dvb_params ${id};'
+  var_make: ${id} = dvbs2rx::dvb_params::make(${standard}, ${frame_size}, ${code_rate}, ${constellation}, ${rolloff}, ${pilots}, ${vl_snr});
+  link: ['gnuradio::gnuradio-dvbs2rx']
+  translations:
+    "'": '"'
+    'True': 'true'
+    'False': 'false'
+
+file_format: 1
