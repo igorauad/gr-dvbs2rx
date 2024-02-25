@@ -64,6 +64,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.ldpc_iterations = options.ldpc_iterations
         self.modcod = options.modcod
         self.multistream = options.multistream
+        self.multistream_isi = options.multistream_isi
         self.out_fd = options.out_fd
         self.out_file = options.out_file
         self.out_stream = options.out_stream
@@ -866,7 +867,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         bbdescrambler = dvbs2rx.bbdescrambler_bb(standard, frame_size,
                                                  code_rate)
         bbdeheader = dvbs2rx.bbdeheader_bb(standard, frame_size, code_rate,
-                                           self.debug)
+                                           self.multistream_isi, self.debug)
 
         self.connect((ldpc_decoder, 0), (bch_decoder, 0), (bbdescrambler, 0))
 
@@ -1234,6 +1235,12 @@ def argument_parser():
         help="Enable processing of multiple input streams (MIS mode). Set to "
         "\"auto\" if unsure about whether the input signal uses SIS or MIS. "
         "Otherwise, choose \"on\" or \"off\" for better performance.")
+    dvb_group.add_argument(
+        "--multistream-isi",
+        type=int,
+        default=0,
+        help="Select which stream to process when operating in MIS mode and "
+        "output stream is MPEG TS.")
     dvb_group.add_argument(
         '-p',
         "--pilots",

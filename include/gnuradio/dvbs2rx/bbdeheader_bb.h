@@ -40,6 +40,7 @@ public:
     static sptr make(dvb_standard_t standard,
                      dvb_framesize_t framesize,
                      dvb_code_rate_t rate,
+                     int multistream_isi = 0,
                      int debug_level = 0);
 
     /*!

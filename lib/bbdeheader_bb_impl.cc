@@ -27,10 +27,11 @@ namespace dvbs2rx {
 bbdeheader_bb::sptr bbdeheader_bb::make(dvb_standard_t standard,
                                         dvb_framesize_t framesize,
                                         dvb_code_rate_t rate,
+                                        int multistream_isi,
                                         int debug_level)
 {
     return gnuradio::get_initial_sptr(
-        new bbdeheader_bb_impl(standard, framesize, rate, debug_level));
+        new bbdeheader_bb_impl(standard, framesize, rate, multistream_isi, debug_level));
 }
 
 /*
@@ -39,6 +40,7 @@ bbdeheader_bb::sptr bbdeheader_bb::make(dvb_standard_t standard,
 bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
                                        dvb_framesize_t framesize,
                                        dvb_code_rate_t rate,
+                                       int multistream_isi,
                                        int debug_level)
     : gr::block("bbdeheader_bb",
                 gr::io_signature::make(1, 1, sizeof(unsigned char)),
@@ -46,6 +48,7 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
       d_debug_level(debug_level),
       d_synched(false),
       d_partial_ts_bytes(0),
+      d_multistream_isi(multistream_isi),
       d_packet_cnt(0),
       d_error_cnt(0),
       d_bbframe_cnt(0),
@@ -57,6 +60,7 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
     get_fec_info(standard, framesize, rate, fec_info);
     d_kbch_bytes = fec_info.bch.k / 8;
     d_max_dfl = fec_info.bch.k - BB_HEADER_LENGTH_BITS;
+    d_up_length = TS_PACKET_LENGTH;
     set_output_multiple(d_max_dfl / 8); // ensure full BBFRAMEs on the input
 }
 
@@ -121,8 +125,22 @@ bool bbdeheader_bb_impl::parse_bbheader(u8_cptr_t in, BBHeader* h)
         return false;
     }
 
-    if (h->upl != (TS_PACKET_LENGTH * 8)) {
-        d_logger->warn("Baseband header unsupported (upl != 188 bytes).");
+    // UP length depends on NPD and ISSY features, moreover ISSY ISCR counter
+    // may be short (2 bytes) or long (3 bytes) format
+    if ((h->issyi == 1) || (h->npd == 1)) {
+        d_up_length = h->upl / 8;
+        if (h->npd == 1) {
+            d_logger->warn("Baseband header unsupported (npd not implemented).");
+            return false;
+        }
+        if ((h->issyi == 1) &&
+            (d_up_length != (TS_PACKET_LENGTH + 2)) &&
+            (d_up_length != (TS_PACKET_LENGTH + 3))) {
+            d_logger->warn("Baseband header unsupported (invalid issy upl).");
+            return false;
+        }
+    } else if (h->upl != (d_up_length * 8)) {
+        d_logger->warn("Baseband header unsupported (invalid upl).");
         return false;
     }
 
@@ -184,6 +202,12 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
             d_bbheader.sync,
             d_bbheader.syncd);
 
+        // Limit processing to user-specified ISI BBFRAMEs only
+        if ((d_bbheader.sis_mis == 0) && (d_bbheader.isi != d_multistream_isi)) {
+            in += d_kbch_bytes;
+            continue;
+        }
+
         // Skip the BBHEADER
         in += BB_HEADER_LENGTH_BYTES;
         unsigned int df_remaining = d_bbheader.dfl / 8; // DATAFIELD bytes remaining
@@ -199,11 +223,11 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
         }
 
         // Process the TS packets available on the DATAFIELD
-        while (df_remaining >= TS_PACKET_LENGTH) {
+        while (df_remaining >= d_up_length) {
             u8_cptr_t packet;
             // Start by completing a partial TS packet from the previous BBFRAME (if any)
             if (d_partial_ts_bytes > 0) {
-                unsigned int remaining = TS_PACKET_LENGTH - d_partial_ts_bytes;
+                unsigned int remaining = d_up_length - d_partial_ts_bytes;
                 memcpy(d_partial_pkt + d_partial_ts_bytes, in, remaining);
                 d_partial_ts_bytes = 0; // Reset the count
                 in += remaining;
@@ -211,11 +235,11 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
                 packet = d_partial_pkt;
             } else {
                 packet = in;
-                in += TS_PACKET_LENGTH;
-                df_remaining -= TS_PACKET_LENGTH;
+                in += d_up_length;
+                df_remaining -= d_up_length;
             }
 
-            const bool crc_valid = check_crc8(packet, TS_PACKET_LENGTH);
+            const bool crc_valid = check_crc8(packet, d_up_length);
             out[0] = MPEG_TS_SYNC_BYTE; // Restore the sync byte
             memcpy(out + 1, packet, TS_PACKET_LENGTH - 1);
             if (!crc_valid) {
