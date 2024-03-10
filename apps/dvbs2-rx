@@ -143,7 +143,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.gui_setup_complete = False
 
         # Adjust the sample rate to an integer if necessary
-        if self.source == 'plutosdr' and not self.samp_rate.is_integer():
+        if self.source == 'plutosdr':
             self.samp_rate = int(round(self.samp_rate))
             gr.log.warn("An integer sample rate is required by the PlutoSDR. "
                         "Setting rate to {:d} samples/sec.".format(
