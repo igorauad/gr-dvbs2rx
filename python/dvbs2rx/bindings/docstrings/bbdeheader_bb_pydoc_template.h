@@ -34,3 +34,6 @@ static const char* __doc_gr_dvbs2rx_bbdeheader_bb_get_bbframe_count = R"doc()doc
 
 
 static const char* __doc_gr_dvbs2rx_bbdeheader_bb_get_bbframe_drop_count = R"doc()doc";
+
+
+static const char* __doc_gr_dvbs2rx_bbdeheader_bb_get_bbframe_gap_count = R"doc()doc";

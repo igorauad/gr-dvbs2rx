@@ -428,6 +428,46 @@ class qa_bbdeheader_bb(gr_unittest.TestCase):
         # The first BBFRAME (with the unsupported SYNCD) should be discarded
         self._assert_up_stream(up_stream, n_discarded_bbframes=1)
 
+    def test_non_consecutive_bbframes(self):
+        """Test processing of non-consecutive BBFRAMEs"""
+        # Parameters
+        kbch = 16008  # QPSK 1/4 with normal fecframe
+        n_bbframes = 10  # Number of BBFRAMEs to generate
+        self._set_stream_len_params(kbch, n_bbframes)
+
+        # Generate the stream of UPs and the corresponding stream of BBFRAMEs
+        up_stream = gen_up_stream(self.n_ups)
+        bbframe_stream = gen_bbframe_stream(kbch, n_bbframes, up_stream)
+
+        # Confirm the length
+        bbframe_bytes = kbch // 8
+        assert len(bbframe_stream) == n_bbframes * bbframe_bytes
+
+        # Drop a BBFRAME in the middle of the stream
+        i_drop = 5  # which BBFRAME to drop
+        bbframe_stream = bbframe_stream[:i_drop * bbframe_bytes] + \
+            bbframe_stream[(i_drop + 1) * bbframe_bytes:]
+        assert len(bbframe_stream) == (n_bbframes - 1) * bbframe_bytes
+
+        # Expected UPs (excluding those dropped in the middle)
+        n_ups_pre_drop = int(floor(i_drop * self.dfl_bytes / UPL_BYTES))
+        n_partial_ts_bytes_remaining = (i_drop * bbframe_bytes) - \
+            (n_ups_pre_drop * UPL_BYTES)
+        n_bytes_dropped = bbframe_bytes + n_partial_ts_bytes_remaining
+        n_ups_dropped = int(ceil(n_bytes_dropped / UPL_BYTES))
+        n_ups_post_drop = self.n_full_ups - n_ups_dropped - n_ups_pre_drop
+        ups_pre_drop = up_stream[:n_ups_pre_drop * UPL_BYTES]
+        i_start_post_drop = (n_ups_pre_drop + n_ups_dropped) * UPL_BYTES
+        i_end_post_drop = i_start_post_drop + n_ups_post_drop * UPL_BYTES
+        ups_post_drop = up_stream[i_start_post_drop:i_end_post_drop]
+        expected_out = list(ups_pre_drop + ups_post_drop)
+
+        # Run the flowgraph and check results
+        self._set_up_flowgraph(bbframe_stream)
+        self.tb.run()
+        observed_out = self.sink.data()
+        self.assertListEqual(expected_out, observed_out)
+
 
 if __name__ == '__main__':
     gr_unittest.run(qa_bbdeheader_bb)

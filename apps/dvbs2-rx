@@ -1018,6 +1018,7 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         # BBFRAME stats
         processed_bbframes = self.bbdeheader.get_bbframe_count()
         dropped_bbframes = self.bbdeheader.get_bbframe_drop_count()
+        bbframe_gaps = self.bbdeheader.get_bbframe_gap_count()
 
         # MPEG TS stats
         mpeg_ts_packets = self.bbdeheader.get_packet_count()
@@ -1053,7 +1054,8 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             },
             "bbframes": {
                 "processed": processed_bbframes,
-                "dropped": dropped_bbframes
+                "dropped": dropped_bbframes,
+                "gaps": bbframe_gaps
             },
             "mpeg-ts": {
                 "packets": mpeg_ts_packets,

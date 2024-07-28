@@ -65,6 +65,12 @@ public:
      * \return uint64_t Number of BBFRAMEs dropped so far.
      */
     virtual uint64_t get_bbframe_drop_count() = 0;
+
+    /*!
+     * \brief Get count of gaps between BBFRAMEs.
+     * \return uint64_t Number of gaps detected between BBFRAMEs.
+     */
+    virtual uint64_t get_bbframe_gap_count() = 0;
 };
 
 } // namespace dvbs2rx

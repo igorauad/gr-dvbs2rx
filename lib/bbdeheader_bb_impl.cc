@@ -50,6 +50,7 @@ bbdeheader_bb_impl::bbdeheader_bb_impl(dvb_standard_t standard,
       d_error_cnt(0),
       d_bbframe_cnt(0),
       d_bbframe_drop_cnt(0),
+      d_bbframe_gap_cnt(0),
       d_crc_poly(0b111010101), // x^8 + x^7 + x^6 + x^4 + x^2 + 1
       d_crc8_table(build_gf2_poly_rem_lut(d_crc_poly))
 {
@@ -187,6 +188,15 @@ int bbdeheader_bb_impl::general_work(int noutput_items,
         // Skip the BBHEADER
         in += BB_HEADER_LENGTH_BYTES;
         unsigned int df_remaining = d_bbheader.dfl / 8; // DATAFIELD bytes remaining
+
+        // Assume the current BBFRAME is not consecutive to the previous one if the
+        // partial TS bytes cannot complete a full TS packet
+        if ((d_partial_ts_bytes > 0) &&
+            ((d_bbheader.syncd / 8) != TS_PACKET_LENGTH - 1 - d_partial_ts_bytes)) {
+            GR_LOG_DEBUG_LEVEL(1, "Not enough bytes to complete the partial TS packet.");
+            d_synched = false;
+            d_bbframe_gap_cnt++;
+        }
 
         // Skip the initial SYNCD bits of the DATAFIELD if re-synchronizing. Skip also the
         // first sync byte, as it contains the CRC8 of a lost or missed TS packet.
