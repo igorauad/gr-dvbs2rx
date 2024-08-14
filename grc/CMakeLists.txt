@@ -7,6 +7,7 @@
 #
 
 install(FILES
+    dvbs2rx_dvb_params.block.yml
     dvbs2rx_bbdeheader_bb.block.yml
     dvbs2rx_bbdescrambler_bb.block.yml
     dvbs2rx_bch_decoder_bb.block.yml

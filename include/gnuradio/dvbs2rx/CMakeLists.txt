@@ -11,6 +11,10 @@
 ########################################################################
 install(FILES
     api.h
+    dvb_config.h
+    dvbs2_config.h
+    dvbt2_config.h
+    dvb_params.h
     bbdeheader_bb.h
     bbdescrambler_bb.h
     bch_decoder_bb.h
