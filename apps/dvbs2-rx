@@ -765,7 +765,9 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         elif (self.sink == "file"):
             sink = blocks.file_sink(gr.sizeof_char, self.out_file)
         elif (self.sink == "udp"):
-            sink = network.udp_sink(gr.sizeof_char, 1, self.out_addr, self.out_port, self.out_header, self.out_packet_size, self.out_send_eof)
+            sink = network.udp_sink(gr.sizeof_char, 1, self.out_addr,
+                                    self.out_port, self.out_header,
+                                    self.out_packet_size, self.out_send_eof)
         return sink
 
     def _plsync_params(self):
@@ -1431,7 +1433,7 @@ def argument_parser():
                            default=1472,
                            help="UDP datagram length used if sink=udp")
     snk_group.add_argument("--out-header",
-                           choices=[0,1,2,4],
+                           choices=[0, 1, 2, 4],
                            default=0,
                            help="UDP datagram header used if sink=udp")
     snk_group.add_argument("--out-send-eof",
