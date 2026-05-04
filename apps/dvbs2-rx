@@ -24,7 +24,8 @@ try:
 except ImportError:
     import sip
 
-from gnuradio import analog, blocks, digital, dvbs2rx, eng_notation, gr, uhd
+from gnuradio import (analog, blocks, digital, dvbs2rx, eng_notation, gr,
+                      network, uhd)
 from gnuradio.dvbs2rx.utils import parse_version
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio.fft import window
@@ -67,6 +68,11 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
         self.out_fd = options.out_fd
         self.out_file = options.out_file
         self.out_stream = options.out_stream
+        self.out_addr = options.out_addr
+        self.out_port = options.out_port
+        self.out_packet_size = options.out_packet_size
+        self.out_header = options.out_header
+        self.out_send_eof = options.out_send_eof
         self.pilots = options.pilots
         self.pl_acm_vcm = options.pl_acm_vcm
         self.pl_freq_est_period = options.pl_freq_est_period
@@ -759,6 +765,10 @@ class DVBS2RxTopBlock(gr.top_block, Qt.QWidget):
             sink = blocks.file_descriptor_sink(gr.sizeof_char, self.out_fd)
         elif (self.sink == "file"):
             sink = blocks.file_sink(gr.sizeof_char, self.out_file)
+        elif (self.sink == "udp"):
+            sink = network.udp_sink(gr.sizeof_char, 1, self.out_addr,
+                                    self.out_port, self.out_header,
+                                    self.out_packet_size, self.out_send_eof)
         return sink
 
     def _plsync_params(self):
@@ -1401,7 +1411,7 @@ def argument_parser():
 
     snk_group = parser.add_argument_group('Sink Options')
     snk_group.add_argument("--sink",
-                           choices=["fd", "file"],
+                           choices=["fd", "file", "udp"],
                            default="fd",
                            help="Sink for the output MPEG transport stream")
     snk_group.add_argument("--out-fd",
@@ -1411,6 +1421,26 @@ def argument_parser():
     snk_group.add_argument("--out-file",
                            type=str,
                            help="Output file used if sink=file")
+    snk_group.add_argument("--out-addr",
+                           type=str,
+                           default="127.0.0.1",
+                           help="UDP address used if sink=udp")
+    snk_group.add_argument("--out-port",
+                           type=int,
+                           default=2000,
+                           help="UDP port used if sink=udp")
+    snk_group.add_argument("--out-packet-size",
+                           type=int,
+                           default=1472,
+                           help="UDP datagram length used if sink=udp")
+    snk_group.add_argument("--out-header",
+                           choices=[0, 1, 2, 4],
+                           default=0,
+                           help="UDP datagram header used if sink=udp")
+    snk_group.add_argument("--out-send-eof",
+                           type=bool,
+                           default=False,
+                           help="Send Null Packet as EOF if sink=udp")
     snk_group.add_argument(
         "--out-stream",
         type=str,
