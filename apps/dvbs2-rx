@@ -24,7 +24,8 @@ try:
 except ImportError:
     import sip
 
-from gnuradio import analog, blocks, digital, dvbs2rx, eng_notation, gr, uhd, network
+from gnuradio import (analog, blocks, digital, dvbs2rx, eng_notation, gr,
+                      network, uhd)
 from gnuradio.dvbs2rx.utils import parse_version
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio.fft import window
